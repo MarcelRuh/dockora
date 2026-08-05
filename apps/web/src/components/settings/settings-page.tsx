@@ -21,6 +21,7 @@ import { SchedulerSection } from '@/components/settings/scheduler-section';
 import { UsersSection } from '@/components/settings/users-section';
 import { AuditSection } from '@/components/settings/audit-section';
 import { SelfUpdateSection } from '@/components/settings/self-update-section';
+import { PluginsSection } from '@/components/settings/plugins-section';
 
 const NOTIFICATION_EVENTS: NotificationEvent[] = [
   'container.started',
@@ -43,6 +44,7 @@ type SettingsTab =
   | 'monitoring'
   | 'scheduler'
   | 'security'
+  | 'plugins'
   | 'audit';
 
 const FORM_TABS: SettingsTab[] = [
@@ -97,6 +99,7 @@ export function SettingsPageView() {
     ];
     if (isAdmin) {
       all.push({ id: 'security', label: t.settings.sections.security });
+      all.push({ id: 'plugins', label: t.settings.sections.plugins });
       all.push({ id: 'audit', label: t.settings.sections.audit });
     }
     return all;
@@ -482,6 +485,8 @@ export function SettingsPageView() {
               {authEnabled || settings.authEnabled ? <UsersSection /> : null}
             </div>
           ) : null}
+
+          {tab === 'plugins' && isAdmin ? <PluginsSection /> : null}
 
           {tab === 'audit' && isAdmin ? <AuditSection /> : null}
 

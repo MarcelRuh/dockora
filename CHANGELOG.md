@@ -3,6 +3,22 @@
 All notable changes to this project are documented here.
 Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
+## [1.2.0] – 2026-08-06
+
+### Added
+
+- Optional GHCR image install (`DOCKORA_USE_IMAGES=1` / `docker-compose.images.yml`)
+- Clear login banner at end of `install.sh` (URL, email, password)
+- Self-update UI waits for API health before reload
+- Plugin enable/disable in Settings → Plugins
+- CI API smoke job (`scripts/e2e-smoke.sh`)
+- Release-notes workflow syncs GitHub Release body from CHANGELOG
+- `scripts/make-ghcr-public.sh` to publish GHCR packages
+
+### Fixed
+
+- (carried from 1.1.x) prune unused, self-update hang, gitignore module tracking
+
 ## [1.1.0] – 2026-08-06
 
 ### Added

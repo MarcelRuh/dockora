@@ -13,6 +13,20 @@ function shortRev(value: string | null | undefined): string {
   return value.length > 12 ? `${value.slice(0, 12)}…` : value;
 }
 
+async function waitForApiHealth(timeoutMs = 120_000): Promise<boolean> {
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    try {
+      const res = await fetch('/api/v1/health', { cache: 'no-store' });
+      if (res.ok) return true;
+    } catch {
+      // API down during rebuild
+    }
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  return false;
+}
+
 export function SelfUpdateSection() {
   const { t } = useLocale();
   const [status, setStatus] = useState<SelfStatus | null>(null);
@@ -42,12 +56,16 @@ export function SelfUpdateSection() {
       const result = await applySelfUpdate();
       setSuccess(result.message);
       await load();
-      // Compose-Stack-Rebuild: Seite nach kurzer Pause neu laden.
-      // Host/Dev: kein langes Warten – Status kommt sofort zurück.
-      if (result.mode === 'compose' && /neu gebaut|Stack/i.test(result.message)) {
-        window.setTimeout(() => {
-          window.location.reload();
-        }, 15_000);
+
+      if (result.mode === 'compose') {
+        setSuccess(`${result.message}\n${t.settings.selfUpdate.waitingHealth}`);
+        const ok = await waitForApiHealth(120_000);
+        if (ok) {
+          setSuccess(t.settings.selfUpdate.healthOk);
+          window.setTimeout(() => window.location.reload(), 1500);
+        } else {
+          setSuccess(t.settings.selfUpdate.healthTimeout);
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : t.common.failed);
@@ -106,7 +124,7 @@ export function SelfUpdateSection() {
               <span className="font-mono text-xs">{status.image ?? '—'}</span>
             </p>
           )}
-          <p className="text-dockora-muted">{status.message}</p>
+          <p className="text-dockora-muted whitespace-pre-wrap">{status.message}</p>
           <div className="flex flex-wrap gap-2 pt-2">
             <Button disabled={busy} onClick={() => void load()}>
               {t.common.refresh}

@@ -289,6 +289,35 @@ export async function applySelfUpdate(): Promise<{
   return request('/system/self-update', { method: 'POST' });
 }
 
+export type PluginInfo = {
+  name: string;
+  version: string | null;
+  enabled: boolean;
+  loaded: boolean;
+  dirName: string;
+};
+
+export async function fetchPlugins(): Promise<{
+  plugins: PluginInfo[];
+  pluginDir: string;
+}> {
+  return request('/plugins');
+}
+
+export async function enablePlugin(name: string): Promise<{
+  plugins: PluginInfo[];
+  pluginDir: string;
+}> {
+  return request(`/plugins/${encodeURIComponent(name)}/enable`, { method: 'POST' });
+}
+
+export async function disablePlugin(name: string): Promise<{
+  plugins: PluginInfo[];
+  pluginDir: string;
+}> {
+  return request(`/plugins/${encodeURIComponent(name)}/disable`, { method: 'POST' });
+}
+
 // Backups
 export async function fetchBackups(): Promise<BackupInfo[]> {
   return request<BackupInfo[]>('/backups');
