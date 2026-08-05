@@ -19,6 +19,17 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Block Cursor co-author trailers
+        run: |
+          chmod +x scripts/check-no-cursor-coauthor.sh
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            scripts/check-no-cursor-coauthor.sh "origin/${{ github.base_ref }}..HEAD"
+          else
+            scripts/check-no-cursor-coauthor.sh "HEAD~15..HEAD"
+          fi
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
