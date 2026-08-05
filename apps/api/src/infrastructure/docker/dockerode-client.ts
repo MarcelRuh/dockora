@@ -209,8 +209,12 @@ export class DockerodeClient implements IDockerClient {
   async pruneImages(
     danglingOnly = true,
   ): Promise<{ imagesDeleted: number; spaceReclaimed: number }> {
-    const filters = danglingOnly ? { dangling: ['true'] } : undefined;
-    const result = await this.docker.pruneImages(filters ? { filters } : {});
+    // Docker default ohne Filter = nur dangling. Für „alle ungenutzten“
+    // muss dangling=false explizit gesetzt werden (entspricht `docker image prune -a`).
+    const filters = danglingOnly
+      ? { dangling: ['true'] }
+      : { dangling: ['false'] };
+    const result = await this.docker.pruneImages({ filters });
     return {
       imagesDeleted: result.ImagesDeleted?.length ?? 0,
       spaceReclaimed: result.SpaceReclaimed ?? 0,

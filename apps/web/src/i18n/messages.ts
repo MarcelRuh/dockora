@@ -211,6 +211,10 @@ export const messages = {
       pullPlaceholder: 'z.B. nginx:latest',
       prune: 'Dangling entfernen',
       pruneAll: 'Alle ungenutzten entfernen',
+      pruneAllConfirm:
+        'Alle ungenutzten Images entfernen (inkl. getaggter)? Entspricht „docker image prune -a“.',
+      pruneResult: '{count} Einträge entfernt, {size} freigegeben.',
+      pruneNone: 'Keine ungenutzten Images gefunden.',
       remove: 'Entfernen',
       removeConfirm: 'Image wirklich entfernen?',
     },
@@ -606,6 +610,10 @@ export const messages = {
       pullPlaceholder: 'e.g. nginx:latest',
       prune: 'Prune dangling',
       pruneAll: 'Prune unused',
+      pruneAllConfirm:
+        'Remove all unused images (including tagged ones)? Same as “docker image prune -a”.',
+      pruneResult: 'Removed {count} entries, reclaimed {size}.',
+      pruneNone: 'No unused images found.',
       remove: 'Remove',
       removeConfirm: 'Remove this image?',
     },

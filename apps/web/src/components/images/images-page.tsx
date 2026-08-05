@@ -15,6 +15,7 @@ import {
   LoadingState,
   PageHeader,
   StatusBadge,
+  SuccessBanner,
 } from '@/components/ui/page-parts';
 
 export function ImagesPage() {
@@ -27,6 +28,7 @@ export function ImagesPage() {
   const [pullRef, setPullRef] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -49,9 +51,12 @@ export function ImagesPage() {
     e.preventDefault();
     if (!pullRef.trim()) return;
     setBusy(true);
+    setError(null);
+    setSuccess(null);
     try {
       await pullImage(pullRef.trim());
       setPullRef('');
+      setSuccess(t.common.success);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : t.common.failed);
@@ -61,9 +66,21 @@ export function ImagesPage() {
   };
 
   const handlePrune = async (danglingOnly: boolean) => {
+    if (!danglingOnly && !window.confirm(t.images.pruneAllConfirm)) return;
     setBusy(true);
+    setError(null);
+    setSuccess(null);
     try {
-      await pruneImages(danglingOnly);
+      const result = await pruneImages(danglingOnly);
+      if (result.imagesDeleted <= 0 && result.spaceReclaimed <= 0) {
+        setSuccess(t.images.pruneNone);
+      } else {
+        setSuccess(
+          t.images.pruneResult
+            .replace('{count}', String(result.imagesDeleted))
+            .replace('{size}', formatBytes(result.spaceReclaimed, loc)),
+        );
+      }
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : t.common.failed);
@@ -143,6 +160,7 @@ export function ImagesPage() {
       </form>
 
       {error ? <ErrorBanner message={error} /> : null}
+      {success ? <SuccessBanner message={success} /> : null}
       {loading ? <LoadingState message={t.common.loading} /> : null}
 
       {!loading ? (
