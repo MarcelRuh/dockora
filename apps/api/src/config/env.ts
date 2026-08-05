@@ -212,10 +212,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     bootstrapAdminEmail: e.BOOTSTRAP_ADMIN_EMAIL ?? 'admin@dockora.local',
     bootstrapAdminPassword: e.BOOTSTRAP_ADMIN_PASSWORD ?? null,
     selfImage: e.DOCKORA_SELF_IMAGE?.trim() || null,
-    installDirHost: e.DOCKORA_INSTALL_DIR?.trim() || null,
+    // Dev: Auto-Detect Repo-Root. Prod/Compose: DOCKORA_INSTALL_DIR (+ optional Mount).
+    installDirHost: e.DOCKORA_INSTALL_DIR?.trim() || detected || null,
     installDirMount:
       e.DOCKORA_INSTALL_MOUNT?.trim() ||
-      (e.DOCKORA_INSTALL_DIR?.trim() ? '/dockora-install' : null),
+      e.DOCKORA_INSTALL_DIR?.trim() ||
+      detected ||
+      null,
     repo: e.DOCKORA_REPO?.trim() || 'MarcelRuh/dockora',
     updateBranch: e.DOCKORA_UPDATE_BRANCH?.trim() || 'main',
     gitSha: e.DOCKORA_GIT_SHA?.trim() || null,
