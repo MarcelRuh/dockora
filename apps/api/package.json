@@ -1,6 +1,6 @@
 {
   "name": "@dockora/api",
-  "version": "0.1.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,7 +8,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/main.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "echo \"lint: api – pending eslint setup\"",
+    "lint": "echo \"lint: api \u2013 pending eslint setup\"",
     "test": "vitest run",
     "test:watch": "vitest",
     "clean": "rm -rf dist",

@@ -26,11 +26,12 @@ data/
 *.db
 *.db-journal
 **/prisma/*.db
-backups/
+# Nur Laufzeit-Ordner im Repo-Root – nicht apps/api/src/modules/{backups,logs}
+/backups/
 apps/api/data/
 
-# Logs
-logs/
+# Logs (nur Root-/generische Logdateien, nicht Source-Module)
+/logs/
 *.log
 npm-debug.log*
 pnpm-debug.log*
