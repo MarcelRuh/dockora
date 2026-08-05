@@ -3,6 +3,18 @@
 All notable changes to this project are documented here.
 Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
+## [1.1.0] – 2026-08-06
+
+### Added
+
+- In-app Compose self-update: GitHub revision check + one-shot updater (`Settings → Updates`)
+- Host updater script: `scripts/update.sh` / `scripts/self-update-apply.sh` (wget one-liner)
+- Installer writes `.dockora-revision` and `DOCKORA_INSTALL_DIR` for seamless updates
+
+### Removed
+
+- Dashboard Lifetime Peaks / Container Lifetime tracking UI and background sampler
+
 ## [1.0.0] – 2026-08-05
 
 ### Added

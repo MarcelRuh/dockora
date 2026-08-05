@@ -86,28 +86,7 @@ function createMocks(overrides?: {
     getVersion: vi.fn().mockResolvedValue('2.29.0'),
   };
 
-  const lifetime = {
-    getSnapshot: vi.fn().mockResolvedValue({
-      trackingSince: '2026-08-01T00:00:00.000Z',
-      samplesCount: 10,
-      peakCpuPercent: 40,
-      peakMemoryPercent: 70,
-      peakDiskPercent: 55,
-      avgCpuPercent: 12.5,
-      avgMemoryPercent: 50,
-      avgDiskPercent: 45,
-      containerStarts: 3,
-      containerStops: 1,
-      containerDies: 0,
-      containerRestarts: 0,
-      maxContainersSeen: 5,
-      lastSampleAt: '2026-08-05T12:00:00.000Z',
-    }),
-    start: vi.fn(),
-    stop: vi.fn(),
-  };
-
-  return { docker, hostMetrics, composeVersion, lifetime };
+  return { docker, hostMetrics, composeVersion };
 }
 
 describe('DashboardService', () => {
@@ -126,8 +105,6 @@ describe('DashboardService', () => {
       unhealthy: 0,
     });
     expect(overview.resources.cpuPercent).toBe(12.5);
-    expect(overview.lifetime.samplesCount).toBe(10);
-    expect(overview.lifetime.peakCpuPercent).toBe(40);
     expect(overview.recentEvents).toHaveLength(1);
     expect(overview.updatesAvailable).toBe(0);
   });

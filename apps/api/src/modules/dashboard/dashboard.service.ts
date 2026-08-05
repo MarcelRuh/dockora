@@ -9,13 +9,11 @@ import type {
   IDockerClient,
   IHostMetrics,
 } from '../../domain/ports.js';
-import type { LifetimeSnapshot } from '../../infrastructure/stats/lifetime-stats.js';
 
 export interface DashboardServiceDeps {
   docker: IDockerClient;
   hostMetrics: IHostMetrics;
   composeVersion: IComposeVersionProvider;
-  lifetime: { getSnapshot: () => Promise<LifetimeSnapshot> };
   listNotifications?: () => Promise<DashboardNotification[]>;
 }
 
@@ -23,15 +21,13 @@ export class DashboardService {
   constructor(private readonly deps: DashboardServiceDeps) {}
 
   async getOverview(): Promise<DashboardOverview> {
-    const [engine, containersResult, resources, composeVersion, notifications, lifetime] =
-      await Promise.all([
-        this.resolveEngine(),
-        this.resolveContainers(),
-        this.deps.hostMetrics.getResources('/'),
-        this.deps.composeVersion.getVersion(),
-        this.deps.listNotifications?.() ?? Promise.resolve([]),
-        this.deps.lifetime.getSnapshot(),
-      ]);
+    const [engine, containersResult, resources, composeVersion, notifications] = await Promise.all([
+      this.resolveEngine(),
+      this.resolveContainers(),
+      this.deps.hostMetrics.getResources('/'),
+      this.deps.composeVersion.getVersion(),
+      this.deps.listNotifications?.() ?? Promise.resolve([]),
+    ]);
 
     return {
       containers: containersResult,
@@ -47,7 +43,6 @@ export class DashboardService {
         composeVersion,
         engineStatus: engine.status,
       },
-      lifetime,
       recentEvents: this.mapEvents(),
       notifications,
       updatesAvailable: 0,

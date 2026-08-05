@@ -43,6 +43,16 @@ const envSchema = z.object({
   BOOTSTRAP_ADMIN_PASSWORD: z.string().optional(),
   /** Image-Ref für Dockora Self-Update (z. B. ghcr.io/org/dockora-api:latest) */
   DOCKORA_SELF_IMAGE: z.string().optional(),
+  /** Host-Pfad der Compose-Installation (für In-App-Update) */
+  DOCKORA_INSTALL_DIR: z.string().optional(),
+  /** Mount-Pfad im API-Container (default: /dockora-install) */
+  DOCKORA_INSTALL_MOUNT: z.string().optional(),
+  /** GitHub repo owner/name für Compose-Self-Update */
+  DOCKORA_REPO: z.string().optional(),
+  /** Branch für Compose-Self-Update */
+  DOCKORA_UPDATE_BRANCH: z.string().optional(),
+  /** Optional: lokale Git-Revision (sonst .dockora-revision) */
+  DOCKORA_GIT_SHA: z.string().optional(),
   /** Verzeichnis für Drop-in-Plugins (index.js pro Unterordner) */
   PLUGIN_DIR: z.string().optional(),
 });
@@ -67,6 +77,11 @@ export type AppConfig = {
   bootstrapAdminEmail: string;
   bootstrapAdminPassword: string | null;
   selfImage: string | null;
+  installDirHost: string | null;
+  installDirMount: string | null;
+  repo: string;
+  updateBranch: string;
+  gitSha: string | null;
   pluginDir: string;
 };
 
@@ -197,6 +212,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     bootstrapAdminEmail: e.BOOTSTRAP_ADMIN_EMAIL ?? 'admin@dockora.local',
     bootstrapAdminPassword: e.BOOTSTRAP_ADMIN_PASSWORD ?? null,
     selfImage: e.DOCKORA_SELF_IMAGE?.trim() || null,
+    installDirHost: e.DOCKORA_INSTALL_DIR?.trim() || null,
+    installDirMount:
+      e.DOCKORA_INSTALL_MOUNT?.trim() ||
+      (e.DOCKORA_INSTALL_DIR?.trim() ? '/dockora-install' : null),
+    repo: e.DOCKORA_REPO?.trim() || 'MarcelRuh/dockora',
+    updateBranch: e.DOCKORA_UPDATE_BRANCH?.trim() || 'main',
+    gitSha: e.DOCKORA_GIT_SHA?.trim() || null,
     pluginDir,
   };
 }

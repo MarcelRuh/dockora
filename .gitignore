@@ -60,3 +60,4 @@ tmp/
 temp/
 *.local
 .cursor/
+.dockora-revision

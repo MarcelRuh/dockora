@@ -45,9 +45,25 @@ Point your TLS terminator at the `proxy` service (or `web` + `/api` → `api:300
 
 ## Upgrades
 
-1. `git pull` / new image tags from GHCR
-2. `docker compose pull && docker compose up -d`
-3. Or set `DOCKORA_SELF_IMAGE` and use **Settings → Updates → Self-Update**, then recreate the stack
+### In-app (Compose installs via `install.sh`)
+
+1. Open **Settings → Updates → Dockora Self-Update** (admin)
+2. Compare local vs GitHub revision, click **Jetzt aktualisieren**
+3. A one-shot updater syncs the install dir (keeps `.env` / `data/`) and runs `docker compose up -d --build`
+
+Requires `DOCKORA_INSTALL_DIR` (set automatically by `install.sh`) and the install path mounted into the API container (default in `docker-compose.yml`).
+
+### CLI
+
+```bash
+wget -qO- https://raw.githubusercontent.com/MarcelRuh/dockora/main/scripts/update.sh | bash
+# or: DOCKORA_DIR=/srv/dockora bash scripts/update.sh
+```
+
+### Image-based
+
+1. Set `DOCKORA_SELF_IMAGE=ghcr.io/marcelruh/dockora-api:latest`
+2. Use Self-Update to pull, then `docker compose up -d` to recreate
 
 ## Backups
 

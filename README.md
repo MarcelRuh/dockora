@@ -5,7 +5,7 @@
 [![CI](https://github.com/MarcelRuh/dockora/actions/workflows/ci.yml/badge.svg)](https://github.com/MarcelRuh/dockora/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
-> Status: **v1.0.0** – feature-complete baseline for self-hosted production use.
+> Status: **v1.1.0** – feature-complete baseline for self-hosted production use (inkl. In-App-Update).
 
 ## One-line install (wget)
 
@@ -33,6 +33,18 @@ Or with curl:
 curl -fsSL https://raw.githubusercontent.com/MarcelRuh/dockora/main/scripts/install.sh | bash
 ```
 
+## Update
+
+**In the UI (recommended):** Settings → Updates → **Dockora Self-Update** → *Jetzt aktualisieren* (admin).
+
+**CLI one-liner:**
+
+```bash
+wget -qO- https://raw.githubusercontent.com/MarcelRuh/dockora/main/scripts/update.sh | bash
+```
+
+Preserves `.env` and `data/`, syncs from GitHub, then runs `docker compose up -d --build`.
+
 ## Features
 
 - Live dashboard (CPU/RAM/disk, container counts, events)
@@ -42,7 +54,7 @@ curl -fsSL https://raw.githubusercontent.com/MarcelRuh/dockora/main/scripts/inst
 - Backups (compose/env/settings/volumes, retention, scheduler) with secret redaction
 - Discord webhooks, monitoring thresholds, central logs
 - JWT auth (admin/operator/viewer), audit log, OpenAPI at `/api/docs`
-- Plugin drop-in loader + optional self-update (`DOCKORA_SELF_IMAGE`)
+- Plugin drop-in loader + **in-app self-update** (Compose/GitHub or `DOCKORA_SELF_IMAGE`)
 
 ## Stack
 

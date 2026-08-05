@@ -7,7 +7,14 @@ import { SelfUpdateService } from './self-update.service.js';
  * System-Meta – App-Info und Self-Update.
  */
 export const systemModule: FastifyPluginAsync = async (app: FastifyInstance) => {
-  const selfUpdate = new SelfUpdateService(app.docker, app.config.selfImage);
+  const selfUpdate = new SelfUpdateService(app.docker, {
+    installDirHost: app.config.installDirHost,
+    installDirMount: app.config.installDirMount,
+    repo: app.config.repo,
+    branch: app.config.updateBranch,
+    gitSha: app.config.gitSha,
+    selfImage: app.config.selfImage,
+  });
 
   app.get(`${API_PREFIX}/system/info`, async () => {
     return {
@@ -18,6 +25,9 @@ export const systemModule: FastifyPluginAsync = async (app: FastifyInstance) => 
       composeExcludePaths: app.config.composeExcludePaths,
       autoUpdateEnabled: app.config.autoUpdateEnabled,
       selfImage: app.config.selfImage,
+      installDir: app.config.installDirHost,
+      repo: app.config.repo,
+      updateBranch: app.config.updateBranch,
       pluginDir: app.config.pluginDir,
     };
   });
@@ -35,7 +45,12 @@ export const systemModule: FastifyPluginAsync = async (app: FastifyInstance) => 
         action: 'system.self-update',
         actorId: actorIdFromRequest(request),
         resource: 'system',
-        metadata: { ok: result.ok, image: app.config.selfImage },
+        metadata: {
+          ok: result.ok,
+          mode: result.mode,
+          image: app.config.selfImage,
+          installDir: app.config.installDirHost,
+        },
       });
       if (!result.ok) {
         throw app.httpErrors.badRequest(result.message);

@@ -6,7 +6,6 @@ import sensible from '@fastify/sensible';
 import type { AppConfig } from './config/env.js';
 import type { IDockerClient, IHostMetrics } from './domain/ports.js';
 import { createDockerClient } from './infrastructure/docker/dockerode-client.js';
-import { LifetimeStatsService } from './infrastructure/stats/lifetime-stats.js';
 import { HostMetricsService } from './infrastructure/system/host-metrics.js';
 import { registerModules } from './modules/index.js';
 import { errorHandler } from './presentation/http/error-handler.js';
@@ -17,7 +16,6 @@ export interface BuildAppDeps {
   logger: FastifyBaseLogger;
   docker?: IDockerClient;
   hostMetrics?: IHostMetrics;
-  lifetime?: LifetimeStatsService;
 }
 
 export async function buildApp(deps: BuildAppDeps): Promise<FastifyInstance> {
@@ -32,12 +30,10 @@ export async function buildApp(deps: BuildAppDeps): Promise<FastifyInstance> {
 
   const docker = deps.docker ?? createDockerClient(config.dockerSocket, logger);
   const hostMetrics = deps.hostMetrics ?? new HostMetricsService();
-  const lifetime = deps.lifetime ?? new LifetimeStatsService(docker, hostMetrics);
 
   app.decorate('config', config);
   app.decorate('docker', docker);
   app.decorate('hostMetrics', hostMetrics);
-  app.decorate('lifetime', lifetime);
 
   await app.register(sensible);
   await app.register(helmet, {
@@ -59,12 +55,10 @@ export async function buildApp(deps: BuildAppDeps): Promise<FastifyInstance> {
 
   app.addHook('onReady', async () => {
     docker.startEventListener();
-    lifetime.start(15_000);
-    logger.info('Docker event listener + lifetime stats started');
+    logger.info('Docker event listener started');
   });
 
   app.addHook('onClose', async () => {
-    lifetime.stop();
     docker.stopEventListener();
   });
 
@@ -76,6 +70,5 @@ declare module 'fastify' {
     config: AppConfig;
     docker: IDockerClient;
     hostMetrics: IHostMetrics;
-    lifetime: LifetimeStatsService;
   }
 }

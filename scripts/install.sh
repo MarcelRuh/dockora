@@ -103,6 +103,16 @@ fi
 
 cd "$INSTALL_DIR"
 
+# portable in-place replace (GNU/BSD sed)
+replace_env() {
+  local key="$1" value="$2" file=".env"
+  if grep -q "^${key}=" "$file"; then
+    sed -i.bak "s|^${key}=.*|${key}=${value}|" "$file"
+  else
+    printf '%s=%s\n' "$key" "$value" >>"$file"
+  fi
+}
+
 if [[ ! -f .env ]]; then
   info "Creating .env from .env.example"
   cp .env.example .env
@@ -112,26 +122,39 @@ if [[ ! -f .env ]]; then
   # trim password to 24 chars for readability while staying strong
   BOOTSTRAP_ADMIN_PASSWORD="${BOOTSTRAP_ADMIN_PASSWORD:0:24}"
 
-  # portable in-place replace (GNU/BSD sed)
-  replace_env() {
-    local key="$1" value="$2" file=".env"
-    if grep -q "^${key}=" "$file"; then
-      sed -i.bak "s|^${key}=.*|${key}=${value}|" "$file"
-    else
-      printf '%s=%s\n' "$key" "$value" >>"$file"
-    fi
-  }
-
   replace_env JWT_SECRET "$JWT_SECRET"
   replace_env BOOTSTRAP_ADMIN_PASSWORD "$BOOTSTRAP_ADMIN_PASSWORD"
   replace_env BOOTSTRAP_ADMIN_EMAIL "${BOOTSTRAP_ADMIN_EMAIL:-admin@dockora.local}"
-  rm -f .env.bak
 
   green "Generated secrets written to ${INSTALL_DIR}/.env"
   yellow "Bootstrap admin password (save now): ${BOOTSTRAP_ADMIN_PASSWORD}"
 else
   info ".env already exists – leaving secrets unchanged"
 fi
+
+# Always keep install-dir / repo wiring for in-app self-update
+replace_env DOCKORA_INSTALL_DIR "$INSTALL_DIR"
+replace_env DOCKORA_REPO "${DOCKORA_REPO:-MarcelRuh/dockora}"
+replace_env DOCKORA_UPDATE_BRANCH "$BRANCH"
+rm -f .env.bak
+
+info "Recording installed revision"
+if [[ -d .git ]] && command -v git >/dev/null 2>&1; then
+  git rev-parse HEAD >.dockora-revision
+else
+  REV="$(wget -qO- --header='Accept: application/vnd.github+json' --header='User-Agent: dockora-install' \
+    "https://api.github.com/repos/${DOCKORA_REPO:-MarcelRuh/dockora}/commits/${BRANCH}" \
+    | sed -n 's/.*"sha": *"\([a-f0-9]\{40\}\)".*/\1/p' | head -1 || true)"
+  if [[ -n "${REV:-}" ]]; then
+    printf '%s\n' "$REV" >.dockora-revision
+  else
+    yellow "Could not resolve git revision – self-update will treat first check as update-available"
+  fi
+fi
+if [[ -f .dockora-revision ]]; then
+  info "Revision: $(tr -d '\n' <.dockora-revision | cut -c1-12)"
+fi
+chmod +x scripts/*.sh 2>/dev/null || true
 
 if [[ "$SKIP_START" == "1" ]]; then
   green "Skip start requested. Configure ${INSTALL_DIR}/.env then run:"

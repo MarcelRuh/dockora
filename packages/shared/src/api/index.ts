@@ -42,22 +42,6 @@ export interface DashboardOverview {
     composeVersion: string | null;
     engineStatus: 'online' | 'offline' | 'unknown';
   };
-  lifetime: {
-    trackingSince: string;
-    samplesCount: number;
-    peakCpuPercent: number;
-    peakMemoryPercent: number;
-    peakDiskPercent: number;
-    avgCpuPercent: number | null;
-    avgMemoryPercent: number | null;
-    avgDiskPercent: number | null;
-    containerStarts: number;
-    containerStops: number;
-    containerDies: number;
-    containerRestarts: number;
-    maxContainersSeen: number;
-    lastSampleAt: string | null;
-  };
   recentEvents: DashboardEvent[];
   notifications: DashboardNotification[];
   updatesAvailable: number;

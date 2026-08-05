@@ -11,7 +11,6 @@ export const dashboardModule: FastifyPluginAsync = async (app: FastifyInstance) 
     docker: app.docker,
     hostMetrics: app.hostMetrics,
     composeVersion: new ComposeVersionProvider(),
-    lifetime: app.lifetime,
     listNotifications: async () => {
       const rows = await prisma.notification.findMany({
         orderBy: { createdAt: 'desc' },

@@ -264,17 +264,28 @@ export async function pullUpdate(containerId: string): Promise<{ ok: boolean; me
 
 export async function fetchSelfUpdateStatus(): Promise<{
   enabled: boolean;
+  mode: 'compose' | 'image' | 'none';
   currentVersion: string;
+  localRevision: string | null;
+  remoteRevision: string | null;
   image: string | null;
   currentDigest: string | null;
   remoteDigest: string | null;
   updateAvailable: boolean;
   message: string;
+  installDir: string | null;
+  repo: string | null;
+  branch: string | null;
+  updating: boolean;
 }> {
   return request('/system/self-update');
 }
 
-export async function applySelfUpdate(): Promise<{ ok: boolean; message: string }> {
+export async function applySelfUpdate(): Promise<{
+  ok: boolean;
+  message: string;
+  mode: 'compose' | 'image' | 'none';
+}> {
   return request('/system/self-update', { method: 'POST' });
 }
 

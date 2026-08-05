@@ -19,7 +19,7 @@
 | 15 | Auth & Rollen | erledigt |
 | 16 | OpenAPI | erledigt |
 | 17 | Plugin-System (Registry + FS-Loader) | erledigt |
-| 18 | App Self-Update | erledigt (Pull via DOCKORA_SELF_IMAGE, Restart manuell) |
+| 18 | App Self-Update | erledigt (Compose/GitHub In-App + DOCKORA_SELF_IMAGE) |
 | 19 | Hardening & erweiterte Tests | teilweise (Unit + Smoke + GitHub CI) |
 
 ## Bekannte Ausbaustufen
@@ -35,9 +35,9 @@
 - ~~Live-Feedback Updates/Backups~~
 - ~~Compose-Validierung (400 + Hinweise)~~
 - ~~Self-Update (DOCKORA_SELF_IMAGE, Pull + Restart-Hinweis)~~
+- ~~Self-Update mit automatischem Compose-Recreate~~
 - ~~Plugin-Filesystem-Loader~~
 - ~~E2E-Smoke erweitert~~
 - CSRF-Token bei Cookie-Sessions (aktuell Bearer JWT)
-- Self-Update mit automatischem Compose-Recreate
 - Plugin-Sandbox / Enable-Disable UI
 

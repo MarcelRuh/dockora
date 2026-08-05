@@ -23,10 +23,18 @@ services:
       BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:?BOOTSTRAP_ADMIN_PASSWORD is required}
       COMPOSE_SEARCH_PATHS: ${COMPOSE_SEARCH_PATHS:-/opt,/srv,/home}
       DOCKORA_SELF_IMAGE: ${DOCKORA_SELF_IMAGE:-}
+      # In-App Self-Update (Compose-Install via install.sh)
+      DOCKORA_INSTALL_DIR: ${DOCKORA_INSTALL_DIR:-/opt/dockora}
+      DOCKORA_INSTALL_MOUNT: /dockora-install
+      DOCKORA_REPO: ${DOCKORA_REPO:-MarcelRuh/dockora}
+      DOCKORA_UPDATE_BRANCH: ${DOCKORA_UPDATE_BRANCH:-main}
+      DOCKORA_GIT_SHA: ${DOCKORA_GIT_SHA:-}
     volumes:
       - dockora-data:/data
       - ${DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock
-      # Compose-Discovery (read-only) – später erweiterbar
+      # Installationsbaum nur lesen (Update schreibt der One-Shot-Updater auf dem Host-Pfad)
+      - ${DOCKORA_INSTALL_DIR:-/opt/dockora}:/dockora-install:ro
+      # Compose-Discovery (read-only)
       - /opt:/opt:ro
       - /srv:/srv:ro
       - /home:/home:ro

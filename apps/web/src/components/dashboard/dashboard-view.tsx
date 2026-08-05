@@ -53,9 +53,6 @@ export function DashboardView({
         <div className="space-y-8">
           <EngineStrip overview={data} labels={t.dashboard} />
           <LiveResources overview={data} labels={t.dashboard} locale={loc} />
-          <LifetimeMeta lifetime={data.lifetime} labels={t.dashboard.lifetime} locale={loc} />
-          <LifetimePeaks lifetime={data.lifetime} labels={t.dashboard} locale={loc} />
-          <LifetimeContainerEvents lifetime={data.lifetime} labels={t.dashboard.lifetime} />
           <div className="grid gap-4 lg:grid-cols-2">
             <EventsPanel events={data.recentEvents} labels={t.dashboard.events} locale={loc} />
             <AsideColumn
@@ -71,38 +68,6 @@ export function DashboardView({
             </p>
           ) : null}
         </div>
-      ) : null}
-    </div>
-  );
-}
-
-function LifetimeMeta({
-  lifetime,
-  labels,
-  locale,
-}: {
-  lifetime: DashboardOverview['lifetime'];
-  labels: { since: string; samples: string; lastSample: string };
-  locale: string;
-}) {
-  return (
-    <div className="flex flex-wrap gap-x-6 gap-y-2 rounded-2xl border border-dockora-border bg-dockora-surface/80 px-4 py-3 font-mono text-xs text-dockora-muted">
-      <span>
-        {labels.since}:{' '}
-        <span className="text-dockora-text">
-          {new Date(lifetime.trackingSince).toLocaleString(locale)}
-        </span>
-      </span>
-      <span>
-        {labels.samples}: <span className="text-dockora-text">{lifetime.samplesCount}</span>
-      </span>
-      {lifetime.lastSampleAt ? (
-        <span>
-          {labels.lastSample}:{' '}
-          <span className="text-dockora-text">
-            {formatRelativeTime(lifetime.lastSampleAt, locale)}
-          </span>
-        </span>
       ) : null}
     </div>
   );
@@ -172,116 +137,6 @@ function LiveResources({
             {row.secondary ? (
               <p className="font-mono text-[11px] text-dockora-muted">{row.secondary}</p>
             ) : null}
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function LifetimePeaks({
-  lifetime,
-  labels,
-  locale,
-}: {
-  lifetime: DashboardOverview['lifetime'];
-  labels: {
-    lifetime: { title: string; peaks: string; averages: string };
-    resources: { cpu: string; memory: string; disk: string };
-  };
-  locale: string;
-}) {
-  const rows = [
-    {
-      key: 'cpu',
-      label: labels.resources.cpu,
-      peak: lifetime.peakCpuPercent,
-      avg: lifetime.avgCpuPercent,
-    },
-    {
-      key: 'mem',
-      label: labels.resources.memory,
-      peak: lifetime.peakMemoryPercent,
-      avg: lifetime.avgMemoryPercent,
-    },
-    {
-      key: 'disk',
-      label: labels.resources.disk,
-      peak: lifetime.peakDiskPercent,
-      avg: lifetime.avgDiskPercent,
-    },
-  ];
-
-  return (
-    <section className="space-y-4">
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 className="font-display text-lg font-bold tracking-tight">{labels.lifetime.title}</h2>
-        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-dockora-muted">
-          {labels.lifetime.peaks} · {labels.lifetime.averages}
-        </p>
-      </div>
-      <div className="grid gap-3 sm:grid-cols-3">
-        {rows.map((row) => (
-          <div
-            key={row.key}
-            className="rounded-2xl border border-dockora-border bg-dockora-surface/60 px-4 py-3"
-          >
-            <p className="text-xs text-dockora-muted">{row.label}</p>
-            <div className="mt-2 flex items-baseline justify-between gap-2 font-mono text-sm">
-              <span>
-                {labels.lifetime.peaks}:{' '}
-                <span className="font-semibold text-dockora-text">
-                  {formatPercent(row.peak, locale)}
-                </span>
-              </span>
-              <span className="text-dockora-muted">
-                {labels.lifetime.averages}: {formatPercent(row.avg, locale)}
-              </span>
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function LifetimeContainerEvents({
-  lifetime,
-  labels,
-}: {
-  lifetime: DashboardOverview['lifetime'];
-  labels: {
-    events: string;
-    starts: string;
-    stops: string;
-    dies: string;
-    restarts: string;
-    maxContainers: string;
-  };
-}) {
-  const items = [
-    { label: labels.starts, value: lifetime.containerStarts, tone: 'text-dockora-success' },
-    { label: labels.stops, value: lifetime.containerStops, tone: 'text-dockora-muted' },
-    { label: labels.dies, value: lifetime.containerDies, tone: 'text-dockora-danger' },
-    { label: labels.restarts, value: lifetime.containerRestarts, tone: 'text-dockora-warning' },
-    { label: labels.maxContainers, value: lifetime.maxContainersSeen, tone: 'text-dockora-accent' },
-  ];
-
-  return (
-    <section className="space-y-4">
-      <h2 className="font-display text-lg font-bold tracking-tight">{labels.events}</h2>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-        {items.map((item) => (
-          <div
-            key={item.label}
-            className="rounded-2xl border border-dockora-border bg-dockora-surface/80 px-4 py-4"
-          >
-            <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-dockora-muted">
-              {item.label}
-            </p>
-            <p className={cn('mt-2 font-mono text-3xl font-bold tabular-nums', item.tone)}>
-              {item.value}
-            </p>
           </div>
         ))}
       </div>
