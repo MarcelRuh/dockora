@@ -10,6 +10,14 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 - In-app Compose self-update: GitHub revision check + one-shot updater (`Settings → Updates`)
 - Host updater script: `scripts/update.sh` / `scripts/self-update-apply.sh` (wget one-liner)
 - Installer writes `.dockora-revision` and `DOCKORA_INSTALL_DIR` for seamless updates
+- wget one-line installer (`scripts/install.sh`)
+
+### Fixed
+
+- Self-update no longer sticks on “Update läuft…” (progress from updater container / host apply)
+- Auto-detect install directory in development
+- Image prune “all unused” now uses `dangling=false` (same as `docker image prune -a`)
+- Source modules `backups` / `logs` were accidentally gitignored – restored for CI builds
 
 ### Removed
 

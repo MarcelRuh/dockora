@@ -1,6 +1,6 @@
 {
   "name": "@dockora/shared",
-  "version": "0.1.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "main": "./dist/index.js",
@@ -16,7 +16,7 @@
     "dev": "tsc -p tsconfig.json --watch",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "clean": "rm -rf dist",
-    "lint": "echo \"lint: shared – pending\""
+    "lint": "echo \"lint: shared \u2013 pending\""
   },
   "devDependencies": {
     "@dockora/tsconfig": "workspace:*",
