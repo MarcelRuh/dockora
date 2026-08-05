@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Image tag (default: latest)'
+        description: 'Image tag (default: latest). Non-latest also tags :latest.'
         required: false
         default: 'latest'
 
@@ -28,21 +28,27 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Image name prefix
+      - name: Image tags (GHCR fully-qualified)
         id: meta
         run: |
           OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          REGISTRY="${{ env.REGISTRY }}"
           echo "owner=${OWNER}" >> "$GITHUB_OUTPUT"
           if [[ "${{ github.ref }}" == refs/tags/* ]]; then
             VERSION="${GITHUB_REF_NAME#v}"
             echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-            echo "tags_api=${OWNER}/dockora-api:${VERSION},${OWNER}/dockora-api:latest" >> "$GITHUB_OUTPUT"
-            echo "tags_web=${OWNER}/dockora-web:${VERSION},${OWNER}/dockora-web:latest" >> "$GITHUB_OUTPUT"
+            echo "tags_api=${REGISTRY}/${OWNER}/dockora-api:${VERSION},${REGISTRY}/${OWNER}/dockora-api:latest" >> "$GITHUB_OUTPUT"
+            echo "tags_web=${REGISTRY}/${OWNER}/dockora-web:${VERSION},${REGISTRY}/${OWNER}/dockora-web:latest" >> "$GITHUB_OUTPUT"
           else
             TAG="${{ inputs.tag || 'latest' }}"
             echo "version=${TAG}" >> "$GITHUB_OUTPUT"
-            echo "tags_api=${OWNER}/dockora-api:${TAG}" >> "$GITHUB_OUTPUT"
-            echo "tags_web=${OWNER}/dockora-web:${TAG}" >> "$GITHUB_OUTPUT"
+            if [[ "$TAG" == "latest" ]]; then
+              echo "tags_api=${REGISTRY}/${OWNER}/dockora-api:latest" >> "$GITHUB_OUTPUT"
+              echo "tags_web=${REGISTRY}/${OWNER}/dockora-web:latest" >> "$GITHUB_OUTPUT"
+            else
+              echo "tags_api=${REGISTRY}/${OWNER}/dockora-api:${TAG},${REGISTRY}/${OWNER}/dockora-api:latest" >> "$GITHUB_OUTPUT"
+              echo "tags_web=${REGISTRY}/${OWNER}/dockora-web:${TAG},${REGISTRY}/${OWNER}/dockora-web:latest" >> "$GITHUB_OUTPUT"
+            fi
           fi
 
       - name: Log in to GHCR
