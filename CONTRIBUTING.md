@@ -7,7 +7,7 @@ Thanks for contributing! This document keeps the bar low but consistent.
 **Requirements:** Node.js ≥ 22, pnpm ≥ 9, Docker (optional but recommended)
 
 ```bash
-git clone https://github.com/<org>/dockora.git
+git clone https://github.com/MarcelRuh/dockora.git
 cd dockora
 cp .env.example .env
 cp apps/api/.env.example apps/api/.env

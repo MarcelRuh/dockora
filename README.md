@@ -2,12 +2,36 @@
 
 **Docker management suite** focused on Compose stacks, image updates, backups, and Discord notifications.
 
-[![CI](https://github.com/OWNER/dockora/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/dockora/actions/workflows/ci.yml)
+[![CI](https://github.com/MarcelRuh/dockora/actions/workflows/ci.yml/badge.svg)](https://github.com/MarcelRuh/dockora/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
 > Status: **v1.0.0** – feature-complete baseline for self-hosted production use.
 
-Replace `OWNER` in badges/URLs after you publish the repository.
+## One-line install (wget)
+
+Requires Docker + Compose V2. Installs to `/opt/dockora` by default and generates strong secrets.
+
+```bash
+wget -qO- https://raw.githubusercontent.com/MarcelRuh/dockora/main/scripts/install.sh | bash
+```
+
+With same-origin proxy (SSE/WebSocket on port 8080):
+
+```bash
+wget -qO- https://raw.githubusercontent.com/MarcelRuh/dockora/main/scripts/install.sh | DOCKORA_PROXY=1 bash
+```
+
+Custom directory:
+
+```bash
+wget -qO- https://raw.githubusercontent.com/MarcelRuh/dockora/main/scripts/install.sh | DOCKORA_DIR=/srv/dockora bash
+```
+
+Or with curl:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/MarcelRuh/dockora/main/scripts/install.sh | bash
+```
 
 ## Features
 
@@ -57,6 +81,8 @@ Default bootstrap admin (first empty DB only):
 ## Production (Docker Compose)
 
 ```bash
+git clone https://github.com/MarcelRuh/dockora.git
+cd dockora
 cp .env.example .env
 # Set strong JWT_SECRET + BOOTSTRAP_ADMIN_PASSWORD
 docker compose up -d --build

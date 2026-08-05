@@ -3,7 +3,7 @@
 ## Quick production (Docker Compose)
 
 ```bash
-git clone https://github.com/OWNER/dockora.git
+git clone https://github.com/MarcelRuh/dockora.git
 cd dockora
 cp .env.example .env
 # Set JWT_SECRET and BOOTSTRAP_ADMIN_PASSWORD to strong values

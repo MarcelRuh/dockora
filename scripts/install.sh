@@ -1,0 +1,157 @@
+#!/usr/bin/env bash
+# Dockora one-line installer (wget / curl friendly)
+#
+# Usage:
+#   wget -qO- https://raw.githubusercontent.com/MarcelRuh/dockora/main/scripts/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/MarcelRuh/dockora/main/scripts/install.sh | bash
+#
+# Options (env):
+#   DOCKORA_DIR=/opt/dockora          Installationsverzeichnis
+#   DOCKORA_BRANCH=main              Git-Branch
+#   DOCKORA_SKIP_START=1             Nur klonen/konfigurieren, nicht starten
+#   DOCKORA_PROXY=1                  nginx Same-Origin-Proxy-Profil mitstarten
+#   JWT_SECRET=...                   sonst wird generiert
+#   BOOTSTRAP_ADMIN_PASSWORD=...     sonst wird generiert (einmal angezeigt)
+
+set -euo pipefail
+
+REPO_SSH="git@github.com:MarcelRuh/dockora.git"
+REPO_HTTPS="https://github.com/MarcelRuh/dockora.git"
+BRANCH="${DOCKORA_BRANCH:-main}"
+INSTALL_DIR="${DOCKORA_DIR:-/opt/dockora}"
+PROXY="${DOCKORA_PROXY:-0}"
+SKIP_START="${DOCKORA_SKIP_START:-0}"
+
+red() { printf '\033[31m%s\033[0m\n' "$*"; }
+green() { printf '\033[32m%s\033[0m\n' "$*"; }
+yellow() { printf '\033[33m%s\033[0m\n' "$*"; }
+info() { printf '==> %s\n' "$*"; }
+
+need_cmd() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    red "Missing required command: $1"
+    exit 1
+  fi
+}
+
+rand_hex() {
+  if command -v openssl >/dev/null 2>&1; then
+    openssl rand -hex 32
+  else
+    head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n'
+  fi
+}
+
+info "Dockora installer"
+info "Target: ${INSTALL_DIR} (branch ${BRANCH})"
+
+need_cmd docker
+if ! docker compose version >/dev/null 2>&1; then
+  red "docker compose plugin is required (Docker Compose V2)"
+  exit 1
+fi
+
+if command -v git >/dev/null 2>&1; then
+  CLONE_OK=1
+else
+  CLONE_OK=0
+  need_cmd wget
+  need_cmd tar
+fi
+
+if [[ "$(id -u)" -ne 0 ]]; then
+  yellow "Not running as root – ensure write access to ${INSTALL_DIR} and Docker socket."
+fi
+
+mkdir -p "$(dirname "$INSTALL_DIR")"
+
+if [[ -d "${INSTALL_DIR}/.git" ]]; then
+  info "Existing git checkout – pulling ${BRANCH}"
+  git -C "$INSTALL_DIR" fetch --depth 1 origin "$BRANCH"
+  git -C "$INSTALL_DIR" checkout "$BRANCH"
+  git -C "$INSTALL_DIR" pull --ff-only origin "$BRANCH"
+elif [[ -d "$INSTALL_DIR" ]] && [[ -f "${INSTALL_DIR}/docker-compose.yml" ]]; then
+  info "Existing install directory found – skipping clone"
+else
+  if [[ "$CLONE_OK" -eq 1 ]]; then
+    info "Cloning repository"
+    if git clone --depth 1 --branch "$BRANCH" "$REPO_HTTPS" "$INSTALL_DIR" 2>/dev/null; then
+      true
+    else
+      git clone --depth 1 --branch "$BRANCH" "$REPO_SSH" "$INSTALL_DIR"
+    fi
+  else
+    info "git not found – downloading tarball via wget"
+    TMP="$(mktemp -d)"
+    trap 'rm -rf "$TMP"' EXIT
+    ARCHIVE="${TMP}/dockora.tar.gz"
+    wget -qO "$ARCHIVE" "https://github.com/MarcelRuh/dockora/archive/refs/heads/${BRANCH}.tar.gz"
+    mkdir -p "$INSTALL_DIR"
+    tar -xzf "$ARCHIVE" -C "$TMP"
+    # github archive extracts to dockora-<branch>
+    SRC="$(find "$TMP" -maxdepth 1 -type d -name 'dockora-*' | head -1)"
+    if [[ -z "$SRC" ]]; then
+      red "Failed to extract Dockora archive"
+      exit 1
+    fi
+    # copy contents into install dir
+    shopt -s dotglob
+    mv "$SRC"/* "$INSTALL_DIR"/
+    shopt -u dotglob
+  fi
+fi
+
+cd "$INSTALL_DIR"
+
+if [[ ! -f .env ]]; then
+  info "Creating .env from .env.example"
+  cp .env.example .env
+
+  JWT_SECRET="${JWT_SECRET:-$(rand_hex)}"
+  BOOTSTRAP_ADMIN_PASSWORD="${BOOTSTRAP_ADMIN_PASSWORD:-$(rand_hex)}"
+  # trim password to 24 chars for readability while staying strong
+  BOOTSTRAP_ADMIN_PASSWORD="${BOOTSTRAP_ADMIN_PASSWORD:0:24}"
+
+  # portable in-place replace (GNU/BSD sed)
+  replace_env() {
+    local key="$1" value="$2" file=".env"
+    if grep -q "^${key}=" "$file"; then
+      sed -i.bak "s|^${key}=.*|${key}=${value}|" "$file"
+    else
+      printf '%s=%s\n' "$key" "$value" >>"$file"
+    fi
+  }
+
+  replace_env JWT_SECRET "$JWT_SECRET"
+  replace_env BOOTSTRAP_ADMIN_PASSWORD "$BOOTSTRAP_ADMIN_PASSWORD"
+  replace_env BOOTSTRAP_ADMIN_EMAIL "${BOOTSTRAP_ADMIN_EMAIL:-admin@dockora.local}"
+  rm -f .env.bak
+
+  green "Generated secrets written to ${INSTALL_DIR}/.env"
+  yellow "Bootstrap admin password (save now): ${BOOTSTRAP_ADMIN_PASSWORD}"
+else
+  info ".env already exists – leaving secrets unchanged"
+fi
+
+if [[ "$SKIP_START" == "1" ]]; then
+  green "Skip start requested. Configure ${INSTALL_DIR}/.env then run:"
+  echo "  cd ${INSTALL_DIR} && docker compose up -d --build"
+  exit 0
+fi
+
+info "Building and starting containers"
+if [[ "$PROXY" == "1" ]]; then
+  docker compose --profile proxy up -d --build
+  WEB_HINT="http://$(hostname -f 2>/dev/null || echo localhost):${DOCKORA_PROXY_PORT:-8080}"
+else
+  docker compose up -d --build
+  WEB_HINT="http://$(hostname -f 2>/dev/null || echo localhost):${DOCKORA_WEB_PORT:-3000}"
+fi
+
+green "Dockora is starting."
+echo "  UI:     ${WEB_HINT}"
+echo "  API:    http://localhost:${DOCKORA_API_PORT:-3001}/api/v1/health"
+echo "  Dir:    ${INSTALL_DIR}"
+echo "  Logs:   docker compose -f ${INSTALL_DIR}/docker-compose.yml logs -f"
+echo
+yellow "Login with BOOTSTRAP_ADMIN_EMAIL / password from .env (shown above if newly generated)."
