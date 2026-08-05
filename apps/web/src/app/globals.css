@@ -1,0 +1,116 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import 'xterm/css/xterm.css';
+
+:root {
+  --dockora-bg: #eef1f6;
+  --dockora-surface: #ffffff;
+  --dockora-surface-2: #e4e9f1;
+  --dockora-border: #c5cedc;
+  --dockora-text: #121826;
+  --dockora-muted: #5c6b82;
+  --dockora-accent: #c45a28;
+  --dockora-accent-soft: rgba(196, 90, 40, 0.12);
+  --dockora-accent-fg: #fff8f3;
+  --dockora-success: #0f7a4a;
+  --dockora-warning: #b45309;
+  --dockora-danger: #b42318;
+  --dockora-glow: rgba(196, 90, 40, 0.18);
+  --dockora-rail: #121826;
+  --dockora-rail-text: #eef1f6;
+  --dockora-hatch: rgba(18, 24, 38, 0.04);
+}
+
+.dark {
+  --dockora-bg: #0a0d14;
+  --dockora-surface: #121722;
+  --dockora-surface-2: #1a2130;
+  --dockora-border: #2a3347;
+  --dockora-text: #eef1f6;
+  --dockora-muted: #8b97ad;
+  --dockora-accent: #e07040;
+  --dockora-accent-soft: rgba(224, 112, 64, 0.14);
+  --dockora-accent-fg: #1a0e08;
+  --dockora-success: #3ecf8e;
+  --dockora-warning: #f0b429;
+  --dockora-danger: #f04438;
+  --dockora-glow: rgba(224, 112, 64, 0.22);
+  --dockora-rail: #06080e;
+  --dockora-rail-text: #eef1f6;
+  --dockora-hatch: rgba(224, 112, 64, 0.035);
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  background-color: var(--dockora-bg);
+  background-image:
+    radial-gradient(ellipse 80% 50% at 0% 0%, var(--dockora-glow), transparent 55%),
+    repeating-linear-gradient(
+      -32deg,
+      transparent,
+      transparent 11px,
+      var(--dockora-hatch) 11px,
+      var(--dockora-hatch) 12px
+    );
+  color: var(--dockora-text);
+}
+
+::selection {
+  background: var(--dockora-accent);
+  color: var(--dockora-accent-fg);
+}
+
+@keyframes dockora-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes dockora-pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.85);
+  }
+}
+
+.animate-in.fade-in {
+  animation: dockora-fade-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.dockora-panel {
+  border: 1px solid var(--dockora-border);
+  background: color-mix(in srgb, var(--dockora-surface) 92%, transparent);
+  border-radius: 1rem;
+  backdrop-filter: blur(8px);
+}
+
+.dockora-brand-mark {
+  background: var(--dockora-accent);
+  color: var(--dockora-accent-fg);
+  border-radius: 0.65rem;
+}
+
+.dockora-nav-active {
+  background: var(--dockora-accent-soft);
+  color: var(--dockora-accent);
+}
+
+.dockora-pulse {
+  animation: dockora-pulse-dot 1.8s ease-in-out infinite;
+}

@@ -1,0 +1,165 @@
+import cron, { type ScheduledTask } from 'node-cron';
+import type { ScheduledJob, JobType } from '@dockora/shared';
+import { prisma } from '../../infrastructure/db/prisma.js';
+
+export type JobCallback = () => Promise<void>;
+
+const DEFAULT_JOBS: Array<{ type: JobType; cron: string; preset?: string }> = [
+  { type: 'update_check', cron: '0 * * * *', preset: 'custom' },
+  { type: 'backup', cron: '0 2 * * *', preset: 'daily' },
+  { type: 'cleanup', cron: '0 3 * * 0', preset: 'weekly' },
+  { type: 'healthcheck', cron: '*/5 * * * *', preset: 'custom' },
+];
+
+export class SchedulerService {
+  private readonly callbacks = new Map<JobType, JobCallback>();
+  private readonly tasks = new Map<string, ScheduledTask>();
+  private started = false;
+
+  registerCallback(type: JobType, callback: JobCallback): void {
+    this.callbacks.set(type, callback);
+  }
+
+  async seedDefaults(): Promise<void> {
+    for (const job of DEFAULT_JOBS) {
+      const existing = await prisma.scheduledJob.findFirst({ where: { type: job.type } });
+      if (!existing) {
+        await prisma.scheduledJob.create({
+          data: {
+            type: job.type,
+            cron: job.cron,
+            preset: job.preset,
+            enabled: true,
+          },
+        });
+      }
+    }
+  }
+
+  async listJobs(): Promise<ScheduledJob[]> {
+    const rows = await prisma.scheduledJob.findMany({ orderBy: { type: 'asc' } });
+    return rows.map(mapRow);
+  }
+
+  async updateJob(
+    id: string,
+    patch: { enabled?: boolean; cron?: string },
+  ): Promise<ScheduledJob> {
+    const row = await prisma.scheduledJob.update({
+      where: { id },
+      data: {
+        enabled: patch.enabled,
+        cron: patch.cron,
+      },
+    });
+
+    if (this.started) {
+      this.rescheduleJob(row.id, row.cron, row.enabled, row.type as JobType);
+    }
+
+    return mapRow(row);
+  }
+
+  async runJob(id: string): Promise<{ ok: boolean; message: string }> {
+    const row = await prisma.scheduledJob.findUnique({ where: { id } });
+    if (!row) {
+      return { ok: false, message: 'Job not found' };
+    }
+
+    const callback = this.callbacks.get(row.type as JobType);
+    if (!callback) {
+      return { ok: false, message: `No callback registered for ${row.type}` };
+    }
+
+    try {
+      await callback();
+      await prisma.scheduledJob.update({
+        where: { id },
+        data: { lastRunAt: new Date() },
+      });
+      return { ok: true, message: 'Job executed' };
+    } catch (error) {
+      return {
+        ok: false,
+        message: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
+  async start(): Promise<void> {
+    if (this.started) return;
+    await this.seedDefaults();
+    this.started = true;
+
+    const jobs = await prisma.scheduledJob.findMany();
+    for (const job of jobs) {
+      if (job.enabled) {
+        this.scheduleJob(job.id, job.cron, job.type as JobType);
+      }
+    }
+  }
+
+  stop(): void {
+    for (const task of this.tasks.values()) {
+      task.stop();
+    }
+    this.tasks.clear();
+    this.started = false;
+  }
+
+  private scheduleJob(id: string, expression: string, _type: JobType): void {
+    if (!cron.validate(expression)) {
+      return;
+    }
+
+    const existing = this.tasks.get(id);
+    existing?.stop();
+
+    const task = cron.schedule(expression, () => {
+      void this.runJob(id).catch(() => undefined);
+    });
+
+    this.tasks.set(id, task);
+  }
+
+  private rescheduleJob(id: string, expression: string, enabled: boolean, type: JobType): void {
+    const existing = this.tasks.get(id);
+    existing?.stop();
+    this.tasks.delete(id);
+
+    if (enabled) {
+      this.scheduleJob(id, expression, type);
+    }
+  }
+}
+
+function mapRow(row: {
+  id: string;
+  type: string;
+  cron: string;
+  preset: string | null;
+  enabled: boolean;
+  lastRunAt: Date | null;
+}): ScheduledJob {
+  return {
+    id: row.id,
+    type: row.type as JobType,
+    cron: row.cron,
+    preset: (row.preset ?? undefined) as ScheduledJob['preset'],
+    enabled: row.enabled,
+    lastRunAt: row.lastRunAt?.toISOString(),
+    nextRunAt: cron.validate(row.cron) ? describeNextRun(row.cron) : undefined,
+  };
+}
+
+function describeNextRun(expression: string): string | undefined {
+  try {
+    // node-cron hat keine nextDate-API – grobe Schätzung via Validierung
+    if (cron.validate(expression)) {
+      return undefined;
+    }
+  } catch {
+    // ignore
+  }
+  return undefined;
+}

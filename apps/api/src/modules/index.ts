@@ -1,0 +1,40 @@
+import type { FastifyInstance } from 'fastify';
+import { healthModule } from './health/index.js';
+import { systemModule } from './system/index.js';
+import { openApiModule } from './openapi/index.js';
+import { authModule } from './auth/index.js';
+import { dashboardModule } from './dashboard/index.js';
+import { containersModule } from './containers/index.js';
+import { composeModule } from './compose/index.js';
+import { imagesModule } from './images/index.js';
+import { settingsModule } from './settings/index.js';
+import { updatesModule } from './updates/index.js';
+import { backupsModule } from './backups/index.js';
+import { notificationsModule } from './notifications/index.js';
+import { monitoringModule } from './monitoring/index.js';
+import { logsModule } from './logs/index.js';
+import { schedulerModule } from './scheduler/index.js';
+import { terminalModule } from './terminal/index.js';
+import { pluginsModule } from './plugins/index.js';
+import { auditModule } from './audit/index.js';
+
+export async function registerModules(app: FastifyInstance): Promise<void> {
+  await app.register(openApiModule);
+  await app.register(healthModule);
+  await app.register(authModule);
+  await app.register(systemModule);
+  await app.register(auditModule);
+  await app.register(dashboardModule);
+  await app.register(containersModule);
+  await app.register(composeModule);
+  await app.register(imagesModule);
+  await app.register(settingsModule);
+  await app.register(updatesModule);
+  await app.register(backupsModule);
+  await app.register(notificationsModule);
+  await app.register(monitoringModule);
+  await app.register(logsModule);
+  await app.register(schedulerModule);
+  await app.register(terminalModule);
+  await app.register(pluginsModule);
+}

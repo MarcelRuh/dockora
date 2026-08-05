@@ -1,0 +1,98 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  displayName  String?
+  role         String   @default("admin")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  severity  String
+  title     String
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  action     String
+  actorId    String?
+  resource   String?
+  resourceId String?
+  metadata   String?
+  createdAt  DateTime @default(now())
+}
+
+model BackupRecord {
+  id        String   @id @default(cuid())
+  name      String
+  format    String
+  path      String
+  sizeBytes Int      @default(0)
+  includes  String
+  createdAt DateTime @default(now())
+}
+
+model ScheduledJob {
+  id         String   @id @default(cuid())
+  type       String
+  cron       String
+  preset     String?
+  enabled    Boolean  @default(true)
+  lastRunAt  DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model UpdateCheckCache {
+  id               String   @id @default(cuid())
+  containerId      String   @unique
+  containerName    String
+  image            String
+  currentDigest    String?
+  remoteDigest     String?
+  updateAvailable  Boolean  @default(false)
+  registry         String
+  currentTag       String
+  error            String?
+  checkedAt        DateTime @default(now())
+}
+
+/// Lifetime-Statistiken (eine Zeile, aggregiert über die gesamte Laufzeit)
+model LifetimeStats {
+  id                  String   @id @default("default")
+  trackingSince       DateTime @default(now())
+  samplesCount        Int      @default(0)
+  peakCpuPercent      Float    @default(0)
+  peakMemoryPercent   Float    @default(0)
+  peakDiskPercent     Float    @default(0)
+  sumCpuPercent       Float    @default(0)
+  sumMemoryPercent    Float    @default(0)
+  sumDiskPercent      Float    @default(0)
+  containerStarts     Int      @default(0)
+  containerStops      Int      @default(0)
+  containerDies       Int      @default(0)
+  containerRestarts   Int      @default(0)
+  maxContainersSeen   Int      @default(0)
+  lastSampleAt        DateTime?
+  updatedAt           DateTime @updatedAt
+}

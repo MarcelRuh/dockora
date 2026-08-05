@@ -1,0 +1,478 @@
+'use client';
+
+import type { DashboardOverview } from '@dockora/shared';
+import { useLocale } from '@/i18n/locale-provider';
+import { formatBytes, formatPercent, formatRelativeTime, usageRatio } from '@/lib/format';
+import { cn } from '@/lib/utils';
+import { ProgressBar } from '@/components/ui/progress-bar';
+import { Button } from '@/components/ui/form-controls';
+import type { UseDashboardResult } from '@/hooks/use-dashboard';
+
+export function DashboardView({
+  data,
+  state,
+  error,
+  lastUpdated,
+  refresh,
+}: UseDashboardResult) {
+  const { t, locale } = useLocale();
+  const loc = locale === 'de' ? 'de-DE' : 'en-US';
+
+  return (
+    <div className="space-y-8 animate-in fade-in">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="space-y-2">
+          <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-dockora-accent">
+            {t.dashboard.live.live}
+          </p>
+          <h1 className="font-display text-4xl font-extrabold tracking-tight sm:text-5xl">
+            {t.dashboard.title}
+          </h1>
+          <p className="max-w-xl text-sm text-dockora-muted sm:text-base">{t.dashboard.subtitle}</p>
+        </div>
+        <LiveBadge
+          state={state}
+          lastUpdated={lastUpdated}
+          labels={t.dashboard.live}
+          locale={loc}
+          onRefresh={() => void refresh()}
+        />
+      </header>
+
+      {state === 'error' && !data ? (
+        <p className="rounded-xl border border-dockora-danger/40 bg-dockora-danger/10 px-4 py-3 text-sm text-dockora-danger">
+          {t.dashboard.loadError}: {error}
+        </p>
+      ) : null}
+
+      {state === 'loading' && !data ? (
+        <p className="text-sm text-dockora-muted">{t.dashboard.loading}</p>
+      ) : null}
+
+      {data ? (
+        <div className="space-y-8">
+          <EngineStrip overview={data} labels={t.dashboard} />
+          <LiveResources overview={data} labels={t.dashboard} locale={loc} />
+          <LifetimeMeta lifetime={data.lifetime} labels={t.dashboard.lifetime} locale={loc} />
+          <LifetimePeaks lifetime={data.lifetime} labels={t.dashboard} locale={loc} />
+          <LifetimeContainerEvents lifetime={data.lifetime} labels={t.dashboard.lifetime} />
+          <div className="grid gap-4 lg:grid-cols-2">
+            <EventsPanel events={data.recentEvents} labels={t.dashboard.events} locale={loc} />
+            <AsideColumn
+              notifications={data.notifications}
+              updatesAvailable={data.updatesAvailable}
+              labels={t.dashboard}
+              locale={loc}
+            />
+          </div>
+          {error ? (
+            <p className="text-xs text-dockora-warning">
+              {t.dashboard.staleWarning}: {error}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function LifetimeMeta({
+  lifetime,
+  labels,
+  locale,
+}: {
+  lifetime: DashboardOverview['lifetime'];
+  labels: { since: string; samples: string; lastSample: string };
+  locale: string;
+}) {
+  return (
+    <div className="flex flex-wrap gap-x-6 gap-y-2 rounded-2xl border border-dockora-border bg-dockora-surface/80 px-4 py-3 font-mono text-xs text-dockora-muted">
+      <span>
+        {labels.since}:{' '}
+        <span className="text-dockora-text">
+          {new Date(lifetime.trackingSince).toLocaleString(locale)}
+        </span>
+      </span>
+      <span>
+        {labels.samples}: <span className="text-dockora-text">{lifetime.samplesCount}</span>
+      </span>
+      {lifetime.lastSampleAt ? (
+        <span>
+          {labels.lastSample}:{' '}
+          <span className="text-dockora-text">
+            {formatRelativeTime(lifetime.lastSampleAt, locale)}
+          </span>
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+function LiveResources({
+  overview,
+  labels,
+  locale,
+}: {
+  overview: DashboardOverview;
+  labels: {
+    resources: { title: string; cpu: string; memory: string; disk: string; realtime: string };
+  };
+  locale: string;
+}) {
+  const memPct = usageRatio(
+    overview.resources.memoryUsedBytes,
+    overview.resources.memoryTotalBytes,
+  );
+  const diskPct = usageRatio(overview.resources.diskUsedBytes, overview.resources.diskTotalBytes);
+
+  const rows = [
+    {
+      key: 'cpu',
+      label: labels.resources.cpu,
+      primary: formatPercent(overview.resources.cpuPercent, locale),
+      ratio: overview.resources.cpuPercent,
+    },
+    {
+      key: 'mem',
+      label: labels.resources.memory,
+      primary: formatPercent(memPct, locale),
+      secondary: `${formatBytes(overview.resources.memoryUsedBytes, locale)} / ${formatBytes(overview.resources.memoryTotalBytes, locale)}`,
+      ratio: memPct,
+    },
+    {
+      key: 'disk',
+      label: labels.resources.disk,
+      primary: formatPercent(diskPct, locale),
+      secondary: `${formatBytes(overview.resources.diskUsedBytes, locale)} / ${formatBytes(overview.resources.diskTotalBytes, locale)}`,
+      ratio: diskPct,
+    },
+  ];
+
+  return (
+    <section className="space-y-4">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="font-display text-lg font-bold tracking-tight">{labels.resources.title}</h2>
+        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-dockora-accent">
+          {labels.resources.realtime}
+        </p>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-3">
+        {rows.map((row) => (
+          <div
+            key={row.key}
+            className="space-y-4 rounded-2xl border border-dockora-border bg-dockora-surface/80 p-5"
+          >
+            <div className="flex items-baseline justify-between">
+              <p className="text-sm font-medium text-dockora-muted">{row.label}</p>
+              <p className="font-mono text-3xl font-bold tabular-nums text-dockora-accent">
+                {row.primary}
+              </p>
+            </div>
+            <ProgressBar value={row.ratio} />
+            {row.secondary ? (
+              <p className="font-mono text-[11px] text-dockora-muted">{row.secondary}</p>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function LifetimePeaks({
+  lifetime,
+  labels,
+  locale,
+}: {
+  lifetime: DashboardOverview['lifetime'];
+  labels: {
+    lifetime: { title: string; peaks: string; averages: string };
+    resources: { cpu: string; memory: string; disk: string };
+  };
+  locale: string;
+}) {
+  const rows = [
+    {
+      key: 'cpu',
+      label: labels.resources.cpu,
+      peak: lifetime.peakCpuPercent,
+      avg: lifetime.avgCpuPercent,
+    },
+    {
+      key: 'mem',
+      label: labels.resources.memory,
+      peak: lifetime.peakMemoryPercent,
+      avg: lifetime.avgMemoryPercent,
+    },
+    {
+      key: 'disk',
+      label: labels.resources.disk,
+      peak: lifetime.peakDiskPercent,
+      avg: lifetime.avgDiskPercent,
+    },
+  ];
+
+  return (
+    <section className="space-y-4">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="font-display text-lg font-bold tracking-tight">{labels.lifetime.title}</h2>
+        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-dockora-muted">
+          {labels.lifetime.peaks} · {labels.lifetime.averages}
+        </p>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-3">
+        {rows.map((row) => (
+          <div
+            key={row.key}
+            className="rounded-2xl border border-dockora-border bg-dockora-surface/60 px-4 py-3"
+          >
+            <p className="text-xs text-dockora-muted">{row.label}</p>
+            <div className="mt-2 flex items-baseline justify-between gap-2 font-mono text-sm">
+              <span>
+                {labels.lifetime.peaks}:{' '}
+                <span className="font-semibold text-dockora-text">
+                  {formatPercent(row.peak, locale)}
+                </span>
+              </span>
+              <span className="text-dockora-muted">
+                {labels.lifetime.averages}: {formatPercent(row.avg, locale)}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function LifetimeContainerEvents({
+  lifetime,
+  labels,
+}: {
+  lifetime: DashboardOverview['lifetime'];
+  labels: {
+    events: string;
+    starts: string;
+    stops: string;
+    dies: string;
+    restarts: string;
+    maxContainers: string;
+  };
+}) {
+  const items = [
+    { label: labels.starts, value: lifetime.containerStarts, tone: 'text-dockora-success' },
+    { label: labels.stops, value: lifetime.containerStops, tone: 'text-dockora-muted' },
+    { label: labels.dies, value: lifetime.containerDies, tone: 'text-dockora-danger' },
+    { label: labels.restarts, value: lifetime.containerRestarts, tone: 'text-dockora-warning' },
+    { label: labels.maxContainers, value: lifetime.maxContainersSeen, tone: 'text-dockora-accent' },
+  ];
+
+  return (
+    <section className="space-y-4">
+      <h2 className="font-display text-lg font-bold tracking-tight">{labels.events}</h2>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+        {items.map((item) => (
+          <div
+            key={item.label}
+            className="rounded-2xl border border-dockora-border bg-dockora-surface/80 px-4 py-4"
+          >
+            <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-dockora-muted">
+              {item.label}
+            </p>
+            <p className={cn('mt-2 font-mono text-3xl font-bold tabular-nums', item.tone)}>
+              {item.value}
+            </p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function LiveBadge({
+  state,
+  lastUpdated,
+  labels,
+  locale,
+  onRefresh,
+}: {
+  state: UseDashboardResult['state'];
+  lastUpdated: Date | null;
+  labels: { live: string; updating: string; refresh: string; lastUpdate: string };
+  locale: string;
+  onRefresh: () => void;
+}) {
+  const isLive = state === 'ready' || state === 'loading';
+
+  return (
+    <div className="flex items-center gap-3 self-start rounded-xl border border-dockora-border bg-dockora-surface/90 px-3 py-2 sm:self-auto">
+      <div className="flex items-center gap-2 text-xs">
+        <span
+          className={cn(
+            'h-2 w-2 rounded-full',
+            isLive ? 'dockora-pulse bg-dockora-accent' : 'bg-dockora-danger',
+          )}
+        />
+        <span className="font-medium">
+          {state === 'loading' && !lastUpdated ? labels.updating : labels.live}
+        </span>
+        {lastUpdated ? (
+          <span className="hidden text-dockora-muted sm:inline">
+            {labels.lastUpdate}{' '}
+            {lastUpdated.toLocaleTimeString(locale, {
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+            })}
+          </span>
+        ) : null}
+      </div>
+      <Button onClick={onRefresh}>{labels.refresh}</Button>
+    </div>
+  );
+}
+
+function EngineStrip({
+  overview,
+  labels,
+}: {
+  overview: DashboardOverview;
+  labels: {
+    engine: string;
+    compose: string;
+    status: string;
+    online: string;
+    offline: string;
+    unknown: string;
+    versionUnknown: string;
+  };
+}) {
+  const statusLabel =
+    overview.docker.engineStatus === 'online'
+      ? labels.online
+      : overview.docker.engineStatus === 'offline'
+        ? labels.offline
+        : labels.unknown;
+
+  return (
+    <section className="grid gap-3 sm:grid-cols-3">
+      {[
+        {
+          label: labels.status,
+          value: statusLabel,
+          className:
+            overview.docker.engineStatus === 'online'
+              ? 'text-dockora-success'
+              : overview.docker.engineStatus === 'offline'
+                ? 'text-dockora-danger'
+                : 'text-dockora-muted',
+        },
+        {
+          label: labels.engine,
+          value: overview.docker.engineVersion ?? labels.versionUnknown,
+          className: 'font-mono',
+        },
+        {
+          label: labels.compose,
+          value: overview.docker.composeVersion ?? labels.versionUnknown,
+          className: 'font-mono',
+        },
+      ].map((item) => (
+        <div
+          key={item.label}
+          className="rounded-2xl border border-dockora-border bg-dockora-surface/80 px-4 py-4"
+        >
+          <p className="text-xs text-dockora-muted">{item.label}</p>
+          <p className={cn('mt-1 text-lg font-semibold', item.className)}>{item.value}</p>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function EventsPanel({
+  events,
+  labels,
+  locale,
+}: {
+  events: DashboardOverview['recentEvents'];
+  labels: { title: string; empty: string };
+  locale: string;
+}) {
+  return (
+    <section className="rounded-2xl border border-dockora-border bg-dockora-surface/80">
+      <h2 className="border-b border-dockora-border px-4 py-3 font-display text-base font-bold">
+        {labels.title}
+      </h2>
+      {events.length === 0 ? (
+        <p className="px-4 py-6 text-sm text-dockora-muted">{labels.empty}</p>
+      ) : (
+        <ul className="divide-y divide-dockora-border">
+          {events.map((event) => (
+            <li key={event.id} className="flex items-start justify-between gap-3 px-4 py-3 text-sm">
+              <div className="min-w-0">
+                <p className="truncate font-medium">{event.message}</p>
+                <p className="mt-0.5 font-mono text-[11px] text-dockora-muted">{event.type}</p>
+              </div>
+              <time className="shrink-0 font-mono text-[11px] text-dockora-muted">
+                {formatRelativeTime(event.timestamp, locale)}
+              </time>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function AsideColumn({
+  notifications,
+  updatesAvailable,
+  labels,
+  locale,
+}: {
+  notifications: DashboardOverview['notifications'];
+  updatesAvailable: number;
+  labels: {
+    notifications: { title: string; empty: string };
+    updates: { title: string; none: string; available: string };
+  };
+  locale: string;
+}) {
+  return (
+    <div className="space-y-4">
+      <section className="rounded-2xl border border-dockora-border bg-dockora-surface/80 px-4 py-4">
+        <h2 className="font-display text-base font-bold">{labels.updates.title}</h2>
+        <p
+          className={cn(
+            'mt-2 text-sm',
+            updatesAvailable > 0 ? 'text-dockora-warning' : 'text-dockora-muted',
+          )}
+        >
+          {updatesAvailable > 0
+            ? labels.updates.available.replace('{count}', String(updatesAvailable))
+            : labels.updates.none}
+        </p>
+      </section>
+
+      <section className="rounded-2xl border border-dockora-border bg-dockora-surface/80 px-4 py-4">
+        <h2 className="font-display text-base font-bold">{labels.notifications.title}</h2>
+        {notifications.length === 0 ? (
+          <p className="mt-2 text-sm text-dockora-muted">{labels.notifications.empty}</p>
+        ) : (
+          <ul className="mt-3 space-y-3">
+            {notifications.map((n) => (
+              <li key={n.id} className="rounded-xl border border-dockora-border px-3 py-2">
+                <p className="text-sm font-medium">{n.title}</p>
+                <p className="text-xs text-dockora-muted">{n.message}</p>
+                <time className="font-mono text-[11px] text-dockora-muted">
+                  {formatRelativeTime(n.timestamp, locale)}
+                </time>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
+  );
+}
