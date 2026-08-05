@@ -15,9 +15,14 @@ services:
       DATABASE_URL: file:/data/dockora.db
       BACKUP_DIR: /data/backups
       DOCKER_SOCKET: /var/run/docker.sock
+      # Public browser origin (scheme + host + port)
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+      # Required – compose will fail if unset; must be strong in production
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-admin@dockora.local}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:?BOOTSTRAP_ADMIN_PASSWORD is required}
       COMPOSE_SEARCH_PATHS: ${COMPOSE_SEARCH_PATHS:-/opt,/srv,/home}
+      DOCKORA_SELF_IMAGE: ${DOCKORA_SELF_IMAGE:-}
     volumes:
       - dockora-data:/data
       - ${DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock
