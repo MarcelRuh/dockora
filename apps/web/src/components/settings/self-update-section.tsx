@@ -42,14 +42,16 @@ export function SelfUpdateSection() {
       const result = await applySelfUpdate();
       setSuccess(result.message);
       await load();
-      if (result.mode === 'compose') {
-        // Stack rebuild restarts API/Web – poll briefly then reload page
+      // Compose-Stack-Rebuild: Seite nach kurzer Pause neu laden.
+      // Host/Dev: kein langes Warten – Status kommt sofort zurück.
+      if (result.mode === 'compose' && /neu gebaut|Stack/i.test(result.message)) {
         window.setTimeout(() => {
           window.location.reload();
-        }, 90_000);
+        }, 15_000);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : t.common.failed);
+      await load();
     } finally {
       setBusy(false);
     }

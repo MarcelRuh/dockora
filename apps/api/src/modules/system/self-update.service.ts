@@ -1,4 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import path from 'node:path';
 import { APP_VERSION } from '@dockora/shared';
 import { request } from 'undici';
@@ -6,6 +8,8 @@ import type Docker from 'dockerode';
 import type { IDockerClient } from '../../domain/ports.js';
 import { apiRepositoryPath, parseImageRef, pickDigest } from '../updates/registry.js';
 import { SELF_UPDATE_APPLY_SCRIPT } from './self-update-apply.sh.js';
+
+const execFileAsync = promisify(execFile);
 
 export type SelfUpdateMode = 'compose' | 'image' | 'none';
 
@@ -33,29 +37,27 @@ export interface SelfUpdateApplyResult {
 }
 
 export interface SelfUpdateOptions {
-  /** Host-Pfad der Installation (Bind für Updater) */
   installDirHost: string | null;
-  /** Pfad innerhalb des API-Containers zum Lesen von .dockora-revision */
   installDirMount: string | null;
   repo: string;
   branch: string;
-  /** Optionaler Override der lokalen Revision (Compose-Env) */
   gitSha: string | null;
-  /** Image-Modus (bestehend) */
   selfImage: string | null;
   updaterImage?: string;
 }
 
 const UPDATER_NAME = 'dockora-self-updater';
 const DEFAULT_UPDATER_IMAGE = 'docker:27-cli';
+const APPLY_TIMEOUT_MS = 20 * 60 * 1000;
 
 /**
  * Self-Update für Dockora selbst:
- * - compose: GitHub-Commit prüfen, Source syncen, `docker compose up -d --build`
- * - image: DOCKORA_SELF_IMAGE pullen (Restart manuell / Compose)
+ * - compose: GitHub-Commit prüfen, Source syncen (+ optional compose rebuild)
+ * - image: DOCKORA_SELF_IMAGE pullen
  */
 export class SelfUpdateService {
-  private updating = false;
+  /** Kurzer Optimistic-Lock, damit Doppelklicks nicht parallel starten */
+  private applyInFlight = false;
 
   constructor(
     private readonly docker: IDockerClient,
@@ -63,10 +65,12 @@ export class SelfUpdateService {
   ) {}
 
   async status(): Promise<SelfUpdateStatus> {
-    const compose = await this.composeStatus();
+    const updating = this.applyInFlight || (await this.isUpdaterRunning());
+
+    const compose = await this.composeStatus(updating);
     if (compose.enabled) return compose;
 
-    const image = await this.imageStatus();
+    const image = await this.imageStatus(updating);
     if (image.enabled) return image;
 
     return {
@@ -84,12 +88,12 @@ export class SelfUpdateService {
       installDir: this.options.installDirHost,
       repo: this.options.repo,
       branch: this.options.branch,
-      updating: this.updating,
+      updating,
     };
   }
 
   async apply(): Promise<SelfUpdateApplyResult> {
-    if (this.updating) {
+    if (this.applyInFlight || (await this.isUpdaterRunning())) {
       return { ok: false, message: 'Update läuft bereits', mode: 'compose' };
     }
 
@@ -107,7 +111,7 @@ export class SelfUpdateService {
     return { ok: false, message: 'Kein Update-Modus aktiv', mode: 'none' };
   }
 
-  private async composeStatus(): Promise<SelfUpdateStatus> {
+  private async composeStatus(updating: boolean): Promise<SelfUpdateStatus> {
     const hostDir = this.options.installDirHost;
     const mount = this.options.installDirMount ?? hostDir;
     const base: SelfUpdateStatus = {
@@ -124,7 +128,7 @@ export class SelfUpdateService {
       installDir: hostDir,
       repo: this.options.repo,
       branch: this.options.branch,
-      updating: this.updating,
+      updating,
     };
 
     if (!hostDir || !mount) {
@@ -164,15 +168,15 @@ export class SelfUpdateService {
       localRevision,
       remoteRevision,
       updateAvailable,
-      message: this.updating
-        ? 'Update läuft – Stack wird neu gebaut…'
+      message: updating
+        ? 'Update läuft…'
         : updateAvailable
-          ? 'Update verfügbar – Source von GitHub holen und Stack neu bauen'
+          ? 'Update verfügbar – Source von GitHub holen und anwenden'
           : 'Up to date',
     };
   }
 
-  private async imageStatus(): Promise<SelfUpdateStatus> {
+  private async imageStatus(updating: boolean): Promise<SelfUpdateStatus> {
     const image = this.options.selfImage;
     const base: SelfUpdateStatus = {
       enabled: false,
@@ -188,7 +192,7 @@ export class SelfUpdateService {
       installDir: this.options.installDirHost,
       repo: this.options.repo,
       branch: this.options.branch,
-      updating: this.updating,
+      updating,
     };
 
     if (!image) return base;
@@ -235,11 +239,75 @@ export class SelfUpdateService {
 
   private async applyCompose(): Promise<SelfUpdateApplyResult> {
     const hostDir = this.options.installDirHost;
-    if (!hostDir) {
+    const mount = this.options.installDirMount ?? hostDir;
+    if (!hostDir || !mount) {
       return { ok: false, message: 'DOCKORA_INSTALL_DIR ist nicht gesetzt', mode: 'compose' };
     }
 
-    this.updating = true;
+    this.applyInFlight = true;
+    try {
+      // Host/Dev (API nicht in Docker): Dateien syncen, kein compose rebuild
+      if (!existsSync('/.dockerenv')) {
+        return await this.applyOnHost(mount);
+      }
+      return await this.applyViaUpdaterContainer(hostDir);
+    } finally {
+      this.applyInFlight = false;
+    }
+  }
+
+  private async applyOnHost(installMount: string): Promise<SelfUpdateApplyResult> {
+    const scriptPath = path.join(installMount, 'scripts', 'self-update-apply.sh');
+    try {
+      if (existsSync(scriptPath)) {
+        const { stdout, stderr } = await execFileAsync('sh', [scriptPath], {
+          env: {
+            ...process.env,
+            DOCKORA_INSTALL_DIR: installMount,
+            DOCKORA_REPO: this.options.repo,
+            DOCKORA_UPDATE_BRANCH: this.options.branch,
+            DOCKORA_SKIP_COMPOSE: '1',
+          },
+          timeout: APPLY_TIMEOUT_MS,
+          maxBuffer: 4 * 1024 * 1024,
+        });
+        const tail = `${stdout}\n${stderr}`.trim().split('\n').slice(-6).join('\n');
+        return {
+          ok: true,
+          mode: 'compose',
+          message: `Dateien aktualisiert (Host/Dev). API ggf. neu starten.\n${tail}`,
+        };
+      }
+
+      // Fallback: embedded script via sh -c
+      const { stdout, stderr } = await execFileAsync('sh', ['-c', SELF_UPDATE_APPLY_SCRIPT], {
+        env: {
+          ...process.env,
+          DOCKORA_INSTALL_DIR: installMount,
+          DOCKORA_REPO: this.options.repo,
+          DOCKORA_UPDATE_BRANCH: this.options.branch,
+          DOCKORA_SKIP_COMPOSE: '1',
+        },
+        timeout: APPLY_TIMEOUT_MS,
+        maxBuffer: 4 * 1024 * 1024,
+      });
+      const tail = `${stdout}\n${stderr}`.trim().split('\n').slice(-6).join('\n');
+      return {
+        ok: true,
+        mode: 'compose',
+        message: `Dateien aktualisiert (Host/Dev). API ggf. neu starten.\n${tail}`,
+      };
+    } catch (error) {
+      const err = error as { message?: string; stdout?: string; stderr?: string };
+      return {
+        ok: false,
+        mode: 'compose',
+        message: [err.message, err.stderr, err.stdout].filter(Boolean).join('\n') || String(error),
+      };
+    }
+  }
+
+  private async applyViaUpdaterContainer(hostDir: string): Promise<SelfUpdateApplyResult> {
     try {
       const raw = this.docker.getRaw() as Docker;
       const updaterImage = this.options.updaterImage ?? DEFAULT_UPDATER_IMAGE;
@@ -247,8 +315,7 @@ export class SelfUpdateService {
       await pullImageQuiet(raw, updaterImage);
 
       try {
-        const existing = raw.getContainer(UPDATER_NAME);
-        await existing.remove({ force: true });
+        await raw.getContainer(UPDATER_NAME).remove({ force: true });
       } catch {
         // not present
       }
@@ -261,14 +328,12 @@ export class SelfUpdateService {
           'DOCKORA_INSTALL_DIR=/install',
           `DOCKORA_REPO=${this.options.repo}`,
           `DOCKORA_UPDATE_BRANCH=${this.options.branch}`,
+          'DOCKORA_SKIP_COMPOSE=0',
         ],
         WorkingDir: '/install',
         HostConfig: {
-          Binds: [
-            `${hostDir}:/install`,
-            '/var/run/docker.sock:/var/run/docker.sock',
-          ],
-          AutoRemove: true,
+          Binds: [`${hostDir}:/install`, '/var/run/docker.sock:/var/run/docker.sock'],
+          AutoRemove: false,
         },
         Labels: {
           'dockora.update': 'self',
@@ -276,15 +341,43 @@ export class SelfUpdateService {
       });
 
       await container.start();
+      const waitResult = await Promise.race([
+        container.wait(),
+        new Promise<{ StatusCode: number }>((_, reject) => {
+          setTimeout(() => reject(new Error('Update-Timeout (20 Min.)')), APPLY_TIMEOUT_MS);
+        }),
+      ]);
+
+      let logs = '';
+      try {
+        const buf = await container.logs({ stdout: true, stderr: true, tail: 40 });
+        logs = Buffer.isBuffer(buf) ? buf.toString('utf8') : String(buf);
+      } catch {
+        // ignore
+      }
+
+      try {
+        await container.remove({ force: true });
+      } catch {
+        // ignore
+      }
+
+      const code = typeof waitResult?.StatusCode === 'number' ? waitResult.StatusCode : 1;
+      if (code !== 0) {
+        return {
+          ok: false,
+          mode: 'compose',
+          message: `Updater beendet mit Code ${code}.\n${logs.trim()}`,
+        };
+      }
 
       return {
         ok: true,
         mode: 'compose',
         message:
-          'Update gestartet. Dockora wird kurz neu gebaut und neu gestartet – Seite in 1–2 Minuten neu laden.',
+          'Update abgeschlossen. Stack wurde neu gebaut – Seite neu laden.\n' + logs.trim().slice(-500),
       };
     } catch (error) {
-      this.updating = false;
       return {
         ok: false,
         mode: 'compose',
@@ -301,7 +394,7 @@ export class SelfUpdateService {
 
     try {
       await this.docker.pullImage(image);
-      const after = await this.imageStatus();
+      const after = await this.imageStatus(false);
       return {
         ok: true,
         mode: 'image',
@@ -313,6 +406,16 @@ export class SelfUpdateService {
         mode: 'image',
         message: error instanceof Error ? error.message : String(error),
       };
+    }
+  }
+
+  private async isUpdaterRunning(): Promise<boolean> {
+    try {
+      const raw = this.docker.getRaw() as Docker;
+      const info = await raw.getContainer(UPDATER_NAME).inspect();
+      return Boolean(info.State?.Running);
+    } catch {
+      return false;
     }
   }
 }
@@ -333,7 +436,6 @@ export function revisionsMatch(local: string, remote: string): boolean {
   const a = local.trim().toLowerCase();
   const b = remote.trim().toLowerCase();
   if (a === b) return true;
-  // short SHA vs full
   if (a.length >= 7 && b.length >= 7 && (a.startsWith(b) || b.startsWith(a))) return true;
   return false;
 }

@@ -1,7 +1,5 @@
 /**
  * Shell-Skript für den One-Shot-Updater-Container (docker:cli).
- * Als String eingebettet, damit Apply auch ohne aktuelles scripts/-File im Host-Tree läuft.
- *
  * JS-Template: `\${...}` → Shell sieht `${...}`.
  */
 export const SELF_UPDATE_APPLY_SCRIPT = `#!/bin/sh
@@ -10,11 +8,12 @@ set -eu
 INSTALL_DIR="\${DOCKORA_INSTALL_DIR:-/install}"
 REPO="\${DOCKORA_REPO:-MarcelRuh/dockora}"
 BRANCH="\${DOCKORA_UPDATE_BRANCH:-main}"
+SKIP_COMPOSE="\${DOCKORA_SKIP_COMPOSE:-0}"
 API_URL="https://api.github.com/repos/\${REPO}/commits/\${BRANCH}"
 TARBALL_URL="https://github.com/\${REPO}/archive/refs/heads/\${BRANCH}.tar.gz"
 
 echo "==> Dockora self-update"
-echo "    dir=\${INSTALL_DIR} repo=\${REPO} branch=\${BRANCH}"
+echo "    dir=\${INSTALL_DIR} repo=\${REPO} branch=\${BRANCH} skip_compose=\${SKIP_COMPOSE}"
 
 if [ ! -f "\${INSTALL_DIR}/docker-compose.yml" ]; then
   echo "ERROR: docker-compose.yml missing in \${INSTALL_DIR}" >&2
@@ -30,11 +29,13 @@ need() {
 
 need wget
 need tar
-need docker
 
-if ! docker compose version >/dev/null 2>&1; then
-  echo "ERROR: docker compose plugin required" >&2
-  exit 1
+if [ "\$SKIP_COMPOSE" != "1" ]; then
+  need docker
+  if ! docker compose version >/dev/null 2>&1; then
+    echo "ERROR: docker compose plugin required" >&2
+    exit 1
+  fi
 fi
 
 TMP="\$(mktemp -d)"
@@ -73,6 +74,12 @@ tar cf - \\
 
 printf '%s\\n' "\$SHA" > "\${INSTALL_DIR}/.dockora-revision"
 echo "    wrote .dockora-revision"
+
+if [ "\$SKIP_COMPOSE" = "1" ]; then
+  echo "==> Skip compose rebuild (host/dev mode)"
+  echo "==> Done. Restart API/Web if they do not hot-reload."
+  exit 0
+fi
 
 echo "==> Rebuilding stack (docker compose up -d --build)"
 cd "\$INSTALL_DIR"
