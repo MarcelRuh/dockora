@@ -43,6 +43,21 @@ The API **refuses to start** in `NODE_ENV=production` with weak JWT/bootstrap se
 
 Point your TLS terminator at the `proxy` service (or `web` + `/api` → `api:3001` with WebSocket upgrade and `proxy_buffering off` for SSE). See `deploy/nginx.conf`.
 
+### Fast path: GHCR images
+
+```bash
+cp .env.example .env
+# set JWT_SECRET + BOOTSTRAP_ADMIN_PASSWORD
+DOCKORA_IMAGE_TAG=1.1.0 docker compose -f docker-compose.yml -f docker-compose.images.yml up -d
+```
+
+Make packages public once (needs `read:packages,write:packages` on your `gh` token):
+
+```bash
+gh auth refresh -h github.com -s read:packages,write:packages
+./scripts/make-ghcr-public.sh
+```
+
 ## Upgrades
 
 ### In-app (Compose installs via `install.sh`)

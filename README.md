@@ -5,7 +5,7 @@
 [![CI](https://github.com/MarcelRuh/dockora/actions/workflows/ci.yml/badge.svg)](https://github.com/MarcelRuh/dockora/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
-> Status: **v1.1.0** – feature-complete baseline for self-hosted production use (inkl. In-App-Update).
+> Status: **v1.2.0** – self-hosted Docker management with in-app updates and GHCR images.
 
 ## One-line install (wget)
 
@@ -44,6 +44,20 @@ wget -qO- https://raw.githubusercontent.com/MarcelRuh/dockora/main/scripts/updat
 ```
 
 Preserves `.env` and `data/`, syncs from GitHub, then runs `docker compose up -d --build`.
+
+### Fast install via GHCR images
+
+```bash
+wget -qO- https://raw.githubusercontent.com/MarcelRuh/dockora/main/scripts/install.sh | DOCKORA_USE_IMAGES=1 DOCKORA_IMAGE_TAG=1.1.0 bash
+```
+
+Or manually:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.images.yml up -d
+```
+
+Images: `ghcr.io/marcelruh/dockora-api` / `dockora-web` (make packages **public** once: `scripts/make-ghcr-public.sh` after `gh auth refresh -s read:packages,write:packages`).
 
 ## Features
 

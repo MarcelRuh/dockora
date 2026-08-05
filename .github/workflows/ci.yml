@@ -66,3 +66,68 @@ jobs:
           JWT_SECRET: ci-test-secret-at-least-16-chars
           DOCKORA_API_URL: http://127.0.0.1:3001
           NEXT_TELEMETRY_DISABLED: '1'
+
+  smoke:
+    name: API smoke
+    needs: build-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm --filter @dockora/shared build
+
+      - name: Prisma generate & migrate
+        working-directory: apps/api
+        env:
+          DATABASE_URL: file:./smoke.db
+        run: |
+          pnpm exec prisma generate
+          pnpm exec prisma migrate deploy
+
+      - name: Start API
+        working-directory: apps/api
+        env:
+          NODE_ENV: development
+          HOST: 127.0.0.1
+          PORT: 3001
+          DATABASE_URL: file:./smoke.db
+          JWT_SECRET: ci-smoke-secret-at-least-32-characters-long
+          BOOTSTRAP_ADMIN_EMAIL: admin@dockora.local
+          BOOTSTRAP_ADMIN_PASSWORD: dockora-admin-change-me
+          CORS_ORIGIN: http://127.0.0.1:3000
+          DOCKER_SOCKET: /var/run/docker.sock
+        run: |
+          pnpm exec tsx src/main.ts > /tmp/dockora-api.log 2>&1 &
+          echo $! > /tmp/dockora-api.pid
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3001/api/v1/health >/dev/null; then
+              echo "API up"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "API failed to start"; cat /tmp/dockora-api.log; exit 1
+
+      - name: E2E smoke
+        env:
+          DOCKORA_API_URL: http://127.0.0.1:3001
+          SMOKE_EMAIL: admin@dockora.local
+          SMOKE_PASSWORD: dockora-admin-change-me
+        run: bash scripts/e2e-smoke.sh
+
+      - name: Stop API
+        if: always()
+        run: |
+          if [[ -f /tmp/dockora-api.pid ]]; then kill "$(cat /tmp/dockora-api.pid)" || true; fi

@@ -305,6 +305,7 @@ export const messages = {
         general: 'Allgemein',
         updates: 'Updates',
         security: 'Sicherheit',
+        plugins: 'Plugins',
       },
       descriptions: {
         general: 'Sprache, Erscheinungsbild und Zeitzone der Oberfläche.',
@@ -314,6 +315,7 @@ export const messages = {
         backup: 'Format, Aufbewahrung und Zeitplan für Backups.',
         monitoring: 'Schwellwerte für Alerts bei Host-Ressourcen.',
         security: 'Authentifizierung und Benutzerverwaltung.',
+        plugins: 'Drop-in-Plugins aktivieren oder deaktivieren.',
       },
       hints: {
         timezone: 'IANA-Zeitzone, z. B. Europe/Berlin oder Etc/UTC.',
@@ -388,6 +390,22 @@ export const messages = {
         applying: 'Update läuft…',
         confirm:
           'Dockora jetzt aktualisieren? Die Oberfläche ist während des Rebuilds kurz nicht erreichbar.',
+        waitingHealth: 'Warte auf API…',
+        healthOk: 'API wieder erreichbar – Seite wird neu geladen.',
+        healthTimeout: 'API antwortet noch nicht – bitte manuell neu laden.',
+      },
+      plugins: {
+        title: 'Plugins',
+        hint: 'Drop-in-Plugins aus dem Plugin-Verzeichnis. Deaktivierte Plugins bleiben auf der Disk, werden aber nicht geladen.',
+        dir: 'Verzeichnis',
+        empty: 'Keine Plugins gefunden.',
+        enable: 'Aktivieren',
+        disable: 'Deaktivieren',
+        enabled: 'Plugin „{name}“ aktiviert.',
+        disabled: 'Plugin „{name}“ deaktiviert.',
+        stateOn: 'Aktiv',
+        stateOff: 'Deaktiviert',
+        loaded: 'geladen',
       },
     },
     theme: {
@@ -704,6 +722,7 @@ export const messages = {
         general: 'General',
         updates: 'Updates',
         security: 'Security',
+        plugins: 'Plugins',
       },
       descriptions: {
         general: 'Language, appearance, and timezone for the UI.',
@@ -713,6 +732,7 @@ export const messages = {
         backup: 'Format, retention, and schedule for backups.',
         monitoring: 'Alert thresholds for host resources.',
         security: 'Authentication and user management.',
+        plugins: 'Enable or disable drop-in plugins.',
       },
       hints: {
         timezone: 'IANA timezone, e.g. Europe/Berlin or Etc/UTC.',
@@ -787,6 +807,22 @@ export const messages = {
         applying: 'Updating…',
         confirm:
           'Update Dockora now? The UI will be briefly unavailable while the stack rebuilds.',
+        waitingHealth: 'Waiting for API…',
+        healthOk: 'API is back – reloading page.',
+        healthTimeout: 'API still unreachable – please reload manually.',
+      },
+      plugins: {
+        title: 'Plugins',
+        hint: 'Drop-in plugins from the plugin directory. Disabled plugins stay on disk but are not loaded.',
+        dir: 'Directory',
+        empty: 'No plugins found.',
+        enable: 'Enable',
+        disable: 'Disable',
+        enabled: 'Plugin “{name}” enabled.',
+        disabled: 'Plugin “{name}” disabled.',
+        stateOn: 'Enabled',
+        stateOff: 'Disabled',
+        loaded: 'loaded',
       },
     },
     theme: {

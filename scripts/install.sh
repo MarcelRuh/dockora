@@ -10,6 +10,8 @@
 #   DOCKORA_BRANCH=main              Git-Branch
 #   DOCKORA_SKIP_START=1             Nur klonen/konfigurieren, nicht starten
 #   DOCKORA_PROXY=1                  nginx Same-Origin-Proxy-Profil mitstarten
+#   DOCKORA_USE_IMAGES=1             GHCR-Images statt lokalem Build
+#   DOCKORA_IMAGE_TAG=1.1.0          Tag für GHCR-Images (default: latest)
 #   JWT_SECRET=...                   sonst wird generiert
 #   BOOTSTRAP_ADMIN_PASSWORD=...     sonst wird generiert (einmal angezeigt)
 
@@ -21,6 +23,8 @@ BRANCH="${DOCKORA_BRANCH:-main}"
 INSTALL_DIR="${DOCKORA_DIR:-/opt/dockora}"
 PROXY="${DOCKORA_PROXY:-0}"
 SKIP_START="${DOCKORA_SKIP_START:-0}"
+USE_IMAGES="${DOCKORA_USE_IMAGES:-0}"
+IMAGE_TAG="${DOCKORA_IMAGE_TAG:-latest}"
 
 red() { printf '\033[31m%s\033[0m\n' "$*"; }
 green() { printf '\033[32m%s\033[0m\n' "$*"; }
@@ -121,16 +125,23 @@ if [[ ! -f .env ]]; then
   BOOTSTRAP_ADMIN_PASSWORD="${BOOTSTRAP_ADMIN_PASSWORD:-$(rand_hex)}"
   # trim password to 24 chars for readability while staying strong
   BOOTSTRAP_ADMIN_PASSWORD="${BOOTSTRAP_ADMIN_PASSWORD:0:24}"
+  BOOTSTRAP_ADMIN_EMAIL="${BOOTSTRAP_ADMIN_EMAIL:-admin@dockora.local}"
 
   replace_env JWT_SECRET "$JWT_SECRET"
   replace_env BOOTSTRAP_ADMIN_PASSWORD "$BOOTSTRAP_ADMIN_PASSWORD"
-  replace_env BOOTSTRAP_ADMIN_EMAIL "${BOOTSTRAP_ADMIN_EMAIL:-admin@dockora.local}"
+  replace_env BOOTSTRAP_ADMIN_EMAIL "$BOOTSTRAP_ADMIN_EMAIL"
 
   green "Generated secrets written to ${INSTALL_DIR}/.env"
-  yellow "Bootstrap admin password (save now): ${BOOTSTRAP_ADMIN_PASSWORD}"
+  NEW_INSTALL=1
 else
   info ".env already exists – leaving secrets unchanged"
+  NEW_INSTALL=0
+  BOOTSTRAP_ADMIN_EMAIL="$(grep -E '^BOOTSTRAP_ADMIN_EMAIL=' .env | head -1 | cut -d= -f2- || true)"
+  BOOTSTRAP_ADMIN_PASSWORD="$(grep -E '^BOOTSTRAP_ADMIN_PASSWORD=' .env | head -1 | cut -d= -f2- || true)"
+  BOOTSTRAP_ADMIN_EMAIL="${BOOTSTRAP_ADMIN_EMAIL:-admin@dockora.local}"
 fi
+
+replace_env DOCKORA_IMAGE_TAG "$IMAGE_TAG"
 
 # Always keep install-dir / repo wiring for in-app self-update
 replace_env DOCKORA_INSTALL_DIR "$INSTALL_DIR"
@@ -158,23 +169,56 @@ chmod +x scripts/*.sh 2>/dev/null || true
 
 if [[ "$SKIP_START" == "1" ]]; then
   green "Skip start requested. Configure ${INSTALL_DIR}/.env then run:"
-  echo "  cd ${INSTALL_DIR} && docker compose up -d --build"
+  if [[ "$USE_IMAGES" == "1" ]]; then
+    echo "  cd ${INSTALL_DIR} && docker compose -f docker-compose.yml -f docker-compose.images.yml up -d"
+  else
+    echo "  cd ${INSTALL_DIR} && docker compose up -d --build"
+  fi
   exit 0
 fi
 
-info "Building and starting containers"
+COMPOSE=(docker compose -f docker-compose.yml)
+if [[ "$USE_IMAGES" == "1" ]]; then
+  COMPOSE+=(-f docker-compose.images.yml)
+  info "Using GHCR images (tag ${IMAGE_TAG})"
+  "${COMPOSE[@]}" pull
+  if [[ "$PROXY" == "1" ]]; then
+    "${COMPOSE[@]}" --profile proxy up -d
+  else
+    "${COMPOSE[@]}" up -d
+  fi
+else
+  info "Building and starting containers"
+  if [[ "$PROXY" == "1" ]]; then
+    docker compose --profile proxy up -d --build
+  else
+    docker compose up -d --build
+  fi
+fi
+
 if [[ "$PROXY" == "1" ]]; then
-  docker compose --profile proxy up -d --build
   WEB_HINT="http://$(hostname -f 2>/dev/null || echo localhost):${DOCKORA_PROXY_PORT:-8080}"
 else
-  docker compose up -d --build
   WEB_HINT="http://$(hostname -f 2>/dev/null || echo localhost):${DOCKORA_WEB_PORT:-3000}"
 fi
 
 green "Dockora is starting."
-echo "  UI:     ${WEB_HINT}"
-echo "  API:    http://localhost:${DOCKORA_API_PORT:-3001}/api/v1/health"
-echo "  Dir:    ${INSTALL_DIR}"
-echo "  Logs:   docker compose -f ${INSTALL_DIR}/docker-compose.yml logs -f"
 echo
-yellow "Login with BOOTSTRAP_ADMIN_EMAIL / password from .env (shown above if newly generated)."
+echo "┌──────────────────────────────────────────────┐"
+echo "│  Login                                       │"
+echo "├──────────────────────────────────────────────┤"
+echo "│  UI:       ${WEB_HINT}"
+echo "│  E-Mail:   ${BOOTSTRAP_ADMIN_EMAIL}"
+if [[ "$NEW_INSTALL" == "1" ]]; then
+  echo "│  Passwort: ${BOOTSTRAP_ADMIN_PASSWORD}"
+else
+  echo "│  Passwort: (siehe ${INSTALL_DIR}/.env)"
+fi
+echo "│  Dir:      ${INSTALL_DIR}"
+echo "└──────────────────────────────────────────────┘"
+echo
+if [[ "$NEW_INSTALL" == "1" ]]; then
+  yellow "Passwort jetzt speichern – es wird nicht erneut angezeigt."
+fi
+echo "  API:    http://localhost:${DOCKORA_API_PORT:-3001}/api/v1/health"
+echo "  Logs:   docker compose -f ${INSTALL_DIR}/docker-compose.yml logs -f"
