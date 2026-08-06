@@ -1,4 +1,5 @@
 import type { UpdateCheckResult, RegistryProvider } from '@dockora/shared';
+import { isDockoraSelfContainer } from '../../domain/dockora-self.js';
 import type { IDockerClient } from '../../domain/ports.js';
 import { prisma } from '../../infrastructure/db/prisma.js';
 import {
@@ -34,7 +35,9 @@ export class UpdatesService {
   }
 
   async checkAll(allContainers = false): Promise<UpdateCheckResult[]> {
-    const containers = await this.deps.docker.listContainers(allContainers);
+    const containers = (await this.deps.docker.listContainers(allContainers)).filter(
+      (c) => !isDockoraSelfContainer(c),
+    );
     const results: UpdateCheckResult[] = [];
 
     for (const container of containers) {

@@ -6,6 +6,7 @@ import type {
   ContainerStatsSnapshot,
   ContainerSummary,
 } from '@dockora/shared';
+import { isDockoraSelfContainer } from '../../domain/dockora-self.js';
 import type { DockerContainerDetails, DockerContainerInfo, IDockerClient } from '../../domain/ports.js';
 
 export interface ContainersServiceDeps {
@@ -17,7 +18,10 @@ export class ContainersService {
 
   async list(filters: ContainerFilter = {}): Promise<ContainerSummary[]> {
     const all = await this.deps.docker.listContainers(true);
-    return all.filter((c) => this.matchesFilter(c, filters)).map(toSummary);
+    return all
+      .filter((c) => !isDockoraSelfContainer(c))
+      .filter((c) => this.matchesFilter(c, filters))
+      .map(toSummary);
   }
 
   async getDetails(id: string): Promise<ContainerDetails> {

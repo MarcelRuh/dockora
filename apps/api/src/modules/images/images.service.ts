@@ -1,12 +1,14 @@
 import type { ActionResult, ImageSummary } from '@dockora/shared';
+import {
+  isDockoraSelfContainer,
+  isDockoraSelfImageTags,
+  isImageUsedOnlyByDockoraSelf,
+} from '../../domain/dockora-self.js';
 import type { IDockerClient } from '../../domain/ports.js';
-
-/** Standard: Images der Dockora-Suite selbst ausblenden */
-const DEFAULT_EXCLUDE_TAG_PATTERNS = [/^dockora(-|[/:])/i, /^dockora$/i];
 
 export interface ImagesServiceDeps {
   docker: IDockerClient;
-  /** Zusätzliche Regex-Quellen; Default blendet dockora-* aus */
+  /** Zusätzliche Regex-Quellen (IMAGE_EXCLUDE_PREFIXES) */
   excludeTagPatterns?: RegExp[];
 }
 
@@ -14,10 +16,7 @@ export class ImagesService {
   private readonly excludeTagPatterns: RegExp[];
 
   constructor(private readonly deps: ImagesServiceDeps) {
-    this.excludeTagPatterns =
-      deps.excludeTagPatterns && deps.excludeTagPatterns.length > 0
-        ? deps.excludeTagPatterns
-        : DEFAULT_EXCLUDE_TAG_PATTERNS;
+    this.excludeTagPatterns = deps.excludeTagPatterns ?? [];
   }
 
   async list(): Promise<ImageSummary[]> {
@@ -26,18 +25,35 @@ export class ImagesService {
       this.deps.docker.listContainers(true),
     ]);
 
+    const selfNames = new Set(
+      containers.filter((c) => isDockoraSelfContainer(c)).map((c) => c.name.toLowerCase()),
+    );
     const usedByMap = buildUsedByMap(containers);
+    const usedByExternalMap = buildUsedByMap(
+      containers.filter((c) => !isDockoraSelfContainer(c)),
+    );
 
     return images
-      .filter((img) => !isExcludedImage(img.tags, this.excludeTagPatterns))
-      .map((img) => ({
-        id: img.id,
-        tags: img.tags,
-        size: img.size,
-        createdAt: img.createdAt,
-        dangling: img.dangling,
-        usedBy: usedByMap.get(img.id) ?? usedByMap.get(normalizeImageId(img.id)) ?? [],
-      }));
+      .filter((img) => {
+        const allUsers =
+          usedByMap.get(img.id) ?? usedByMap.get(normalizeImageId(img.id)) ?? [];
+        if (isImageUsedOnlyByDockoraSelf(allUsers, selfNames)) return false;
+        return !isExcludedImage(img.tags, this.excludeTagPatterns);
+      })
+      .map((img) => {
+        const usedBy =
+          usedByExternalMap.get(img.id) ??
+          usedByExternalMap.get(normalizeImageId(img.id)) ??
+          [];
+        return {
+          id: img.id,
+          tags: img.tags,
+          size: img.size,
+          createdAt: img.createdAt,
+          dangling: img.dangling,
+          usedBy,
+        };
+      });
   }
 
   async pull(image: string): Promise<ActionResult> {
@@ -64,7 +80,8 @@ export class ImagesService {
 }
 
 function isExcludedImage(tags: string[], patterns: RegExp[]): boolean {
-  if (tags.length === 0) return false;
+  if (isDockoraSelfImageTags(tags)) return true;
+  if (tags.length === 0 || patterns.length === 0) return false;
   return tags.some((tag) => {
     const repo = tag.split(':')[0] ?? tag;
     return patterns.some((re) => re.test(tag) || re.test(repo));

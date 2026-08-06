@@ -10,6 +10,7 @@ import type {
   ComposeProjectDetails,
   ComposeProjectSummary,
 } from '@dockora/shared';
+import { isDockoraSelfComposeProject } from '../../domain/dockora-self.js';
 import type { IDockerClient } from '../../domain/ports.js';
 import {
   COMPOSE_FILENAMES,
@@ -41,18 +42,20 @@ export class ComposeService {
       this.deps.docker.listContainers(true),
     ]);
 
-    return projects.map((p) => {
-      const { status, containerCount, runningCount } = resolveComposeStatus(p.name, containers);
-      return {
-        id: encodeComposeId(p.absoluteComposePath),
-        name: p.name,
-        path: p.path,
-        composeFile: p.composeFile,
-        status,
-        containerCount,
-        runningCount,
-      };
-    });
+    return projects
+      .filter((p) => !isDockoraSelfComposeProject({ name: p.name, path: p.path }))
+      .map((p) => {
+        const { status, containerCount, runningCount } = resolveComposeStatus(p.name, containers);
+        return {
+          id: encodeComposeId(p.absoluteComposePath),
+          name: p.name,
+          path: p.path,
+          composeFile: p.composeFile,
+          status,
+          containerCount,
+          runningCount,
+        };
+      });
   }
 
   async getDetails(id: string): Promise<ComposeProjectDetails> {

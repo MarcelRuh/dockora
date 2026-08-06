@@ -7,29 +7,76 @@ interface CpuSample {
   total: number;
 }
 
+interface MemorySample {
+  usedBytes: number;
+  totalBytes: number;
+}
+
 /**
- * Host-Ressourcen (CPU/RAM/Disk) – unabhängig von Docker.
- * CPU wird über zwei /proc/stat-Samples (Linux) oder loadavg-Fallback gemessen.
+ * Host-/Gast-Ressourcen (CPU/RAM/Disk).
+ *
+ * Docker-in-LXC: `/proc/meminfo` im Container zeigt oft den Hypervisor.
+ * Bind-Mounts von `/proc/*` sind unzuverlässig (falsche MemAvailable).
+ * Daher bevorzugt: Snap-Datei vom Host-Agent (`nsenter` → `/data/host-proc.snap`).
  */
 export class HostMetricsService implements IHostMetrics {
-  constructor(private readonly sampleDelayMs = 200) {}
+  private lastCpuSample: CpuSample | null = null;
+
+  constructor(
+    private readonly sampleDelayMs = 200,
+    private readonly snapPath = process.env.DOCKORA_HOST_PROC_SNAP?.trim() || '/data/host-proc.snap',
+    private readonly procRoots: string[] = defaultProcRoots(),
+  ) {}
 
   async getResources(diskPath = '/'): Promise<HostResources> {
-    const memoryTotalBytes = os.totalmem();
-    const memoryUsedBytes = memoryTotalBytes - os.freemem();
-    const cpuPercent = await this.measureCpuPercent();
-    const disk = await this.measureDisk(diskPath);
+    const snap = await readHostProcSnap(this.snapPath);
+
+    const memory =
+      (snap ? parseMeminfo(snap.meminfo) : null) ??
+      (await readCgroupMemory()) ??
+      (await this.readMemoryFromProcRoots()) ??
+      fallbackOsMemory();
+
+    const cpuPercent = snap?.stat
+      ? this.cpuPercentFromSample(parseProcStat(snap.stat))
+      : await this.measureCpuPercent();
+
+    const disk =
+      (snap?.df ? parseDfLine(snap.df) : null) ?? (await this.measureDisk(diskPath));
+
     const temperatureC = await this.readTemperatureC();
 
     return {
       cpuPercent,
-      memoryUsedBytes,
-      memoryTotalBytes,
+      memoryUsedBytes: memory.usedBytes,
+      memoryTotalBytes: memory.totalBytes,
       diskUsedBytes: disk?.used ?? null,
       diskTotalBytes: disk?.total ?? null,
       diskPath,
       temperatureC,
     };
+  }
+
+  private async readMemoryFromProcRoots(): Promise<MemorySample | null> {
+    for (const root of this.procRoots) {
+      if (root !== '/proc') continue;
+      const fromProc = await readMeminfoFile(`${root}/meminfo`);
+      if (fromProc) return fromProc;
+    }
+    return null;
+  }
+
+  /** CPU-% aus aufeinanderfolgenden Polls (Monitoring/SSE). */
+  private cpuPercentFromSample(sample: CpuSample | null): number | null {
+    if (!sample) return this.loadAvgFallback();
+    const prev = this.lastCpuSample;
+    this.lastCpuSample = sample;
+    if (!prev) return this.loadAvgFallback();
+
+    const idleDelta = sample.idle - prev.idle;
+    const totalDelta = sample.total - prev.total;
+    if (totalDelta <= 0) return 0;
+    return round1(clamp((1 - idleDelta / totalDelta) * 100, 0, 100));
   }
 
   private async measureCpuPercent(): Promise<number | null> {
@@ -39,15 +86,17 @@ export class HostMetricsService implements IHostMetrics {
       await sleep(this.sampleDelayMs);
       const second = await this.readProcStat();
       if (!second) return this.loadAvgFallback();
-
-      const idleDelta = second.idle - first.idle;
-      const totalDelta = second.total - first.total;
-      if (totalDelta <= 0) return 0;
-      const usage = (1 - idleDelta / totalDelta) * 100;
-      return round1(clamp(usage, 0, 100));
+      return this.cpuPercentFromSamplePair(first, second);
     }
 
     return this.loadAvgFallback();
+  }
+
+  private cpuPercentFromSamplePair(first: CpuSample, second: CpuSample): number {
+    const idleDelta = second.idle - first.idle;
+    const totalDelta = second.total - first.total;
+    if (totalDelta <= 0) return 0;
+    return round1(clamp((1 - idleDelta / totalDelta) * 100, 0, 100));
   }
 
   private loadAvgFallback(): number {
@@ -57,19 +106,11 @@ export class HostMetricsService implements IHostMetrics {
   }
 
   private async readProcStat(): Promise<CpuSample | null> {
-    try {
-      const content = await fs.readFile('/proc/stat', 'utf8');
-      const line = content.split('\n').find((l) => l.startsWith('cpu '));
-      if (!line) return null;
-      const parts = line.trim().split(/\s+/).slice(1).map(Number);
-      if (parts.length < 4 || parts.some((n) => Number.isNaN(n))) return null;
-
-      const idle = (parts[3] ?? 0) + (parts[4] ?? 0); // idle + iowait
-      const total = parts.reduce((a, b) => a + b, 0);
-      return { idle, total };
-    } catch {
-      return null;
+    for (const root of this.procRoots) {
+      const sample = await readProcStatFile(`${root}/stat`);
+      if (sample) return sample;
     }
+    return null;
   }
 
   private async readTemperatureC(): Promise<number | null> {
@@ -82,25 +123,17 @@ export class HostMetricsService implements IHostMetrics {
       const readings: number[] = [];
 
       for (const zone of zones) {
-        if (!zone.startsWith('thermal_zone')) {
-          continue;
-        }
-
+        if (!zone.startsWith('thermal_zone')) continue;
         try {
           const raw = await fs.readFile(`/sys/class/thermal/${zone}/temp`, 'utf8');
           const milliC = Number.parseInt(raw.trim(), 10);
-          if (!Number.isNaN(milliC)) {
-            readings.push(milliC / 1000);
-          }
+          if (!Number.isNaN(milliC)) readings.push(milliC / 1000);
         } catch {
-          // Einzelne Zone ignorieren
+          // ignore
         }
       }
 
-      if (readings.length === 0) {
-        return null;
-      }
-
+      if (readings.length === 0) return null;
       return round1(Math.max(...readings));
     } catch {
       return null;
@@ -114,11 +147,130 @@ export class HostMetricsService implements IHostMetrics {
       const stats = await fs.statfs(path);
       const total = Number(stats.blocks) * Number(stats.bsize);
       const free = Number(stats.bavail) * Number(stats.bsize);
-      const used = total - free;
-      return { used, total };
+      return { used: total - free, total };
     } catch {
       return null;
     }
+  }
+}
+
+function defaultProcRoots(): string[] {
+  const fromEnv = process.env.DOCKORA_HOST_PROC?.trim();
+  const roots = [fromEnv, '/proc'].filter((v): v is string => Boolean(v && v.length > 0));
+  return [...new Set(roots)];
+}
+
+function fallbackOsMemory(): MemorySample {
+  const totalBytes = os.totalmem();
+  return { totalBytes, usedBytes: Math.max(0, totalBytes - os.freemem()) };
+}
+
+async function readHostProcSnap(
+  snapPath: string,
+): Promise<{ meminfo: string; stat: string; df: string } | null> {
+  try {
+    const st = await fs.stat(snapPath);
+    // veraltet (>15s) ignorieren
+    if (Date.now() - st.mtimeMs > 15_000) return null;
+    const raw = await fs.readFile(snapPath, 'utf8');
+    const [meminfo, rest] = raw.split('----STAT----');
+    if (!meminfo || !rest) return null;
+    const [stat, dfPart] = rest.split('----DF----');
+    return {
+      meminfo: meminfo.trim(),
+      stat: (stat ?? '').trim(),
+      df: (dfPart ?? '').trim(),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function parseMeminfo(content: string): MemorySample | null {
+  const totalKb = matchMemKb(content, 'MemTotal');
+  if (totalKb === null || totalKb <= 0) return null;
+  const availableKb = matchMemKb(content, 'MemAvailable');
+  const freeKb = matchMemKb(content, 'MemFree') ?? 0;
+  const usedKb =
+    availableKb !== null ? Math.max(0, totalKb - availableKb) : Math.max(0, totalKb - freeKb);
+  return { totalBytes: totalKb * 1024, usedBytes: usedKb * 1024 };
+}
+
+async function readMeminfoFile(filePath: string): Promise<MemorySample | null> {
+  try {
+    return parseMeminfo(await fs.readFile(filePath, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function matchMemKb(content: string, key: string): number | null {
+  const re = new RegExp(`^${key}:\\s+(\\d+)\\s+kB`, 'm');
+  const m = content.match(re);
+  if (!m) return null;
+  const n = Number.parseInt(m[1]!, 10);
+  return Number.isFinite(n) ? n : null;
+}
+
+function parseProcStat(content: string): CpuSample | null {
+  const line = content.split('\n').find((l) => l.startsWith('cpu '));
+  if (!line) return null;
+  const parts = line.trim().split(/\s+/).slice(1).map(Number);
+  if (parts.length < 4 || parts.some((n) => Number.isNaN(n))) return null;
+  const idle = (parts[3] ?? 0) + (parts[4] ?? 0);
+  const total = parts.reduce((a, b) => a + b, 0);
+  return { idle, total };
+}
+
+async function readProcStatFile(filePath: string): Promise<CpuSample | null> {
+  try {
+    return parseProcStat(await fs.readFile(filePath, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function parseDfLine(line: string): { used: number; total: number } | null {
+  // df -B1 -P: Filesystem 1024-blocks Used Available Capacity Mounted
+  const parts = line.trim().split(/\s+/);
+  if (parts.length < 4) return null;
+  const total = Number.parseInt(parts[1]!, 10);
+  const used = Number.parseInt(parts[2]!, 10);
+  if (!Number.isFinite(total) || !Number.isFinite(used) || total <= 0) return null;
+  return { total, used };
+}
+
+async function readCgroupMemory(): Promise<MemorySample | null> {
+  const v2 = await readCgroupV2Memory('/sys/fs/cgroup');
+  if (v2) return v2;
+
+  try {
+    const limitRaw = await fs.readFile('/sys/fs/cgroup/memory/memory.limit_in_bytes', 'utf8');
+    const usageRaw = await fs.readFile('/sys/fs/cgroup/memory/memory.usage_in_bytes', 'utf8');
+    const limit = Number.parseInt(limitRaw.trim(), 10);
+    const usage = Number.parseInt(usageRaw.trim(), 10);
+    if (!Number.isFinite(limit) || limit <= 0 || limit > 1e15) return null;
+    if (!Number.isFinite(usage) || usage < 0) return null;
+    return { totalBytes: limit, usedBytes: Math.min(usage, limit) };
+  } catch {
+    return null;
+  }
+}
+
+async function readCgroupV2Memory(root: string): Promise<MemorySample | null> {
+  try {
+    const maxRaw = (await fs.readFile(`${root}/memory.max`, 'utf8')).trim();
+    if (maxRaw === 'max') return null;
+    const max = Number.parseInt(maxRaw, 10);
+    if (!Number.isFinite(max) || max <= 0) return null;
+    const current = Number.parseInt(
+      (await fs.readFile(`${root}/memory.current`, 'utf8')).trim(),
+      10,
+    );
+    if (!Number.isFinite(current) || current < 0) return null;
+    return { totalBytes: max, usedBytes: Math.min(current, max) };
+  } catch {
+    return null;
   }
 }
 

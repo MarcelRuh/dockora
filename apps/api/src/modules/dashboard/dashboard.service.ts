@@ -4,6 +4,7 @@ import type {
   DashboardOverview,
 } from '@dockora/shared';
 import { summarizeContainers } from '../../domain/container-utils.js';
+import { isDockoraSelfContainer } from '../../domain/dockora-self.js';
 import type {
   IComposeVersionProvider,
   IDockerClient,
@@ -67,7 +68,9 @@ export class DashboardService {
 
   private async resolveContainers(): Promise<DashboardOverview['containers']> {
     try {
-      const list = await this.deps.docker.listContainers(true);
+      const list = (await this.deps.docker.listContainers(true)).filter(
+        (c) => !isDockoraSelfContainer(c),
+      );
       return summarizeContainers(list);
     } catch {
       return { total: 0, running: 0, stopped: 0, unhealthy: 0 };

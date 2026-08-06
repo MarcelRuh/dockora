@@ -5,6 +5,9 @@ services:
       dockerfile: docker/Dockerfile.api
     container_name: dockora-api
     restart: unless-stopped
+    # Host-Docker-Gruppe (Socket ist root:docker) – sonst EACCES auf /var/run/docker.sock
+    group_add:
+      - "${DOCKER_GID:-999}"
     ports:
       - "${DOCKORA_API_PORT:-3001}:3001"
     environment:
@@ -15,6 +18,7 @@ services:
       DATABASE_URL: file:/data/dockora.db
       BACKUP_DIR: /data/backups
       DOCKER_SOCKET: /var/run/docker.sock
+      DOCKORA_HOST_PROC_SNAP: /data/host-proc.snap
       # Public browser origin (scheme + host + port)
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
       # Required – compose will fail if unset; must be strong in production
@@ -44,6 +48,21 @@ services:
       timeout: 5s
       retries: 3
       start_period: 15s
+
+  # Liefert korrekte LXC-/Host-Metriken (Docker-in-LXC sieht sonst oft den Hypervisor)
+  host-agent:
+    image: alpine:3.20
+    container_name: dockora-host-agent
+    restart: unless-stopped
+    pid: host
+    network_mode: none
+    cap_add:
+      - SYS_ADMIN
+      - SYS_PTRACE
+    volumes:
+      - dockora-data:/data
+      - ./scripts/host-proc-agent.sh:/agent.sh:ro
+    command: ["sh", "/agent.sh"]
 
   web:
     build:

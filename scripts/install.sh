@@ -143,6 +143,12 @@ fi
 
 replace_env DOCKORA_IMAGE_TAG "$IMAGE_TAG"
 
+# Docker-Socket-Gruppe am Host (sonst EACCES im API-Container)
+if command -v getent >/dev/null 2>&1; then
+  DOCKER_GID_DETECTED="$(getent group docker 2>/dev/null | cut -d: -f3 || true)"
+fi
+replace_env DOCKER_GID "${DOCKER_GID:-${DOCKER_GID_DETECTED:-999}}"
+
 # Always keep install-dir / repo wiring for in-app self-update
 replace_env DOCKORA_INSTALL_DIR "$INSTALL_DIR"
 replace_env DOCKORA_REPO "${DOCKORA_REPO:-MarcelRuh/dockora}"
