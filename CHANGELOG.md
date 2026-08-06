@@ -3,6 +3,19 @@
 All notable changes to this project are documented here.
 Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
+## [1.2.1] – 2026-08-06
+
+### Added
+
+- Host-proc agent for correct LXC/guest RAM & CPU under Docker-in-LXC
+- `DOCKER_GID` / `group_add` so the API can access the Docker socket
+- OCI source labels on Docker images for GHCR package linking
+
+### Fixed
+
+- Hide Dockora’s own containers, images, and compose project from management views (Monitoring still shows them)
+- Image filter now matches registry refs like `ghcr.io/.../dockora-api` and suite-only images (e.g. proxy nginx)
+
 ## [1.2.0] – 2026-08-06
 
 ### Added
