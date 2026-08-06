@@ -36,6 +36,9 @@ services:
     volumes:
       - dockora-data:/data
       - ${DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock
+      # Compose-Version + Self-Update-Hilfen (CLI liegt nicht im API-Image)
+      - /usr/bin/docker:/usr/bin/docker:ro
+      - /usr/libexec/docker/cli-plugins:/usr/libexec/docker/cli-plugins:ro
       # Installationsbaum nur lesen (Update schreibt der One-Shot-Updater auf dem Host-Pfad)
       - ${DOCKORA_INSTALL_DIR:-/opt/dockora}:/dockora-install:ro
       # Compose-Discovery (read-only)

@@ -7,7 +7,15 @@ TMP="${OUT}.tmp"
 INTERVAL="${HOST_PROC_INTERVAL_SEC:-2}"
 
 while true; do
-  if nsenter -t 1 -m sh -c 'cat /proc/meminfo; echo "----STAT----"; cat /proc/stat; echo "----DF----"; df -B1 -P / 2>/dev/null | tail -1' >"$TMP" 2>/dev/null; then
+  if nsenter -t 1 -m sh -c '
+    cat /proc/meminfo
+    echo "----STAT----"
+    cat /proc/stat
+    echo "----DF----"
+    df -B1 -P / 2>/dev/null | tail -1
+    echo "----COMPOSE----"
+    (/usr/bin/docker compose version --short 2>/dev/null || /usr/local/bin/docker compose version --short 2>/dev/null || true)
+  ' >"$TMP" 2>/dev/null; then
     mv "$TMP" "$OUT"
   else
     rm -f "$TMP"
