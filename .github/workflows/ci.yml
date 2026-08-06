@@ -5,16 +5,19 @@ on:
     branches: [main, master]
   pull_request:
     branches: [main, master]
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Avoid cancelling a nearly-finished main run when another push lands;
+  # still cancel superseded PR runs to save minutes.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build-test:
-    name: Typecheck · Test · Build
+    name: Typecheck · Test · Build · Smoke
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
@@ -67,34 +70,11 @@ jobs:
           DOCKORA_API_URL: http://127.0.0.1:3001
           NEXT_TELEMETRY_DISABLED: '1'
 
-  smoke:
-    name: API smoke
-    needs: build-test
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v5
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9.15.0
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
-
-      - run: pnpm install --frozen-lockfile
-
-      - run: pnpm --filter @dockora/shared build
-
-      - name: Prisma generate & migrate
+      - name: Prisma migrate (smoke DB)
         working-directory: apps/api
         env:
           DATABASE_URL: file:./smoke.db
-        run: |
-          pnpm exec prisma generate
-          pnpm exec prisma migrate deploy
+        run: pnpm exec prisma migrate deploy
 
       - name: Start API
         working-directory: apps/api
@@ -111,7 +91,7 @@ jobs:
         run: |
           pnpm exec tsx src/main.ts > /tmp/dockora-api.log 2>&1 &
           echo $! > /tmp/dockora-api.pid
-          for i in $(seq 1 30); do
+          for i in $(seq 1 45); do
             if curl -fsS http://127.0.0.1:3001/api/v1/health >/dev/null; then
               echo "API up"
               exit 0
