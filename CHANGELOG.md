@@ -3,6 +3,13 @@
 All notable changes to this project are documented here.
 Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
+## [1.2.2] – 2026-08-06
+
+### Fixed
+
+- Dashboard shows Docker Compose version in the API container (host CLI mount + host-agent fallback)
+- Align running image `APP_VERSION` with GitHub release tags
+
 ## [1.2.1] – 2026-08-06
 
 ### Added
