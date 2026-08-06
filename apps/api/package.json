@@ -46,12 +46,12 @@
     "@types/archiver": "^8.0.0",
     "@types/bcryptjs": "^3.0.0",
     "@types/dockerode": "^4.0.1",
-    "@types/node": "^22.10.2",
+    "@types/node": "^26.1.2",
     "@types/node-cron": "^3.0.11",
     "@types/ws": "^8.18.1",
-    "prisma": "^6.1.0",
+    "prisma": "^7.9.1",
     "tsx": "^4.19.2",
-    "typescript": "^5.7.2",
-    "vitest": "^2.1.8"
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
   }
 }
