@@ -53,11 +53,11 @@ export function ContainerTerminal({ containerId }: { containerId: string }) {
         rows: String(term.rows),
       });
       const token = getAuthToken();
-      if (token) qs.set('token', token);
-
       const wsUrl = `${wsBaseUrl()}/api/v1/containers/${encodeURIComponent(containerId)}/terminal?${qs}`;
 
-      const ws = new WebSocket(wsUrl);
+      // Prefer Sec-WebSocket-Protocol so the JWT is not logged in access URLs.
+      const protocols = token ? [`dockora.jwt.${token}`] : undefined;
+      const ws = protocols ? new WebSocket(wsUrl, protocols) : new WebSocket(wsUrl);
       wsRef.current = ws;
 
       ws.onopen = () => {

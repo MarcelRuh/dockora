@@ -191,6 +191,8 @@ export interface ScheduledJob {
   enabled: boolean;
   lastRunAt?: string;
   nextRunAt?: string;
+  /** Last run error message (cleared on success). */
+  lastError?: string;
 }
 
 export interface AppSettings {

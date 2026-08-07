@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { API_PREFIX, type ActionResult, type ImageSummary } from '@dockora/shared';
 import { withDockerError } from '../../domain/docker-errors.js';
+import { destructiveRateLimit } from '../../presentation/http/destructive-rate-limit.js';
 import { ImagesService } from './images.service.js';
 
 /**
@@ -32,6 +33,7 @@ export const imagesModule: FastifyPluginAsync = async (app: FastifyInstance) => 
 
   app.post<{ Body: { danglingOnly?: boolean } }>(
     `${API_PREFIX}/images/prune`,
+    { ...destructiveRateLimit },
     async (request) => {
       const danglingOnly = request.body?.danglingOnly ?? true;
       return withDockerError(app, () => service.prune(danglingOnly));

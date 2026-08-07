@@ -6,6 +6,7 @@ import type {
   AuthUser,
   BackupFormat,
   BackupInfo,
+  BackupRestoreResult,
   ComposeAction,
   ComposeProjectDetails,
   ComposeProjectSummary,
@@ -22,6 +23,7 @@ import type {
   LogLevel,
   MonitoringSnapshot,
   ScheduledJob,
+  UpdateApplyResult,
   UpdateCheckResult,
 } from '@dockora/shared';
 import { clearAuthToken, getAuthToken } from './auth';
@@ -275,8 +277,8 @@ export async function checkUpdates(): Promise<UpdateCheckResult[]> {
   return request<UpdateCheckResult[]>('/updates/check', { method: 'POST' });
 }
 
-export async function pullUpdate(containerId: string): Promise<{ ok: boolean; message: string }> {
-  return request<{ ok: boolean; message: string }>(
+export async function pullUpdate(containerId: string): Promise<UpdateApplyResult> {
+  return request<UpdateApplyResult>(
     `/updates/${encodeURIComponent(containerId)}/pull`,
     { method: 'POST' },
   );
@@ -360,18 +362,9 @@ export async function restoreBackup(
     applyFiles?: boolean;
     applySettings?: boolean;
     applyVolumes?: boolean;
-  } = {
-    confirm: true,
-  },
-): Promise<{
-  ok: boolean;
-  message: string;
-  extractedTo: string;
-  appliedFiles?: number;
-  appliedSettings?: boolean;
-  appliedVolumes?: number;
-}> {
-  return request(`/backups/${encodeURIComponent(id)}/restore`, {
+  } = {},
+): Promise<BackupRestoreResult> {
+  return request<BackupRestoreResult>(`/backups/${encodeURIComponent(id)}/restore`, {
     method: 'POST',
     body: JSON.stringify(options),
   });

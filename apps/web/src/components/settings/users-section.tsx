@@ -26,6 +26,9 @@ export function UsersSection() {
   const [displayName, setDisplayName] = useState('');
   const [role, setRole] = useState<UserRole>('viewer');
   const [pendingDelete, setPendingDelete] = useState<AuthUser | null>(null);
+  const [editing, setEditing] = useState<AuthUser | null>(null);
+  const [editDisplayName, setEditDisplayName] = useState('');
+  const [editPassword, setEditPassword] = useState('');
 
   const load = useCallback(async () => {
     try {
@@ -75,6 +78,39 @@ export function UsersSection() {
     }
   };
 
+  const openEdit = (u: AuthUser) => {
+    setEditing(u);
+    setEditDisplayName(u.displayName ?? '');
+    setEditPassword('');
+  };
+
+  const handleEditSave = async () => {
+    if (!editing) return;
+    setBusy(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const patch: { displayName?: string | null; password?: string } = {
+        displayName: editDisplayName.trim() || null,
+      };
+      if (editPassword.trim().length >= 8) {
+        patch.password = editPassword.trim();
+      } else if (editPassword.trim().length > 0) {
+        setError(t.settings.users.passwordTooShort);
+        setBusy(false);
+        return;
+      }
+      await updateAuthUser(editing.id, patch);
+      setEditing(null);
+      setSuccess(t.settings.users.updated);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t.common.failed);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleDelete = async (u: AuthUser) => {
     setBusy(true);
     setError(null);
@@ -101,6 +137,9 @@ export function UsersSection() {
             <div>
               <p className="font-medium">{u.displayName || u.email}</p>
               <p className="font-mono text-xs text-dockora-muted">{u.email}</p>
+              {u.totpEnabled ? (
+                <p className="text-[11px] text-dockora-muted">{t.settings.users.totpOn}</p>
+              ) : null}
             </div>
             <div className="flex items-center gap-2">
               <Select
@@ -113,6 +152,9 @@ export function UsersSection() {
                 <option value="operator">operator</option>
                 <option value="viewer">viewer</option>
               </Select>
+              <Button disabled={busy} onClick={() => openEdit(u)}>
+                {t.settings.users.edit}
+              </Button>
               <Button
                 variant="danger"
                 disabled={busy || me?.id === u.id}
@@ -182,6 +224,32 @@ export function UsersSection() {
           if (u) void handleDelete(u);
         }}
       />
+
+      <ConfirmDialog
+        open={Boolean(editing)}
+        title={t.settings.users.editTitle}
+        description={editing?.email}
+        confirmLabel={t.common.save}
+        cancelLabel={t.common.cancel}
+        busy={busy}
+        onCancel={() => setEditing(null)}
+        onConfirm={() => void handleEditSave()}
+      >
+        <div className="space-y-3 pt-2">
+          <Input
+            placeholder={t.settings.users.displayName}
+            value={editDisplayName}
+            onChange={(e) => setEditDisplayName(e.target.value)}
+          />
+          <Input
+            type="password"
+            placeholder={t.settings.users.newPasswordOptional}
+            value={editPassword}
+            onChange={(e) => setEditPassword(e.target.value)}
+            minLength={8}
+          />
+        </div>
+      </ConfirmDialog>
     </Section>
   );
 }

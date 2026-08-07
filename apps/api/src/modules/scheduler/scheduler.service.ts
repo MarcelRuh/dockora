@@ -1,6 +1,7 @@
 import cron, { type ScheduledTask } from 'node-cron';
 import type { ScheduledJob, JobType } from '@dockora/shared';
 import { prisma } from '../../infrastructure/db/prisma.js';
+import { nextCronRunIso } from './next-cron-run.js';
 
 export type JobCallback = () => Promise<void>;
 
@@ -14,6 +15,7 @@ const DEFAULT_JOBS: Array<{ type: JobType; cron: string; preset?: string }> = [
 export class SchedulerService {
   private readonly callbacks = new Map<JobType, JobCallback>();
   private readonly tasks = new Map<string, ScheduledTask>();
+  private readonly lastErrors = new Map<string, string>();
   private started = false;
 
   registerCallback(type: JobType, callback: JobCallback): void {
@@ -38,7 +40,7 @@ export class SchedulerService {
 
   async listJobs(): Promise<ScheduledJob[]> {
     const rows = await prisma.scheduledJob.findMany({ orderBy: { type: 'asc' } });
-    return rows.map(mapRow);
+    return rows.map((row) => mapRow(row, this.lastErrors.get(row.id)));
   }
 
   async updateJob(
@@ -57,7 +59,7 @@ export class SchedulerService {
       this.rescheduleJob(row.id, row.cron, row.enabled, row.type as JobType);
     }
 
-    return mapRow(row);
+    return mapRow(row, this.lastErrors.get(row.id));
   }
 
   async runJob(id: string): Promise<{ ok: boolean; message: string }> {
@@ -73,15 +75,18 @@ export class SchedulerService {
 
     try {
       await callback();
+      this.lastErrors.delete(id);
       await prisma.scheduledJob.update({
         where: { id },
         data: { lastRunAt: new Date() },
       });
       return { ok: true, message: 'Job executed' };
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.lastErrors.set(id, message);
       return {
         ok: false,
-        message: error instanceof Error ? error.message : String(error),
+        message,
       };
     }
   }
@@ -133,14 +138,17 @@ export class SchedulerService {
   }
 }
 
-function mapRow(row: {
-  id: string;
-  type: string;
-  cron: string;
-  preset: string | null;
-  enabled: boolean;
-  lastRunAt: Date | null;
-}): ScheduledJob {
+function mapRow(
+  row: {
+    id: string;
+    type: string;
+    cron: string;
+    preset: string | null;
+    enabled: boolean;
+    lastRunAt: Date | null;
+  },
+  lastError?: string,
+): ScheduledJob {
   return {
     id: row.id,
     type: row.type as JobType,
@@ -148,18 +156,7 @@ function mapRow(row: {
     preset: (row.preset ?? undefined) as ScheduledJob['preset'],
     enabled: row.enabled,
     lastRunAt: row.lastRunAt?.toISOString(),
-    nextRunAt: cron.validate(row.cron) ? describeNextRun(row.cron) : undefined,
+    nextRunAt: cron.validate(row.cron) ? nextCronRunIso(row.cron) : undefined,
+    lastError,
   };
-}
-
-function describeNextRun(expression: string): string | undefined {
-  try {
-    // node-cron hat keine nextDate-API – grobe Schätzung via Validierung
-    if (cron.validate(expression)) {
-      return undefined;
-    }
-  } catch {
-    // ignore
-  }
-  return undefined;
 }

@@ -1,18 +1,23 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import type { ScheduledJob } from '@dockora/shared';
+import type { JobType, ScheduledJob } from '@dockora/shared';
 import { fetchSchedulerJobs, runSchedulerJob, updateSchedulerJob } from '@/lib/api';
 import { useLocale } from '@/i18n/locale-provider';
 import { formatRelativeTime } from '@/lib/format';
 import { Button, Input } from '@/components/ui/form-controls';
-import { ErrorBanner, Section } from '@/components/ui/page-parts';
+import { ErrorBanner, Section, SuccessBanner } from '@/components/ui/page-parts';
+
+function jobLabel(type: JobType, labels: Record<string, string>): string {
+  return labels[type] ?? type;
+}
 
 export function SchedulerSection({ canEdit }: { canEdit: boolean }) {
   const { t, locale } = useLocale();
   const loc = locale === 'de' ? 'de-DE' : 'en-US';
   const [jobs, setJobs] = useState<ScheduledJob[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [cronEdits, setCronEdits] = useState<Record<string, string>>({});
 
@@ -34,6 +39,7 @@ export function SchedulerSection({ canEdit }: { canEdit: boolean }) {
   const toggle = async (job: ScheduledJob) => {
     if (!canEdit) return;
     setBusy(job.id);
+    setSuccess(null);
     try {
       await updateSchedulerJob(job.id, { enabled: !job.enabled });
       await load();
@@ -49,8 +55,10 @@ export function SchedulerSection({ canEdit }: { canEdit: boolean }) {
     const cron = cronEdits[job.id]?.trim();
     if (!cron || cron === job.cron) return;
     setBusy(job.id);
+    setSuccess(null);
     try {
       await updateSchedulerJob(job.id, { cron });
+      setSuccess(t.settings.scheduler.saved);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : t.common.failed);
@@ -62,8 +70,14 @@ export function SchedulerSection({ canEdit }: { canEdit: boolean }) {
   const runNow = async (job: ScheduledJob) => {
     if (!canEdit) return;
     setBusy(job.id);
+    setSuccess(null);
     try {
-      await runSchedulerJob(job.id);
+      const result = await runSchedulerJob(job.id);
+      if (!result.ok) {
+        setError(result.message);
+      } else {
+        setSuccess(t.settings.scheduler.runOk);
+      }
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : t.common.failed);
@@ -75,6 +89,7 @@ export function SchedulerSection({ canEdit }: { canEdit: boolean }) {
   return (
     <Section title={t.settings.sections.scheduler}>
       {error ? <ErrorBanner message={error} /> : null}
+      {success ? <SuccessBanner message={success} /> : null}
       <div className="space-y-3">
         {jobs.map((job) => (
           <div
@@ -82,13 +97,20 @@ export function SchedulerSection({ canEdit }: { canEdit: boolean }) {
             className="flex flex-col gap-3 rounded-md border border-dockora-border bg-dockora-surface/80 p-4 sm:flex-row sm:items-center sm:justify-between"
           >
             <div className="min-w-0 space-y-1">
-              <p className="font-medium">{job.type}</p>
+              <p className="font-medium">
+                {jobLabel(job.type, t.settings.scheduler.jobTypes)}
+              </p>
               <p className="font-mono text-xs text-dockora-muted">
                 {t.settings.scheduler.lastRun}:{' '}
                 {job.lastRunAt ? formatRelativeTime(job.lastRunAt, loc) : '—'} ·{' '}
                 {t.settings.scheduler.nextRun}:{' '}
                 {job.nextRunAt ? formatRelativeTime(job.nextRunAt, loc) : '—'}
               </p>
+              {job.lastError ? (
+                <p className="text-xs text-dockora-danger" title={job.lastError}>
+                  {t.settings.scheduler.lastError}: {job.lastError}
+                </p>
+              ) : null}
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Input

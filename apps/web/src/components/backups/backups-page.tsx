@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import type { BackupInfo } from '@dockora/shared';
+import type { BackupInfo, BackupRestorePreview } from '@dockora/shared';
 import {
   cleanupBackups,
   createBackup,
@@ -24,6 +24,15 @@ import {
   SuccessBanner,
 } from '@/components/ui/page-parts';
 
+type RestoreDraft = {
+  id: string;
+  name: string;
+  preview: BackupRestorePreview;
+  applyFiles: boolean;
+  applySettings: boolean;
+  applyVolumes: boolean;
+};
+
 export function BackupsPage() {
   const { t, locale } = useLocale();
   const { authEnabled, user } = useAuth();
@@ -36,6 +45,7 @@ export function BackupsPage() {
   const [busy, setBusy] = useState(false);
   const [includeVolumes, setIncludeVolumes] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [restoreDraft, setRestoreDraft] = useState<RestoreDraft | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -72,9 +82,39 @@ export function BackupsPage() {
     }
   };
 
-  const handleRestore = async (id: string, name: string) => {
-    const typed = window.prompt(t.backups.restoreConfirmTyped.replace('{name}', name));
-    if (typed !== name) {
+  const startRestore = async (id: string, name: string) => {
+    setBusy(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const previewResult = await restoreBackup(id, { confirm: false });
+      const preview = previewResult.preview ?? {
+        composeFiles: [],
+        envFiles: [],
+        hasSettings: false,
+        volumes: [],
+      };
+      setRestoreDraft({
+        id,
+        name,
+        preview,
+        applyFiles: preview.composeFiles.length + preview.envFiles.length > 0,
+        applySettings: preview.hasSettings,
+        applyVolumes: preview.volumes.length > 0,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t.common.failed);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const confirmRestore = async () => {
+    if (!restoreDraft) return;
+    const typed = window.prompt(
+      t.backups.restoreConfirmTyped.replace('{name}', restoreDraft.name),
+    );
+    if (typed !== restoreDraft.name) {
       if (typed != null) setError(t.backups.restoreNameMismatch);
       return;
     }
@@ -82,13 +122,14 @@ export function BackupsPage() {
     setError(null);
     setSuccess(null);
     try {
-      const result = await restoreBackup(id, {
+      const result = await restoreBackup(restoreDraft.id, {
         confirm: true,
-        applyFiles: true,
-        applySettings: true,
-        applyVolumes: true,
+        applyFiles: restoreDraft.applyFiles,
+        applySettings: restoreDraft.applySettings,
+        applyVolumes: restoreDraft.applyVolumes,
       });
       setSuccess(result.message);
+      setRestoreDraft(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : t.common.failed);
     } finally {
@@ -131,7 +172,7 @@ export function BackupsPage() {
     <div key={`act-${b.id}`} className="inline-flex flex-nowrap items-center gap-1.5">
       {isAdmin ? (
         <>
-          <Button size="sm" disabled={busy} onClick={() => void handleRestore(b.id, b.name)}>
+          <Button size="sm" disabled={busy} onClick={() => void startRestore(b.id, b.name)}>
             {t.backups.restore}
           </Button>
           <Button
@@ -216,6 +257,80 @@ export function BackupsPage() {
           if (id) void handleDelete(id);
         }}
       />
+
+      <ConfirmDialog
+        open={Boolean(restoreDraft)}
+        title={t.backups.restorePreviewTitle}
+        description={
+          restoreDraft
+            ? t.backups.restorePreviewHint.replace('{name}', restoreDraft.name)
+            : undefined
+        }
+        consequences={
+          restoreDraft
+            ? [
+                t.backups.restorePreviewCompose.replace(
+                  '{count}',
+                  String(restoreDraft.preview.composeFiles.length),
+                ),
+                t.backups.restorePreviewEnv.replace(
+                  '{count}',
+                  String(restoreDraft.preview.envFiles.length),
+                ),
+                restoreDraft.preview.hasSettings
+                  ? t.backups.restorePreviewSettingsYes
+                  : t.backups.restorePreviewSettingsNo,
+                t.backups.restorePreviewVolumes.replace(
+                  '{count}',
+                  String(restoreDraft.preview.volumes.length),
+                ),
+              ]
+            : []
+        }
+        confirmLabel={t.backups.restoreApply}
+        cancelLabel={t.common.cancel}
+        danger
+        busy={busy}
+        onCancel={() => setRestoreDraft(null)}
+        onConfirm={() => void confirmRestore()}
+      >
+        {restoreDraft ? (
+          <div className="mt-3 space-y-2 text-sm">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={restoreDraft.applyFiles}
+                onChange={(e) =>
+                  setRestoreDraft({ ...restoreDraft, applyFiles: e.target.checked })
+                }
+              />
+              {t.backups.applyFiles}
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={restoreDraft.applySettings}
+                disabled={!restoreDraft.preview.hasSettings}
+                onChange={(e) =>
+                  setRestoreDraft({ ...restoreDraft, applySettings: e.target.checked })
+                }
+              />
+              {t.backups.applySettings}
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={restoreDraft.applyVolumes}
+                disabled={restoreDraft.preview.volumes.length === 0}
+                onChange={(e) =>
+                  setRestoreDraft({ ...restoreDraft, applyVolumes: e.target.checked })
+                }
+              />
+              {t.backups.applyVolumes}
+            </label>
+          </div>
+        ) : null}
+      </ConfirmDialog>
     </div>
   );
 }

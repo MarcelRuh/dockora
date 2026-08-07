@@ -64,6 +64,12 @@ export interface RestoreResult {
   appliedSettings: boolean;
   appliedVolumes: number;
   backedUpFiles: string[];
+  preview?: {
+    composeFiles: string[];
+    envFiles: string[];
+    hasSettings: boolean;
+    volumes: string[];
+  };
 }
 
 export class BackupsService {
@@ -213,15 +219,25 @@ export class BackupsService {
     const applyVolumes = options.applyVolumes !== false;
 
     if (!options.confirm) {
+      const manifest = await readManifest(extractDir);
+      const preview = {
+        composeFiles: manifest.files
+          .filter((f) => f.kind === 'compose')
+          .map((f) => f.sourcePath),
+        envFiles: manifest.files.filter((f) => f.kind === 'env').map((f) => f.sourcePath),
+        hasSettings: manifest.files.some((f) => f.kind === 'settings'),
+        volumes: manifest.files.filter((f) => f.kind === 'volume').map((f) => f.sourcePath),
+      };
       return {
         ok: true,
         message:
-          'Backup extrahiert. Zum Anwenden erneut mit { confirm: true } aufrufen (Dateien + Settings + Volumes).',
+          'Backup extrahiert (Dry-Run). Mit { confirm: true } und apply*-Flags anwenden.',
         extractedTo: extractDir,
         appliedFiles: 0,
         appliedSettings: false,
         appliedVolumes: 0,
         backedUpFiles: [],
+        preview,
       };
     }
 

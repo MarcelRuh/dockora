@@ -10,6 +10,7 @@ import {
 } from '@dockora/shared';
 import { withDockerError } from '../../domain/docker-errors.js';
 import { actorIdFromRequest, auditService } from '../audit/audit.service.js';
+import { destructiveRateLimit } from '../../presentation/http/destructive-rate-limit.js';
 import { ContainersService } from './containers.service.js';
 
 const CONTAINER_ACTIONS = new Set<ContainerAction>([
@@ -21,6 +22,8 @@ const CONTAINER_ACTIONS = new Set<ContainerAction>([
   'unpause',
   'remove',
 ]);
+
+const DESTRUCTIVE_CONTAINER_ACTIONS = new Set<ContainerAction>(['kill', 'remove']);
 
 /**
  * Container-Modul – Liste, Details, Aktionen, Logs und Stats.
@@ -101,6 +104,7 @@ export const containersModule: FastifyPluginAsync = async (app: FastifyInstance)
   }>(
     `${API_PREFIX}/containers/:id/:action`,
     {
+      ...destructiveRateLimit,
       preHandler: [
         async (request) => {
           if (request.params.action === 'remove' || request.params.action === 'kill') {
@@ -117,7 +121,7 @@ export const containersModule: FastifyPluginAsync = async (app: FastifyInstance)
       const result = await withDockerError(app, () =>
         service.action(request.params.id, action, request.body ?? {}),
       );
-      if (action === 'remove' || action === 'kill') {
+      if (DESTRUCTIVE_CONTAINER_ACTIONS.has(action)) {
         void auditService.record({
           action: `container.${action}`,
           actorId: actorIdFromRequest(request),

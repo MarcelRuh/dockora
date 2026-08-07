@@ -1,4 +1,4 @@
-import type { UpdateCheckResult, RegistryProvider } from '@dockora/shared';
+import type { UpdateApplyResult, UpdateCheckResult, RegistryProvider } from '@dockora/shared';
 import { isDockoraSelfContainer } from '../../domain/dockora-self.js';
 import type { IDockerClient } from '../../domain/ports.js';
 import { prisma } from '../../infrastructure/db/prisma.js';
@@ -189,10 +189,10 @@ export class UpdatesService {
   /**
    * Pullt das Image, recreatet den Container, prüft Health und rollt bei Fail zurück.
    */
-  async applyUpdate(containerId: string): Promise<{ ok: boolean; message: string }> {
+  async applyUpdate(containerId: string): Promise<UpdateApplyResult> {
     const cached = await prisma.updateCheckCache.findUnique({ where: { containerId } });
     if (!cached) {
-      return { ok: false, message: 'No cached update info for container' };
+      return { ok: false, message: 'No cached update info for container', step: 'pull' };
     }
 
     if (!cached.updateAvailable) {
@@ -254,6 +254,8 @@ export class UpdatesService {
         });
         return {
           ok: false,
+          rolledBack: true,
+          step: 'rollback',
           message: `Update failed healthcheck: ${health.message}. ${rolled}`,
         };
       }
@@ -284,13 +286,32 @@ export class UpdatesService {
           .catch(() => undefined);
       }
 
+      let prunedImages = 0;
+      let spaceReclaimed = 0;
+      try {
+        const pruned = await this.deps.docker.pruneImages(false);
+        prunedImages = pruned.imagesDeleted;
+        spaceReclaimed = pruned.spaceReclaimed;
+      } catch {
+        // Prune ist best-effort – Update bleibt erfolgreich
+      }
+
+      const pruneMsg =
+        prunedImages > 0
+          ? ` Pruned ${prunedImages} unused image(s) (${Math.round(spaceReclaimed / (1024 * 1024))} MiB).`
+          : '';
+
       return {
         ok: true,
-        message: `Image pulled.${recreateMsg} ${health.message}`,
+        step: 'done',
+        prunedImages,
+        spaceReclaimed,
+        message: `Image pulled.${recreateMsg} ${health.message}${pruneMsg}`,
       };
     } catch (error) {
       return {
         ok: false,
+        step: 'pull',
         message: error instanceof Error ? error.message : String(error),
       };
     }

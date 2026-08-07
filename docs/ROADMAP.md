@@ -38,6 +38,12 @@
 - ~~Self-Update mit automatischem Compose-Recreate~~
 - ~~Plugin-Filesystem-Loader~~
 - ~~E2E-Smoke erweitert~~
+- ~~Image-Prune nach erfolgreichem Update~~
+- ~~Monitoring-Alert-Dedup (Fingerprint + Cooldown)~~
+- ~~Terminal Idle-Timeout + Message-Rate-Limit + WS-Protocol JWT~~
+- ~~Scheduler nextRunAt + lastError + Labels~~
+- ~~Backup-Restore Preview (Dry-Run + apply*-Flags)~~
+- ~~User Edit (DisplayName / Passwort)~~
 - CSRF-Token bei Cookie-Sessions (aktuell Bearer JWT)
-- Plugin-Sandbox / Enable-Disable UI
+- Plugin-Worker-Isolation (derzeit Pfad-Allowlist + Register-Timeout)
 

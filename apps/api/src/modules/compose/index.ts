@@ -7,12 +7,13 @@ import {
   type ComposeProjectDetails,
   type ComposeProjectSummary,
 } from '@dockora/shared';
+import { actorIdFromRequest, auditService } from '../audit/audit.service.js';
 import {
   ComposeNotFoundError,
   ComposeService,
   ComposeValidationError,
 } from './compose.service.js';
-import { actorIdFromRequest, auditService } from '../audit/audit.service.js';
+import { destructiveRateLimit } from '../../presentation/http/destructive-rate-limit.js';
 
 const COMPOSE_ACTIONS = new Set<ComposeAction>([
   'up',
@@ -25,14 +26,6 @@ const COMPOSE_ACTIONS = new Set<ComposeAction>([
 
 const DESTRUCTIVE_ACTIONS = new Set<ComposeAction>(['down', 'recreate']);
 
-const destructiveRateLimit = {
-  config: {
-    rateLimit: {
-      max: 10,
-      timeWindow: '1 minute',
-    },
-  },
-} as const;
 
 /**
  * Compose-Modul – Discovery, Lifecycle-Aktionen, YAML-Editor und Backups.

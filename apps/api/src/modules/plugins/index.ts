@@ -7,6 +7,7 @@ import {
   discoverPlugins,
   importPlugin,
   loadPluginsFromDir,
+  registerPluginSandboxed,
 } from './plugin-loader.js';
 
 const DISABLED_KEY = 'plugins.disabled';
@@ -126,12 +127,12 @@ export const pluginsModule: FastifyPluginAsync = async (app: FastifyInstance) =>
         if (!entry) {
           throw app.httpErrors.notFound(`Plugin not found: ${dirName}`);
         }
-        const plugin = await importPlugin(entry.indexPath);
+        const plugin = await importPlugin(entry.indexPath, app.config.pluginDir);
         if (!plugin) {
           throw app.httpErrors.badRequest('Invalid plugin export');
         }
         if (!registry.has(plugin.name)) {
-          await registry.register(plugin);
+          await registerPluginSandboxed(registry, plugin);
         }
       }
 

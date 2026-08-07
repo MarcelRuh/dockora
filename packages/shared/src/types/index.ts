@@ -86,3 +86,28 @@ export interface ActionResult {
   ok: boolean;
   message: string;
 }
+
+/** Result of applying a container image update (pull + recreate + health). */
+export interface UpdateApplyResult extends ActionResult {
+  rolledBack?: boolean;
+  step?: 'pull' | 'recreate' | 'health' | 'done' | 'rollback';
+  prunedImages?: number;
+  spaceReclaimed?: number;
+}
+
+/** Dry-run / preview payload before confirming a backup restore. */
+export interface BackupRestorePreview {
+  composeFiles: string[];
+  envFiles: string[];
+  hasSettings: boolean;
+  volumes: string[];
+}
+
+export interface BackupRestoreResult extends ActionResult {
+  extractedTo: string;
+  appliedFiles: number;
+  appliedSettings: boolean;
+  appliedVolumes: number;
+  backedUpFiles: string[];
+  preview?: BackupRestorePreview;
+}

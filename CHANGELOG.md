@@ -3,6 +3,22 @@
 All notable changes to this project are documented here.
 Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
+## [Unreleased]
+
+### Added
+
+- Update apply returns structured result (`step`, `rolledBack`, prune stats); unused images pruned after successful update
+- Backup restore dry-run preview with selective apply flags (files / settings / volumes)
+- Scheduler: real `nextRunAt`, `lastError`, human-readable job labels
+- Users: edit display name and optional password reset in Settings
+- Plugin loader: path sandbox (realpath under PLUGIN_DIR), name allowlist, register timeout
+- Destructive rate limits on container kill/remove, backups, and image prune
+- Terminal: idle timeout (15m), message rate limit, JWT via Sec-WebSocket-Protocol
+
+### Fixed
+
+- Monitoring alert cooldown uses fingerprints so fluctuating CPU/disk numbers do not bypass dedup
+
 ## [1.2.3] – 2026-08-07
 
 ### Added

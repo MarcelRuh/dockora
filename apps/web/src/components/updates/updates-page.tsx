@@ -143,16 +143,17 @@ export function UpdatesPage() {
         setApplyProgress(15);
         const result = await pullUpdate(id);
         if (!result.ok) {
-          const msg = result.message;
-          const isHealth =
-            /health/i.test(msg) || /rollback/i.test(msg);
-          setApplyStep(isHealth ? 'rollback' : 'done');
+          const rolledBack = result.rolledBack === true || result.step === 'rollback';
+          setApplyStep(rolledBack ? 'rollback' : 'done');
           setApplyProgress(100);
           setError(
-            isHealth ? `${t.updates.healthFailedRollback}: ${msg}` : msg,
+            rolledBack ? `${t.updates.healthFailedRollback}: ${result.message}` : result.message,
           );
           await load();
           return;
+        }
+        if (result.step) {
+          setApplyStep(result.step === 'done' ? 'done' : result.step);
         }
       }
       setApplyStep('done');
