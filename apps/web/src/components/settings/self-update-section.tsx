@@ -13,7 +13,7 @@ function shortRev(value: string | null | undefined): string {
   return value.length > 12 ? `${value.slice(0, 12)}…` : value;
 }
 
-async function waitForApiHealth(timeoutMs = 120_000): Promise<boolean> {
+async function waitForApiHealth(timeoutMs = 180_000): Promise<boolean> {
   const started = Date.now();
   while (Date.now() - started < timeoutMs) {
     try {
@@ -47,6 +47,13 @@ export function SelfUpdateSection() {
     void load();
   }, [load]);
 
+  // Poll while an updater container is running (even after page reload).
+  useEffect(() => {
+    if (!status?.updating && !busy) return;
+    const timer = window.setInterval(() => void load(), 3000);
+    return () => window.clearInterval(timer);
+  }, [status?.updating, busy, load]);
+
   const handleApply = async () => {
     if (!window.confirm(t.settings.selfUpdate.confirm)) return;
     setBusy(true);
@@ -57,11 +64,20 @@ export function SelfUpdateSection() {
       setSuccess(result.message);
       await load();
 
-      if (result.mode === 'compose') {
+      if (result.mode === 'compose' && result.ok) {
         setSuccess(`${result.message}\n${t.settings.selfUpdate.waitingHealth}`);
-        const ok = await waitForApiHealth(120_000);
+        // Wait until updater finishes, then until API is healthy again.
+        const deadline = Date.now() + 20 * 60 * 1000;
+        while (Date.now() < deadline) {
+          await new Promise((r) => setTimeout(r, 3000));
+          const next = await fetchSelfUpdateStatus();
+          setStatus(next);
+          if (!next.updating) break;
+        }
+        const ok = await waitForApiHealth(180_000);
         if (ok) {
           setSuccess(t.settings.selfUpdate.healthOk);
+          await load();
           window.setTimeout(() => window.location.reload(), 1500);
         } else {
           setSuccess(t.settings.selfUpdate.healthTimeout);

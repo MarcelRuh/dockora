@@ -320,19 +320,22 @@ export class SelfUpdateService {
         // not present
       }
 
+      // Bind host path → same path inside updater. Compose bind-mounts are
+      // resolved by the Docker daemon on the host; a remount as /install breaks
+      // relative volumes (nginx.conf) and leaks DOCKORA_INSTALL_DIR=/install.
       const container = await raw.createContainer({
         name: UPDATER_NAME,
         Image: updaterImage,
         Cmd: ['sh', '-c', SELF_UPDATE_APPLY_SCRIPT],
         Env: [
-          'DOCKORA_INSTALL_DIR=/install',
+          `DOCKORA_INSTALL_DIR=${hostDir}`,
           `DOCKORA_REPO=${this.options.repo}`,
           `DOCKORA_UPDATE_BRANCH=${this.options.branch}`,
           'DOCKORA_SKIP_COMPOSE=0',
         ],
-        WorkingDir: '/install',
+        WorkingDir: hostDir,
         HostConfig: {
-          Binds: [`${hostDir}:/install`, '/var/run/docker.sock:/var/run/docker.sock'],
+          Binds: [`${hostDir}:${hostDir}`, '/var/run/docker.sock:/var/run/docker.sock'],
           AutoRemove: false,
         },
         Labels: {
@@ -341,41 +344,18 @@ export class SelfUpdateService {
       });
 
       await container.start();
-      const waitResult = await Promise.race([
-        container.wait(),
-        new Promise<{ StatusCode: number }>((_, reject) => {
-          setTimeout(() => reject(new Error('Update-Timeout (20 Min.)')), APPLY_TIMEOUT_MS);
-        }),
-      ]);
 
-      let logs = '';
-      try {
-        const buf = await container.logs({ stdout: true, stderr: true, tail: 40 });
-        logs = Buffer.isBuffer(buf) ? buf.toString('utf8') : String(buf);
-      } catch {
-        // ignore
-      }
-
-      try {
-        await container.remove({ force: true });
-      } catch {
-        // ignore
-      }
-
-      const code = typeof waitResult?.StatusCode === 'number' ? waitResult.StatusCode : 1;
-      if (code !== 0) {
-        return {
-          ok: false,
-          mode: 'compose',
-          message: `Updater beendet mit Code ${code}.\n${logs.trim()}`,
-        };
-      }
+      // Fire-and-forget: waiting here blocks the API/UI for the full rebuild and
+      // dies when compose recreates the API container mid-request.
+      void this.finalizeUpdater(container).catch(() => {
+        // best-effort cleanup; status.updating reflects container state
+      });
 
       return {
         ok: true,
         mode: 'compose',
         message:
-          'Update abgeschlossen. Stack wurde neu gebaut – Seite neu laden.\n' + logs.trim().slice(-500),
+          'Update gestartet. Source wird synchronisiert und der Stack neu gebaut – Status aktualisiert sich automatisch.',
       };
     } catch (error) {
       return {
@@ -383,6 +363,30 @@ export class SelfUpdateService {
         mode: 'compose',
         message: error instanceof Error ? error.message : String(error),
       };
+    }
+  }
+
+  private async finalizeUpdater(container: Docker.Container): Promise<void> {
+    try {
+      await Promise.race([
+        container.wait(),
+        new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error('Update-Timeout (20 Min.)')), APPLY_TIMEOUT_MS);
+        }),
+      ]);
+    } catch {
+      try {
+        await container.remove({ force: true });
+      } catch {
+        // ignore
+      }
+      return;
+    }
+
+    try {
+      await container.remove({ force: true });
+    } catch {
+      // ignore – may already be gone after compose recreate
     }
   }
 
@@ -422,6 +426,26 @@ export class SelfUpdateService {
 
 export function readLocalRevision(mountDir: string, envSha: string | null): string | null {
   if (envSha?.trim()) return envSha.trim();
+
+  // Prefer live git HEAD when install dir is a clone (agent/deploy pushes).
+  const gitHead = path.join(mountDir, '.git', 'HEAD');
+  if (existsSync(gitHead)) {
+    try {
+      const head = readFileSync(gitHead, 'utf8').trim();
+      if (/^[a-f0-9]{7,40}$/i.test(head)) return head;
+      const refMatch = /^ref:\s*(.+)$/.exec(head);
+      if (refMatch?.[1]) {
+        const refPath = path.join(mountDir, '.git', refMatch[1]);
+        if (existsSync(refPath)) {
+          const sha = readFileSync(refPath, 'utf8').trim();
+          if (/^[a-f0-9]{7,40}$/i.test(sha)) return sha;
+        }
+      }
+    } catch {
+      // fall through to revision file
+    }
+  }
+
   const file = path.join(mountDir, '.dockora-revision');
   if (!existsSync(file)) return null;
   try {

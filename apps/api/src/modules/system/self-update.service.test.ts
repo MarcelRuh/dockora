@@ -34,4 +34,20 @@ describe('readLocalRevision', () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it('prefers git HEAD over stale .dockora-revision', () => {
+    const dir = join(tmpdir(), `dockora-git-rev-${Date.now()}`);
+    mkdirSync(join(dir, '.git', 'refs', 'heads'), { recursive: true });
+    writeFileSync(join(dir, '.git', 'HEAD'), 'ref: refs/heads/main\n');
+    writeFileSync(
+      join(dir, '.git', 'refs', 'heads', 'main'),
+      'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n',
+    );
+    writeFileSync(join(dir, '.dockora-revision'), 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n');
+    try {
+      expect(readLocalRevision(dir, null)).toBe('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
