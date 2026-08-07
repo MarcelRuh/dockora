@@ -5,15 +5,24 @@ import { cn } from '@/lib/utils';
 export function ProgressBar({
   value,
   tone = 'accent',
+  autoTone = true,
   className,
 }: {
   value: number | null;
   tone?: 'accent' | 'success' | 'warning' | 'danger';
+  /** Resource gauges: color shifts by fill %. Task progress: set false. */
+  autoTone?: boolean;
   className?: string;
 }) {
   const pct = value == null ? 0 : Math.min(100, Math.max(0, value));
   const resolvedTone =
-    value == null ? 'accent' : value >= 90 ? 'danger' : value >= 75 ? 'warning' : tone;
+    !autoTone || value == null
+      ? tone
+      : value >= 90
+        ? 'danger'
+        : value >= 75
+          ? 'warning'
+          : tone;
 
   return (
     <div

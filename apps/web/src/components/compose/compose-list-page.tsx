@@ -16,6 +16,7 @@ import { useAuth } from '@/components/auth/auth-provider';
 import { canAdmin, canOperate } from '@/lib/roles';
 import { composeStatusTone } from '@/lib/status';
 import { Button, Input, Select, Textarea } from '@/components/ui/form-controls';
+import { ProgressBar } from '@/components/ui/progress-bar';
 import {
   DataTable,
   EmptyState,
@@ -33,6 +34,8 @@ const DEFAULT_YAML = `services:
     restart: unless-stopped
 `;
 
+type CreateStep = 'validate' | 'write' | 'start' | 'done';
+
 export function ComposeListPage() {
   const { t } = useLocale();
   const { authEnabled, user } = useAuth();
@@ -46,6 +49,10 @@ export function ComposeListPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [createProgress, setCreateProgress] = useState<{
+    percent: number;
+    step: CreateStep;
+  } | null>(null);
 
   const [name, setName] = useState('');
   const [basePath, setBasePath] = useState('');
@@ -53,6 +60,19 @@ export function ComposeListPage() {
   const [yaml, setYaml] = useState(DEFAULT_YAML);
   const [envContent, setEnvContent] = useState('');
   const [startAfterCreate, setStartAfterCreate] = useState(true);
+
+  const createStepLabel = (step: CreateStep) => {
+    switch (step) {
+      case 'validate':
+        return t.compose.createProgressValidate;
+      case 'write':
+        return t.compose.createProgressWrite;
+      case 'start':
+        return t.compose.createProgressStart;
+      case 'done':
+        return t.compose.createProgressDone;
+    }
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -123,15 +143,36 @@ export function ComposeListPage() {
     }
     setCreating(true);
     setError(null);
+    setCreateProgress({ percent: 8, step: 'validate' });
+    let tick: ReturnType<typeof setInterval> | null = null;
     try {
+      setCreateProgress({ percent: 22, step: 'write' });
       const project = await createComposeProject({
         name: trimmed,
         basePath,
         composeFileName,
         yaml,
         envContent: envContent.trim() || undefined,
-        start: startAfterCreate,
+        start: false,
       });
+
+      if (startAfterCreate) {
+        let percent = 55;
+        setCreateProgress({ percent, step: 'start' });
+        tick = setInterval(() => {
+          percent = Math.min(percent + 2, 92);
+          setCreateProgress({ percent, step: 'start' });
+        }, 700);
+        try {
+          await composeAction(project.id, 'up');
+        } finally {
+          if (tick) clearInterval(tick);
+          tick = null;
+        }
+      }
+
+      setCreateProgress({ percent: 100, step: 'done' });
+      await new Promise((r) => setTimeout(r, 280));
       setShowCreate(false);
       setName('');
       setYaml(DEFAULT_YAML);
@@ -140,8 +181,11 @@ export function ComposeListPage() {
       router.push(`/compose/${encodeURIComponent(project.id)}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : t.compose.createError);
+      await load();
     } finally {
+      if (tick) clearInterval(tick);
       setCreating(false);
+      setCreateProgress(null);
     }
   };
 
@@ -202,7 +246,11 @@ export function ComposeListPage() {
         actions={
           <div className="flex gap-2">
             {canOps ? (
-              <Button variant="primary" onClick={() => setShowCreate((v) => !v)}>
+              <Button
+                variant="primary"
+                disabled={creating}
+                onClick={() => setShowCreate((v) => !v)}
+              >
                 {showCreate ? t.common.cancel : t.compose.create}
               </Button>
             ) : null}
@@ -222,11 +270,16 @@ export function ComposeListPage() {
                 onChange={(e) => setName(e.target.value)}
                 placeholder="my-app"
                 autoComplete="off"
+                disabled={creating}
               />
             </label>
             <label className="space-y-1 text-sm">
               <span className="text-dockora-muted">{t.compose.basePath}</span>
-              <Select value={basePath} onChange={(e) => setBasePath(e.target.value)}>
+              <Select
+                value={basePath}
+                onChange={(e) => setBasePath(e.target.value)}
+                disabled={creating}
+              >
                 {bases.map((b) => (
                   <option key={b.path} value={b.path} disabled={!b.writable}>
                     {b.path}
@@ -240,6 +293,7 @@ export function ComposeListPage() {
               <Select
                 value={composeFileName}
                 onChange={(e) => setComposeFileName(e.target.value)}
+                disabled={creating}
               >
                 <option value="compose.yaml">compose.yaml</option>
                 <option value="compose.yml">compose.yml</option>
@@ -253,13 +307,19 @@ export function ComposeListPage() {
                 checked={startAfterCreate}
                 onChange={(e) => setStartAfterCreate(e.target.checked)}
                 className="h-4 w-4"
+                disabled={creating}
               />
               <span>{t.compose.startAfterCreate}</span>
             </label>
           </div>
           <label className="block space-y-1 text-sm">
             <span className="text-dockora-muted">{t.compose.yaml}</span>
-            <Textarea rows={12} value={yaml} onChange={(e) => setYaml(e.target.value)} />
+            <Textarea
+              rows={12}
+              value={yaml}
+              onChange={(e) => setYaml(e.target.value)}
+              disabled={creating}
+            />
           </label>
           <label className="block space-y-1 text-sm">
             <span className="text-dockora-muted">{t.compose.envOptional}</span>
@@ -268,11 +328,27 @@ export function ComposeListPage() {
               value={envContent}
               onChange={(e) => setEnvContent(e.target.value)}
               placeholder="KEY=value"
+              disabled={creating}
             />
           </label>
           <p className="font-mono text-xs text-dockora-muted">
             {t.compose.targetPath}: {basePath}/{name || '…'}/{composeFileName}
           </p>
+          {createProgress ? (
+            <div className="space-y-2 rounded-md border border-dockora-border bg-dockora-surface2/60 p-3">
+              <div className="flex items-center justify-between gap-3 text-sm">
+                <span className="text-dockora-muted">{createStepLabel(createProgress.step)}</span>
+                <span className="tabular-nums text-dockora-muted">
+                  {Math.round(createProgress.percent)}%
+                </span>
+              </div>
+              <ProgressBar
+                value={createProgress.percent}
+                tone={createProgress.step === 'done' ? 'success' : 'accent'}
+                autoTone={false}
+              />
+            </div>
+          ) : null}
           <Button
             variant="primary"
             disabled={creating || !name.trim() || !yaml.trim()}

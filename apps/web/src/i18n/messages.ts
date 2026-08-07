@@ -198,6 +198,10 @@ export const messages = {
       envNew: 'neu',
       startAfterCreate: 'Nach dem Anlegen starten (compose up -d)',
       targetPath: 'Ziel',
+      createProgressValidate: 'Eingaben prüfen…',
+      createProgressWrite: 'Ordner anlegen und Dateien schreiben…',
+      createProgressStart: 'Images pullen und Container starten…',
+      createProgressDone: 'Fertig',
       deleteConfirm:
         'Projekt „{name}“ wirklich löschen? Container werden gestoppt und Projektdateien entfernt.',
       deleteVolumesConfirm: 'Auch Docker-Volumes dieses Projekts löschen?',
@@ -640,6 +644,10 @@ export const messages = {
       envNew: 'new',
       startAfterCreate: 'Start after create (compose up -d)',
       targetPath: 'Target',
+      createProgressValidate: 'Validating input…',
+      createProgressWrite: 'Creating folder and writing files…',
+      createProgressStart: 'Pulling images and starting containers…',
+      createProgressDone: 'Done',
       deleteConfirm:
         'Really delete project “{name}”? Containers will be stopped and project files removed.',
       deleteVolumesConfirm: 'Also delete Docker volumes for this project?',
