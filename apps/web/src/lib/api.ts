@@ -188,9 +188,13 @@ export async function backupComposeProject(id: string): Promise<BackupInfo> {
   return request<BackupInfo>(`/compose/${encodeURIComponent(id)}/backup`, { method: 'POST' });
 }
 
-export async function fetchComposeBases(): Promise<string[]> {
-  const res = await request<{ bases: string[] }>('/compose/bases');
-  return res.bases;
+export async function fetchComposeBases(): Promise<Array<{ path: string; writable: boolean }>> {
+  const res = await request<{ bases: Array<string | { path: string; writable: boolean }> }>(
+    '/compose/bases',
+  );
+  return res.bases.map((b) =>
+    typeof b === 'string' ? { path: b, writable: true } : { path: b.path, writable: b.writable },
+  );
 }
 
 export async function createComposeProject(input: {

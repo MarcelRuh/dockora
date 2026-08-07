@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { accessSync, constants, existsSync } from 'node:fs';
 import { access, copyFile, mkdir, readFile, rm, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
@@ -26,6 +27,21 @@ import {
 const execFileAsync = promisify(execFile);
 
 const ALLOWED_ENV_FILES = new Set(['.env', '.env.local', '.env.production']);
+
+function isDirWritable(dir: string): boolean {
+  const resolved = path.resolve(dir);
+  try {
+    if (existsSync(resolved)) {
+      accessSync(resolved, constants.W_OK);
+      return true;
+    }
+    // Parent writable → mkdir -p will succeed
+    accessSync(path.dirname(resolved), constants.W_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export interface ComposeServiceDeps {
   docker: IDockerClient;
@@ -412,8 +428,22 @@ export class ComposeService {
     return this.getDetails(id);
   }
 
-  listBasePaths(): string[] {
-    return [...this.deps.searchPaths];
+  listBasePaths(): Array<{ path: string; writable: boolean }> {
+    return this.deps.searchPaths.map((p) => ({
+      path: p,
+      writable: isDirWritable(p),
+    }));
+  }
+
+  /** Ensure writable compose roots exist (e.g. /data/compose). */
+  async ensureSearchRoots(): Promise<void> {
+    for (const root of this.deps.searchPaths) {
+      try {
+        await mkdir(root, { recursive: true });
+      } catch {
+        // read-only host mounts may fail – discovery still works if path exists
+      }
+    }
   }
 
   /**

@@ -4,7 +4,7 @@ import { prisma } from '../../infrastructure/db/prisma.js';
 
 const DEFAULTS: AppSettings = {
   dockerSocket: '/var/run/docker.sock',
-  composeSearchPaths: ['/opt', '/srv', '/home'],
+  composeSearchPaths: ['/data/compose', '/opt', '/srv', '/home'],
   discordWebhookUrl: '',
   discordEnabled: false,
   discordEvents: [

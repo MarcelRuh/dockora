@@ -44,6 +44,8 @@ export const composeModule: FastifyPluginAsync = async (app: FastifyInstance) =>
     excludePaths: app.config.composeExcludePaths,
   });
 
+  await service.ensureSearchRoots();
+
   app.get(`${API_PREFIX}/compose`, async (): Promise<ComposeProjectSummary[]> => {
     try {
       return await service.list();

@@ -40,7 +40,7 @@ export function ComposeListPage() {
   const isAdmin = canAdmin(user?.role, authEnabled);
   const router = useRouter();
   const [items, setItems] = useState<ComposeProjectSummary[]>([]);
-  const [bases, setBases] = useState<string[]>([]);
+  const [bases, setBases] = useState<Array<{ path: string; writable: boolean }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -64,7 +64,9 @@ export function ComposeListPage() {
       ]);
       setItems(projects);
       setBases(baseList);
-      setBasePath((prev) => prev || baseList[0] || '/opt');
+      const preferred =
+        baseList.find((b) => b.writable)?.path ?? baseList[0]?.path ?? '/data/compose';
+      setBasePath((prev) => prev || preferred);
     } catch (err) {
       setError(err instanceof Error ? err.message : t.compose.loadError);
     } finally {
@@ -223,8 +225,9 @@ export function ComposeListPage() {
               <span className="text-dockora-muted">{t.compose.basePath}</span>
               <Select value={basePath} onChange={(e) => setBasePath(e.target.value)}>
                 {bases.map((b) => (
-                  <option key={b} value={b}>
-                    {b}
+                  <option key={b.path} value={b.path} disabled={!b.writable}>
+                    {b.path}
+                    {b.writable ? '' : ` (${t.compose.readOnlyPath})`}
                   </option>
                 ))}
               </Select>

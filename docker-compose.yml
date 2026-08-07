@@ -25,7 +25,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-admin@dockora.local}
       BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:?BOOTSTRAP_ADMIN_PASSWORD is required}
-      COMPOSE_SEARCH_PATHS: ${COMPOSE_SEARCH_PATHS:-/opt,/srv,/home}
+      COMPOSE_SEARCH_PATHS: ${COMPOSE_SEARCH_PATHS:-/data/compose,/opt,/srv,/home}
       DOCKORA_SELF_IMAGE: ${DOCKORA_SELF_IMAGE:-}
       # In-App Self-Update (Compose-Install via install.sh)
       DOCKORA_INSTALL_DIR: ${DOCKORA_INSTALL_DIR:-/opt/dockora}
