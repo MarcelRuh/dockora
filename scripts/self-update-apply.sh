@@ -42,7 +42,11 @@ trap 'rm -rf "$TMP"' EXIT
 
 echo "==> Resolving remote revision"
 RAW="$(wget -qO- --header="Accept: application/vnd.github+json" --header="User-Agent: dockora-self-update" "$API_URL")"
-SHA="$(printf '%s' "$RAW" | sed -n 's/.*"sha": *"\([a-f0-9]\{40\}\)".*/\1/p' | head -1)"
+# Commit-API: erstes JSON-Feld ist der Commit-SHA (nicht Tree/Blob-SHAs matchen)
+SHA="$(printf '%s' "$RAW" | sed -n 's/^{"sha":"\([a-f0-9]\{40\}\)".*/\1/p')"
+if [ -z "$SHA" ]; then
+  SHA="$(printf '%s' "$RAW" | tr '{' '\n' | sed -n 's/^"sha": "\([a-f0-9]\{40\}\)".*/\1/p' | head -1)"
+fi
 if [ -z "$SHA" ]; then
   echo "ERROR: could not parse remote commit SHA" >&2
   exit 1
