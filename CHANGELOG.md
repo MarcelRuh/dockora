@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [1.5.1] – 2026-08-07
+
+### Fixed
+
+- Compose validate/logs (and container logs) return JSON wrappers so the UI no longer fails with `Unexpected token … is not valid JSON` on YAML/text responses
+
 ## [1.5.0] – 2026-08-07
 
 Finale Ops-Release: Host-Terminal, härtere Update-/Terminal-Pfade, zuverlässige Docker-Bereinigung und UX für Scheduler, Users und Backup-Restore.

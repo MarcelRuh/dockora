@@ -88,9 +88,11 @@ export const containersModule: FastifyPluginAsync = async (app: FastifyInstance)
 
   app.get<{ Params: { id: string }; Querystring: { tail?: string } }>(
     `${API_PREFIX}/containers/:id/logs`,
-    async (request): Promise<string> => {
+    async (request): Promise<{ logs: string }> => {
       const tail = parseTail(request.query);
-      return withDockerError(app, () => service.logs(request.params.id, tail));
+      // Wrap as JSON — bare strings break the web client's JSON.parse
+      const logs = await withDockerError(app, () => service.logs(request.params.id, tail));
+      return { logs };
     },
   );
 

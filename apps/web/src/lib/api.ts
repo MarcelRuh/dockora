@@ -76,7 +76,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   const text = await res.text();
   if (!text) return undefined as T;
-  return JSON.parse(text) as T;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    // Fastify sends bare strings as-is (e.g. compose `config` YAML, log dumps).
+    // Treat non-JSON success bodies as plain text rather than failing the UI.
+    return text as T;
+  }
 }
 
 function qs(params: Record<string, string | number | undefined>): string {
@@ -131,7 +137,10 @@ export async function fetchContainerStats(id: string): Promise<ContainerStatsSna
 }
 
 export async function fetchContainerLogs(id: string, tail = 200): Promise<string> {
-  return request<string>(`/containers/${encodeURIComponent(id)}/logs${qs({ tail })}`);
+  const res = await request<string | { logs: string }>(
+    `/containers/${encodeURIComponent(id)}/logs${qs({ tail })}`,
+  );
+  return typeof res === 'string' ? res : res.logs;
 }
 
 export async function containerAction(
@@ -185,7 +194,10 @@ export async function saveComposeEnv(
 }
 
 export async function validateComposeConfig(id: string): Promise<string> {
-  return request<string>(`/compose/${encodeURIComponent(id)}/config`);
+  const res = await request<string | { config: string }>(
+    `/compose/${encodeURIComponent(id)}/config`,
+  );
+  return typeof res === 'string' ? res : res.config;
 }
 
 export async function previewComposeChanges(id: string): Promise<import('@dockora/shared').ComposeChangePreview> {
@@ -193,7 +205,10 @@ export async function previewComposeChanges(id: string): Promise<import('@dockor
 }
 
 export async function fetchComposeLogs(id: string): Promise<string> {
-  return request<string>(`/compose/${encodeURIComponent(id)}/logs`);
+  const res = await request<string | { logs: string }>(
+    `/compose/${encodeURIComponent(id)}/logs`,
+  );
+  return typeof res === 'string' ? res : res.logs;
 }
 
 export async function backupComposeProject(id: string): Promise<BackupInfo> {
