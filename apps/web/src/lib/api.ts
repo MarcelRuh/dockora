@@ -104,6 +104,12 @@ export async function fetchContainers(filter?: ContainerFilter): Promise<Contain
       image: filter?.image,
       label: filter?.label,
       network: filter?.network,
+      includeSelf:
+        filter?.includeSelf === true ||
+        filter?.includeSelf === 'true' ||
+        filter?.includeSelf === '1'
+          ? 'true'
+          : undefined,
     })}`,
   );
 }

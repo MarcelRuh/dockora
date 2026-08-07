@@ -15,6 +15,7 @@
     "@dockora/shared": "workspace:*",
     "@xterm/addon-attach": "^0.12.0",
     "@xterm/addon-fit": "^0.11.0",
+    "@xyflow/react": "^12.11.2",
     "clsx": "^2.1.1",
     "geist": "^1.3.1",
     "next": "^15.1.2",

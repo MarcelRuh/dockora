@@ -109,6 +109,8 @@ export interface ContainerFilter {
   image?: string;
   label?: string;
   network?: string;
+  /** When true, include Dockora's own containers (for monitoring topology). */
+  includeSelf?: boolean | string;
 }
 
 export interface ComposeProjectSummary {

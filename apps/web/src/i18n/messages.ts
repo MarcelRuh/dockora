@@ -287,6 +287,21 @@ export const messages = {
       containers: 'Container',
       alert: 'Alert',
       emptyContainers: 'Keine Container.',
+      ports: {
+        title: 'Freigegebene Ports',
+        empty: 'Keine freigegebenen Host-Ports.',
+        host: 'Host',
+        container: 'Container-Port',
+        protocol: 'Protokoll',
+        status: 'Status',
+      },
+      topology: {
+        title: 'Netzwerk-Topologie',
+        empty: 'Keine Container für die Topologie.',
+        host: 'Docker Host',
+        network: 'Container',
+        published: 'Ports & Netzwerke',
+      },
     },
     settings: {
       title: 'Einstellungen',
@@ -706,6 +721,21 @@ export const messages = {
       containers: 'Containers',
       alert: 'Alert',
       emptyContainers: 'No containers.',
+      ports: {
+        title: 'Published ports',
+        empty: 'No published host ports.',
+        host: 'Host',
+        container: 'Container port',
+        protocol: 'Protocol',
+        status: 'Status',
+      },
+      topology: {
+        title: 'Network topology',
+        empty: 'No containers for topology.',
+        host: 'Docker Host',
+        network: 'containers',
+        published: 'Ports & networks',
+      },
     },
     settings: {
       title: 'Settings',

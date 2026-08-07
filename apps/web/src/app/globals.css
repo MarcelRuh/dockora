@@ -3,6 +3,7 @@
 @tailwind utilities;
 
 @import 'xterm/css/xterm.css';
+@import '@xyflow/react/dist/style.css';
 
 :root {
   --dockora-bg: #eef1f6;

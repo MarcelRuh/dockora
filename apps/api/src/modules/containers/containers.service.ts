@@ -18,8 +18,12 @@ export class ContainersService {
 
   async list(filters: ContainerFilter = {}): Promise<ContainerSummary[]> {
     const all = await this.deps.docker.listContainers(true);
+    const includeSelf =
+      filters.includeSelf === true ||
+      filters.includeSelf === 'true' ||
+      filters.includeSelf === '1';
     return all
-      .filter((c) => !isDockoraSelfContainer(c))
+      .filter((c) => includeSelf || !isDockoraSelfContainer(c))
       .filter((c) => this.matchesFilter(c, filters))
       .map(toSummary);
   }

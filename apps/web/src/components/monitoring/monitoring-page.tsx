@@ -1,8 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import type { MonitoringSnapshot } from '@dockora/shared';
-import { fetchMonitoring } from '@/lib/api';
+import type { ContainerSummary, MonitoringSnapshot } from '@dockora/shared';
+import { fetchContainers, fetchMonitoring } from '@/lib/api';
 import { useLocale } from '@/i18n/locale-provider';
 import { formatPercent, formatRelativeTime } from '@/lib/format';
 import { containerStatusTone } from '@/lib/status';
@@ -16,17 +16,25 @@ import {
   StatusBadge,
 } from '@/components/ui/page-parts';
 import { ProgressBar } from '@/components/ui/progress-bar';
+import { PortCards } from '@/components/monitoring/port-cards';
+import { NetworkTopology } from '@/components/monitoring/network-topology';
 
 export function MonitoringPage() {
   const { t, locale } = useLocale();
   const loc = locale === 'de' ? 'de-DE' : 'en-US';
   const [data, setData] = useState<MonitoringSnapshot | null>(null);
+  const [containers, setContainers] = useState<ContainerSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      setData(await fetchMonitoring());
+      const [snap, list] = await Promise.all([
+        fetchMonitoring(),
+        fetchContainers({ includeSelf: true }),
+      ]);
+      setData(snap);
+      setContainers(list);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : t.monitoring.loadError);
@@ -129,6 +137,9 @@ export function MonitoringPage() {
               </ul>
             )}
           </section>
+
+          <PortCards containers={containers} labels={t.monitoring.ports} />
+          <NetworkTopology containers={containers} labels={t.monitoring.topology} />
 
           <section className="space-y-3">
             <h2 className="font-display text-lg font-bold">{t.monitoring.containers}</h2>
