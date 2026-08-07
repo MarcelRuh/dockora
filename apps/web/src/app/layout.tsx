@@ -3,6 +3,7 @@ import { Inter, Orbitron, JetBrains_Mono } from 'next/font/google';
 import { ThemeProvider } from '@/components/theme-provider';
 import { AuthProvider } from '@/components/auth/auth-provider';
 import { LocaleProvider } from '@/i18n/locale-provider';
+import { AppShell } from '@/components/app-shell';
 import './globals.css';
 
 const inter = Inter({
@@ -45,7 +46,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       >
         <ThemeProvider>
           <LocaleProvider>
-            <AuthProvider>{children}</AuthProvider>
+            <AuthProvider>
+              <AppShell>{children}</AppShell>
+            </AuthProvider>
           </LocaleProvider>
         </ThemeProvider>
       </body>

@@ -95,9 +95,9 @@ export function ComposeListPage() {
     }
   };
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (opts?: { clearError?: boolean }) => {
     setLoading(true);
-    setError(null);
+    if (opts?.clearError) setError(null);
     try {
       const [projects, baseList, containers] = await Promise.all([
         fetchComposeProjects(),
@@ -129,11 +129,12 @@ export function ComposeListPage() {
   }, [t.compose.loadError]);
 
   useEffect(() => {
-    void load();
+    void load({ clearError: true });
   }, [load]);
 
   const run = async (id: string, action: 'up' | 'down' | 'restart' | 'pull' | 'build') => {
     setBusy(id);
+    setError(null);
     try {
       await composeAction(id, action);
       await load();
@@ -213,10 +214,11 @@ export function ComposeListPage() {
         setBulkProgress({ done: i + 1, total: ids.length });
       }
       setSelected(new Set());
-      await load();
+      await load({ clearError: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.common.failed);
+      const msg = err instanceof Error ? err.message : t.common.failed;
       await load();
+      setError(msg);
     } finally {
       setBusy(null);
       setBulkBusy(false);
@@ -248,7 +250,7 @@ export function ComposeListPage() {
       setError(t.compose.invalidName);
       return;
     }
-    if (!yaml.trim() || !/^\s*services:\s*$/m.test(yaml)) {
+    if (!yaml.trim() || !/^\s*services:\s*(?:#.*)?$/m.test(yaml)) {
       setError(t.compose.invalidYaml);
       return;
     }
@@ -256,7 +258,6 @@ export function ComposeListPage() {
     setError(null);
     setCreateProgress({ percent: 8, step: 'validate' });
     let tick: ReturnType<typeof setInterval> | null = null;
-    let createdId: string | null = null;
     try {
       setCreateProgress({ percent: 22, step: 'write' });
       const project = await createComposeProject({
@@ -267,7 +268,6 @@ export function ComposeListPage() {
         envContent: envContent.trim() || undefined,
         start: false,
       });
-      createdId = project.id;
 
       if (startAfterCreate) {
         let percent = 55;
@@ -282,14 +282,12 @@ export function ComposeListPage() {
           if (tick) clearInterval(tick);
           tick = null;
           const msg = err instanceof Error ? err.message : t.common.failed;
-          setError(`${t.compose.createStartFailed}: ${msg}`);
-          setCreateProgress({ percent: 100, step: 'done' });
-          setShowCreate(false);
-          setName('');
-          setYaml(DEFAULT_YAML);
-          setEnvContent('');
+          setCreateProgress(null);
           await load();
-          router.push(`/compose/${encodeURIComponent(project.id)}`);
+          // Stay on create form with YAML intact so the user can fix ports/volumes
+          setError(
+            `${t.compose.createStartFailed}: ${msg} (${t.compose.targetPath}: ${basePath}/${trimmed})`,
+          );
           return;
         } finally {
           if (tick) clearInterval(tick);
@@ -303,14 +301,13 @@ export function ComposeListPage() {
       setName('');
       setYaml(DEFAULT_YAML);
       setEnvContent('');
-      await load();
+      await load({ clearError: true });
       router.push(`/compose/${encodeURIComponent(project.id)}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.compose.createError);
+      const msg = err instanceof Error ? err.message : t.compose.createError;
       await load();
-      if (createdId) {
-        router.push(`/compose/${encodeURIComponent(createdId)}`);
-      }
+      setError(msg);
+      // Created on disk but later step failed – keep form open with error (no silent navigate)
     } finally {
       if (tick) clearInterval(tick);
       setCreating(false);
@@ -410,7 +407,7 @@ export function ComposeListPage() {
                 {showCreate ? t.common.cancel : t.compose.create}
               </Button>
             ) : null}
-            <Button onClick={() => void load()}>{t.common.refresh}</Button>
+            <Button onClick={() => void load({ clearError: true })}>{t.common.refresh}</Button>
           </div>
         }
       />
@@ -418,6 +415,24 @@ export function ComposeListPage() {
       {showCreate && canOps ? (
         <section className="dockora-panel space-y-4 border-l-[3px] border-l-dockora-pink p-4">
           <h2 className="dockora-title-gradient text-lg">{t.compose.createTitle}</h2>
+          <div className="sticky top-16 z-30 -mx-1 space-y-3 bg-dockora-surface/95 px-1 py-2 backdrop-blur-md md:top-4">
+            {error ? <ErrorBanner message={error} /> : null}
+            {createProgress ? (
+              <div className="space-y-2 rounded-md border border-dockora-border bg-dockora-surface2/80 p-3">
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <span className="text-dockora-muted">{createStepLabel(createProgress.step)}</span>
+                  <span className="tabular-nums text-dockora-muted">
+                    {Math.round(createProgress.percent)}%
+                  </span>
+                </div>
+                <ProgressBar
+                  value={createProgress.percent}
+                  tone={createProgress.step === 'done' ? 'success' : 'accent'}
+                  autoTone={false}
+                />
+              </div>
+            ) : null}
+          </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="space-y-1.5 text-sm">
               <Label>{t.common.name}</Label>
@@ -492,21 +507,6 @@ export function ComposeListPage() {
           <p className="font-mono text-xs text-dockora-muted">
             {t.compose.targetPath}: {basePath}/{name || '…'}/{composeFileName}
           </p>
-          {createProgress ? (
-            <div className="space-y-2 rounded-md border border-dockora-border bg-dockora-surface2/60 p-3">
-              <div className="flex items-center justify-between gap-3 text-sm">
-                <span className="text-dockora-muted">{createStepLabel(createProgress.step)}</span>
-                <span className="tabular-nums text-dockora-muted">
-                  {Math.round(createProgress.percent)}%
-                </span>
-              </div>
-              <ProgressBar
-                value={createProgress.percent}
-                tone={createProgress.step === 'done' ? 'success' : 'accent'}
-                autoTone={false}
-              />
-            </div>
-          ) : null}
           <Button
             variant="primary"
             disabled={creating || !name.trim() || !yaml.trim()}
@@ -517,7 +517,7 @@ export function ComposeListPage() {
         </section>
       ) : null}
 
-      {error ? <ErrorBanner message={error} /> : null}
+      {error && !showCreate ? <ErrorBanner message={error} /> : null}
       {bulkProgress ? (
         <p className="font-mono text-xs text-dockora-muted">
           {t.common.bulkProgress

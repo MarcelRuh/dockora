@@ -2,6 +2,10 @@
 module.exports = {
   darkMode: 'class',
   content: ['./src/**/*.{ts,tsx}'],
+  future: {
+    // Touch: first tap must activate, not only apply :hover
+    hoverOnlyWhenSupported: true,
+  },
   theme: {
     extend: {
       colors: {

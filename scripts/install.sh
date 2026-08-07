@@ -223,6 +223,13 @@ else
   else
     docker compose up -d --build
   fi
+  # BuildKit layers accumulate fast (~GBs per Dockora rebuild)
+  if [[ -x "${INSTALL_DIR}/scripts/prune-build-cache.sh" ]]; then
+    "${INSTALL_DIR}/scripts/prune-build-cache.sh" || true
+  else
+    docker builder prune -af || true
+  fi
+  docker image prune -f || true
 fi
 
 if [[ "$PROXY" == "1" ]]; then

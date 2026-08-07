@@ -37,19 +37,19 @@ function NavList({
 
   return (
     <ul className={cn('space-y-0.5', compact && 'space-y-0')}>
-      {NAV_ITEMS.map((item, index) => {
+      {NAV_ITEMS.map((item) => {
         const active = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
         const Icon = NAV_ICONS[item.key];
         const className = cn(
-          'flex items-center gap-2.5 px-3 py-2.5 text-sm font-medium uppercase tracking-wide transition-all',
-          compact ? 'py-2' : 'animate-in fade-in',
+          'flex items-center gap-2.5 px-3 py-2.5 text-sm font-medium uppercase tracking-wide transition-colors',
+          compact && 'py-2',
           active
             ? 'dockora-nav-active'
             : 'text-dockora-railMuted hover:bg-dockora-accentSoft hover:text-white hover:shadow-[0_0_16px_rgba(255,0,110,0.15)]',
         );
 
         return (
-          <li key={item.key} style={compact ? undefined : { animationDelay: `${index * 20}ms` }}>
+          <li key={item.key}>
             {item.ready ? (
               <Link href={item.href} className={className} onClick={onNavigate}>
                 <Icon className="h-4 w-4 opacity-90" />

@@ -86,6 +86,10 @@ function resolveProvider(registryHost: string, remainder: string): RegistryProvi
   if (host === 'ghcr.io') {
     return 'ghcr';
   }
+  // LinuxServer Container Registry is a GHCR front-end
+  if (host === 'lscr.io') {
+    return 'ghcr';
+  }
   if (host === 'quay.io') {
     return 'quay';
   }

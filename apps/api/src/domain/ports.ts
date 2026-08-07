@@ -97,6 +97,8 @@ export interface IDockerClient {
   pullImage(image: string): Promise<void>;
   removeImage(id: string, force?: boolean): Promise<void>;
   pruneImages(danglingOnly?: boolean): Promise<{ imagesDeleted: number; spaceReclaimed: number }>;
+  /** Total BuildKit/build-cache bytes (0 if unavailable). */
+  getBuildCacheBytes(): Promise<number>;
   getImageInspect(id: string): Promise<{ Id: string; RepoDigests?: string[]; RepoTags?: string[] }>;
   /** Low-level dockerode instance for exec/attach (terminal) */
   getRaw(): unknown;

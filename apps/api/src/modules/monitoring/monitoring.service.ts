@@ -17,6 +17,7 @@ export class MonitoringService {
 
     let dockerOnline = false;
     let containers: MonitoringSnapshot['containers'] = [];
+    let buildCacheBytes: number | null = null;
 
     try {
       dockerOnline = await this.deps.docker.ping();
@@ -39,6 +40,15 @@ export class MonitoringService {
 
           return entry;
         });
+
+        buildCacheBytes = await this.deps.docker.getBuildCacheBytes();
+        const cacheGb = buildCacheBytes / (1024 ** 3);
+        const cacheLimit = settings.monitoringBuildCacheGbThreshold;
+        if (cacheLimit > 0 && cacheGb >= cacheLimit) {
+          alerts.push(
+            `Docker build cache ${cacheGb.toFixed(1)} GB exceeds ${cacheLimit} GB threshold`,
+          );
+        }
       } else {
         alerts.push('Docker daemon offline');
       }
@@ -65,7 +75,13 @@ export class MonitoringService {
       alerts.push(`Memory usage ${memoryPercent}% exceeds threshold`);
     }
     if (diskPercent !== null && diskPercent >= settings.monitoringDiskThreshold) {
-      alerts.push(`Disk usage ${diskPercent}% exceeds threshold`);
+      const freeGb =
+        resources.diskTotalBytes != null && resources.diskUsedBytes != null
+          ? ((resources.diskTotalBytes - resources.diskUsedBytes) / 1024 ** 3).toFixed(1)
+          : '?';
+      alerts.push(
+        `Disk usage ${diskPercent}% exceeds ${settings.monitoringDiskThreshold}% threshold (${freeGb} GB free)`,
+      );
     }
     if (resources.temperatureC !== null && resources.temperatureC >= 85) {
       alerts.push(`High temperature: ${resources.temperatureC}°C`);
@@ -77,6 +93,7 @@ export class MonitoringService {
         cpuPercent: resources.cpuPercent,
         memoryPercent,
         diskPercent,
+        buildCacheBytes,
         temperatureC: resources.temperatureC,
       },
       dockerOnline,

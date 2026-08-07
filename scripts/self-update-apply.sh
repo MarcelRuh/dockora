@@ -93,4 +93,9 @@ fi
 # shellcheck disable=SC2086
 docker compose $PROFILES up -d --build
 
+echo "==> Pruning Docker build cache"
+docker builder prune -af || true
+echo "==> Pruning dangling images"
+docker image prune -f || true
+
 echo "==> Done. Dockora should come back shortly."

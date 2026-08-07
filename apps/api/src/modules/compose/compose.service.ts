@@ -106,6 +106,9 @@ export class ComposeService {
     const project = await this.resolveProject(id);
     const args = await buildComposeArgs(project, action);
     await execCompose(args, { cwd: project.path });
+    if (action === 'build') {
+      await pruneDockerBuildCache().catch(() => undefined);
+    }
     return { ok: true, message: `Compose ${action} succeeded for ${project.name}` };
   }
 
@@ -420,13 +423,8 @@ export class ComposeService {
       throw new ComposeValidationError('Compose file must define at least one service under "services:"');
     }
 
-    // Grobe Sicherheitsheuristik – kein Ersatz für Policy-Engines
-    if (/^\s*privileged:\s*true\b/im.test(input.yaml)) {
-      throw new ComposeValidationError('privileged: true is not allowed via Dockora create');
-    }
-    if (/^\s*network_mode:\s*["']?host["']?\b/im.test(input.yaml)) {
-      throw new ComposeValidationError('network_mode: host is not allowed via Dockora create');
-    }
+    // privileged / network_mode: host are allowed – Dockora manages the host Docker
+    // daemon for operators (Plex, Jellyfin, VPN, etc. commonly need these).
 
     const basePath = path.resolve(input.basePath.trim());
     const allowed = this.deps.searchPaths.some((sp) => {
@@ -702,6 +700,19 @@ async function execCompose(
     maxBuffer: 4 * 1024 * 1024,
     cwd: options?.cwd,
   });
+}
+
+/** Drop BuildKit cache after compose builds (images/containers stay). */
+async function pruneDockerBuildCache(): Promise<void> {
+  await execFileAsync('docker', ['builder', 'prune', '-af'], {
+    timeout: 120_000,
+    maxBuffer: 1024 * 1024,
+  });
+  // Dangling intermediate layers from multi-stage builds
+  await execFileAsync('docker', ['image', 'prune', '-f'], {
+    timeout: 120_000,
+    maxBuffer: 1024 * 1024,
+  }).catch(() => undefined);
 }
 
 function hintMissingEnv(message: string, hadEnvAttempt: boolean): string {

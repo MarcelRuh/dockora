@@ -25,7 +25,8 @@ const DEFAULTS: AppSettings = {
   backupSchedule: 'daily',
   monitoringCpuThreshold: 90,
   monitoringRamThreshold: 90,
-  monitoringDiskThreshold: 90,
+  monitoringDiskThreshold: 85,
+  monitoringBuildCacheGbThreshold: 5,
   authEnabled: false,
 };
 
@@ -91,6 +92,10 @@ export class SettingsService {
       monitoringCpuThreshold: num(stored.monitoringCpuThreshold, base.monitoringCpuThreshold),
       monitoringRamThreshold: num(stored.monitoringRamThreshold, base.monitoringRamThreshold),
       monitoringDiskThreshold: num(stored.monitoringDiskThreshold, base.monitoringDiskThreshold),
+      monitoringBuildCacheGbThreshold: num(
+        stored.monitoringBuildCacheGbThreshold,
+        base.monitoringBuildCacheGbThreshold,
+      ),
       authEnabled: stored.authEnabled ? stored.authEnabled === 'true' : base.authEnabled,
     };
   }

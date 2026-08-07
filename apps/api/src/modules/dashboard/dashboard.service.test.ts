@@ -53,6 +53,7 @@ function createMocks(overrides?: {
     pullImage: vi.fn(),
     removeImage: vi.fn(),
     pruneImages: vi.fn(),
+    getBuildCacheBytes: vi.fn(async () => 0),
     getImageInspect: vi.fn(),
     getRaw: vi.fn(),
     getRecentEvents: vi.fn().mockReturnValue([

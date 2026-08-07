@@ -460,7 +460,7 @@ export function SettingsPageView() {
 
           {tab === 'monitoring' ? (
             <SettingsPanel title={t.settings.sections.monitoring} description={desc.monitoring}>
-              <div className="grid gap-4 sm:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <Field label={t.settings.fields.monitoringCpuThreshold}>
                   <Input
                     type="number"
@@ -488,6 +488,21 @@ export function SettingsPageView() {
                     max={100}
                     value={settings.monitoringDiskThreshold}
                     onChange={(e) => patch('monitoringDiskThreshold', Number(e.target.value))}
+                    disabled={!isAdmin}
+                  />
+                </Field>
+                <Field
+                  label={t.settings.fields.monitoringBuildCacheGbThreshold}
+                  hint={t.settings.hints.monitoringBuildCacheGbThreshold}
+                >
+                  <Input
+                    type="number"
+                    min={0}
+                    max={500}
+                    value={settings.monitoringBuildCacheGbThreshold}
+                    onChange={(e) =>
+                      patch('monitoringBuildCacheGbThreshold', Number(e.target.value))
+                    }
                     disabled={!isAdmin}
                   />
                 </Field>

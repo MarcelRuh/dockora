@@ -221,6 +221,18 @@ export class DockerodeClient implements IDockerClient {
     };
   }
 
+  async getBuildCacheBytes(): Promise<number> {
+    try {
+      const df = (await this.docker.df()) as {
+        BuildCache?: Array<{ Size?: number }>;
+      };
+      return (df.BuildCache ?? []).reduce((sum, entry) => sum + (entry.Size ?? 0), 0);
+    } catch (error) {
+      this.logger?.debug({ err: error }, 'docker df (build cache) failed');
+      return 0;
+    }
+  }
+
   async getImageInspect(
     id: string,
   ): Promise<{ Id: string; RepoDigests?: string[]; RepoTags?: string[] }> {
@@ -371,6 +383,10 @@ export class OfflineDockerClient implements IDockerClient {
 
   async pruneImages(): Promise<{ imagesDeleted: number; spaceReclaimed: number }> {
     OfflineDockerClient.offline();
+  }
+
+  async getBuildCacheBytes(): Promise<number> {
+    return 0;
   }
 
   async getImageInspect(_id: string): Promise<{ Id: string; RepoDigests?: string[]; RepoTags?: string[] }> {

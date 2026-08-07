@@ -134,7 +134,10 @@ export function NeonParticles() {
 /** Ambient glow orbs + floating geometric shapes (NeonVerse hero atmosphere) */
 export function NeonAtmosphere() {
   return (
-    <div aria-hidden className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+    <div
+      aria-hidden
+      className="pointer-events-none absolute inset-0 z-0 overflow-hidden [&_*]:pointer-events-none"
+    >
       <div
         className="dockora-glow-orb"
         style={{

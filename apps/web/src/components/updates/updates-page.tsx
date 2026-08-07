@@ -32,12 +32,33 @@ function shortDigest(d: string | null | undefined): string {
 
 function errorStatusLabel(
   error: string | undefined,
-  labels: { statusAuth: string; statusManifest: string; checkFailed: string },
+  labels: {
+    statusAuth: string;
+    statusManifest: string;
+    statusRateLimit: string;
+    checkFailed: string;
+  },
 ): string {
   if (!error) return labels.checkFailed;
   const lower = error.toLowerCase();
-  if (lower.includes('auth required') || lower.includes('401')) return labels.statusAuth;
-  if (lower.includes('manifest') || lower.includes('404')) return labels.statusManifest;
+  if (
+    lower.includes('auth required') ||
+    lower.includes('invalid token') ||
+    lower.includes('denied') ||
+    lower.includes('(401)') ||
+    lower.includes('(403)')
+  ) {
+    return labels.statusAuth;
+  }
+  if (lower.includes('rate limited') || lower.includes('(429)')) {
+    return labels.statusRateLimit;
+  }
+  if (lower.includes('manifest not found') || lower.includes('(404)')) {
+    return labels.statusManifest;
+  }
+  if (lower.includes('manifest fetch failed')) {
+    return labels.statusManifest;
+  }
   return labels.checkFailed;
 }
 
@@ -163,11 +184,12 @@ export function UpdatesPage() {
     u.currentTag,
     u.registry,
     u.error ? (
-      <StatusBadge
-        key={`st-${u.containerId}`}
-        status="danger"
-        label={errorStatusLabel(u.error, t.updates)}
-      />
+      <div key={`st-${u.containerId}`} className="max-w-md space-y-1.5">
+        <StatusBadge status="danger" label={errorStatusLabel(u.error, t.updates)} />
+        <p className="break-words font-mono text-[11px] leading-snug text-dockora-danger" title={u.error}>
+          {u.error}
+        </p>
+      </div>
     ) : u.updateAvailable ? (
       <StatusBadge key={`st-${u.containerId}`} status="warning" label={t.updates.available} />
     ) : (
@@ -184,9 +206,7 @@ export function UpdatesPage() {
     </span>,
     formatRelativeTime(u.checkedAt, loc),
     u.error ? (
-      <span key={`err-${u.containerId}`} className="max-w-[14rem] text-xs text-dockora-danger" title={u.error}>
-        {u.error}
-      </span>
+      '—'
     ) : u.updateAvailable && canOps ? (
       <Button
         key={`pull-${u.containerId}`}

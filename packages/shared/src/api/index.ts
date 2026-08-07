@@ -214,6 +214,8 @@ export interface AppSettings {
   monitoringCpuThreshold: number;
   monitoringRamThreshold: number;
   monitoringDiskThreshold: number;
+  /** Alert when Docker build cache exceeds this many GB */
+  monitoringBuildCacheGbThreshold: number;
   authEnabled: boolean;
 }
 
@@ -270,6 +272,8 @@ export interface MonitoringSnapshot {
     cpuPercent: number | null;
     memoryPercent: number | null;
     diskPercent: number | null;
+    /** Docker BuildKit cache size in bytes (null if unknown). */
+    buildCacheBytes: number | null;
     temperatureC: number | null;
   };
   dockerOnline: boolean;

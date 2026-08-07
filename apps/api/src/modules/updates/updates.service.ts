@@ -449,6 +449,7 @@ const MANIFEST_ACCEPT = [
 ].join(', ');
 
 type ManifestAuth = {
+  /** Pre-fetched bearer (e.g. Docker Hub anonymous token) */
   bearer?: string;
   registryAuth?: RegistryAuth;
 };
@@ -460,35 +461,85 @@ async function fetchManifestDigest(
   auth?: ManifestAuth,
 ): Promise<string | null> {
   const url = `https://${registryHost}/v2/${repoPath}/manifests/${tag}`;
-  const headers: Record<string, string> = {
-    Accept: MANIFEST_ACCEPT,
+  const ref = `${registryHost}/${repoPath}:${tag}`;
+
+  const attempt = async (bearer?: string) => {
+    const headers: Record<string, string> = { Accept: MANIFEST_ACCEPT };
+    if (bearer) headers.Authorization = `Bearer ${bearer}`;
+    return request(url, { headers });
   };
-  if (auth?.bearer) {
-    headers.Authorization = `Bearer ${auth.bearer}`;
-  } else if (auth?.registryAuth?.token) {
-    // Try PAT as Bearer first (works for many GHCR packages)
-    headers.Authorization = `Bearer ${auth.registryAuth.token}`;
-  }
 
-  let res = await request(url, { headers });
+  // Never send a raw PAT as Bearer on the first request – GHCR/LSCR answer 403
+  // ("invalid token") without WWW-Authenticate, which broke public image checks.
+  let res = await attempt(auth?.bearer);
+  let usedChallenge = false;
 
-  // OCI registries (ghcr, lscr→ghcr, …) often require a Bearer challenge first
-  if (res.statusCode === 401) {
-    const challenge = parseWwwAuthenticate(res.headers['www-authenticate']);
-    const bearer = await fetchRegistryBearerToken(challenge, repoPath, auth?.registryAuth);
+  const needsAuth =
+    res.statusCode === 401 ||
+    res.statusCode === 403 ||
+    (res.statusCode === 404 && !auth?.bearer); // some registries hide existence until authed
+
+  if (needsAuth) {
+    let challenge = parseWwwAuthenticate(res.headers['www-authenticate']);
     await res.body.dump().catch(() => undefined);
-    if (!bearer) {
-      throw new Error(`Registry auth required (${registryHost})`);
+
+    // 403 with bad Bearer (or no challenge): retry anonymous to obtain a real challenge
+    if (!challenge) {
+      const anon = await attempt(undefined);
+      challenge = parseWwwAuthenticate(anon.headers['www-authenticate']);
+      if (!challenge && anon.statusCode < 400) {
+        // Public registry that accepted anonymous GET – use this response
+        res = anon;
+      } else {
+        await anon.body.dump().catch(() => undefined);
+      }
     }
-    headers.Authorization = `Bearer ${bearer}`;
-    res = await request(url, { headers });
+
+    if (challenge) {
+      const bearer = await fetchRegistryBearerToken(challenge, repoPath, auth?.registryAuth);
+      if (!bearer) {
+        throw new Error(`Registry auth required (${ref})`);
+      }
+      usedChallenge = true;
+      res = await attempt(bearer);
+    }
   }
 
-  if (res.statusCode === 401) {
-    throw new Error(`Registry auth required (${registryHost})`);
+  // Rate limit: one short retry
+  if (res.statusCode === 429) {
+    await res.body.dump().catch(() => undefined);
+    await sleep(1500);
+    const bearer = auth?.bearer;
+    res = await attempt(bearer);
+    if (res.statusCode === 401 || res.statusCode === 403) {
+      const challenge = parseWwwAuthenticate(res.headers['www-authenticate']);
+      await res.body.dump().catch(() => undefined);
+      const token = await fetchRegistryBearerToken(challenge, repoPath, auth?.registryAuth);
+      if (token) res = await attempt(token);
+    }
+  }
+
+  if (res.statusCode === 401 || res.statusCode === 403) {
+    await res.body.dump().catch(() => undefined);
+    throw new Error(
+      usedChallenge
+        ? `Registry auth required (${ref})`
+        : `Registry auth required (${ref}) – check GHCR/LSCR token or leave empty for public images`,
+    );
+  }
+  if (res.statusCode === 404) {
+    await res.body.dump().catch(() => undefined);
+    throw new Error(`Manifest not found (${ref})`);
+  }
+  if (res.statusCode === 429) {
+    await res.body.dump().catch(() => undefined);
+    throw new Error(`Registry rate limited (${ref})`);
   }
   if (res.statusCode >= 400) {
-    throw new Error(`Manifest fetch failed (${res.statusCode})`);
+    const snippet = (await res.body.text().catch(() => '')).slice(0, 160).trim();
+    throw new Error(
+      `Manifest fetch failed (${res.statusCode}) for ${ref}${snippet ? `: ${snippet}` : ''}`,
+    );
   }
 
   const digestHeader = res.headers['docker-content-digest'];
@@ -500,10 +551,15 @@ async function fetchManifestDigest(
   const body = (await res.body.json()) as {
     config?: { digest?: string };
     layers?: Array<{ digest?: string }>;
+    manifests?: Array<{ digest?: string }>;
   };
 
   if (body.config?.digest) {
     return body.config.digest;
+  }
+  // OCI index / manifest list without Content-Digest header – use first child digest
+  if (body.manifests?.[0]?.digest) {
+    return body.manifests[0].digest;
   }
 
   return null;
@@ -516,15 +572,18 @@ interface WwwAuthChallenge {
 }
 
 function parseWwwAuthenticate(header: string | string[] | undefined): WwwAuthChallenge | null {
-  const raw = Array.isArray(header) ? header[0] : header;
-  if (!raw || !/^Bearer\s+/i.test(raw)) return null;
-  const params = raw.replace(/^Bearer\s+/i, '');
+  const raw = Array.isArray(header) ? header.join(', ') : header;
+  if (!raw) return null;
+  // Prefer Bearer challenge if multiple schemes are present
+  const bearerIdx = raw.search(/Bearer\s+/i);
+  if (bearerIdx < 0) return null;
+  const params = raw.slice(bearerIdx).replace(/^Bearer\s+/i, '');
   const out: WwwAuthChallenge = {};
   for (const part of params.split(',')) {
-    const m = part.trim().match(/^(\w+)="([^"]*)"$/);
+    const m = part.trim().match(/^(\w+)=(?:"([^"]*)"|([^,\s]+))/);
     if (!m) continue;
     const key = m[1]?.toLowerCase();
-    const value = m[2];
+    const value = m[2] ?? m[3];
     if (key === 'realm') out.realm = value;
     if (key === 'service') out.service = value;
     if (key === 'scope') out.scope = value;
@@ -538,27 +597,46 @@ async function fetchRegistryBearerToken(
   registryAuth?: RegistryAuth,
 ): Promise<string | null> {
   if (!challenge?.realm) return null;
-  const url = new URL(challenge.realm);
-  if (challenge.service) url.searchParams.set('service', challenge.service);
-  url.searchParams.set('scope', challenge.scope ?? `repository:${repoPath}:pull`);
 
-  const headers: Record<string, string> = {};
-  if (registryAuth?.token) {
-    const basic = Buffer.from(`${registryAuth.username}:${registryAuth.token}`).toString('base64');
-    headers.Authorization = `Basic ${basic}`;
-  }
+  const buildUrl = () => {
+    const url = new URL(challenge.realm!);
+    if (challenge.service) url.searchParams.set('service', challenge.service);
+    url.searchParams.set('scope', challenge.scope ?? `repository:${repoPath}:pull`);
+    return url.toString();
+  };
 
-  try {
-    const tokenRes = await request(url.toString(), { headers });
-    if (tokenRes.statusCode >= 400) {
-      await tokenRes.body.dump().catch(() => undefined);
+  const requestToken = async (withCreds: boolean): Promise<string | null> => {
+    const headers: Record<string, string> = {};
+    if (withCreds && registryAuth?.token) {
+      const basic = Buffer.from(`${registryAuth.username}:${registryAuth.token}`).toString(
+        'base64',
+      );
+      headers.Authorization = `Basic ${basic}`;
+    }
+    try {
+      const tokenRes = await request(buildUrl(), { headers });
+      if (tokenRes.statusCode >= 400) {
+        await tokenRes.body.dump().catch(() => undefined);
+        return null;
+      }
+      const body = (await tokenRes.body.json()) as { token?: string; access_token?: string };
+      return body.token ?? body.access_token ?? null;
+    } catch {
       return null;
     }
-    const body = (await tokenRes.body.json()) as { token?: string; access_token?: string };
-    return body.token ?? body.access_token ?? null;
-  } catch {
-    return null;
+  };
+
+  // Prefer credentials when present, but fall back to anonymous for public packages
+  // (invalid PAT must not block linuxserver/ghcr public images).
+  if (registryAuth?.token) {
+    const withCreds = await requestToken(true);
+    if (withCreds) return withCreds;
   }
+  return requestToken(false);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function recreateStandaloneContainer(

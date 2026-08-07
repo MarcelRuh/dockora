@@ -83,11 +83,22 @@ export function MonitoringPage() {
             </span>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
             {[
               { label: t.monitoring.cpu, value: data.host.cpuPercent },
               { label: t.monitoring.memory, value: data.host.memoryPercent },
               { label: t.monitoring.disk, value: data.host.diskPercent },
+              {
+                label: t.monitoring.buildCache,
+                value: data.host.buildCacheBytes,
+                format: (v: number | null) => {
+                  if (v == null) return '—';
+                  const gb = v / 1024 ** 3;
+                  if (gb >= 1) return `${new Intl.NumberFormat(loc, { maximumFractionDigits: 1 }).format(gb)} GB`;
+                  const mb = v / 1024 ** 2;
+                  return `${new Intl.NumberFormat(loc, { maximumFractionDigits: 0 }).format(mb)} MB`;
+                },
+              },
               {
                 label: t.monitoring.temp,
                 value: data.host.temperatureC,
@@ -104,10 +115,10 @@ export function MonitoringPage() {
                   <p className="font-mono text-xl font-bold tabular-nums">
                     {'format' in item && item.format
                       ? item.format(item.value)
-                      : formatPercent(item.value, loc)}
+                      : formatPercent(item.value as number | null, loc)}
                   </p>
                 </div>
-                {'format' in item ? null : <ProgressBar value={item.value} />}
+                {'format' in item ? null : <ProgressBar value={item.value as number | null} />}
               </div>
             ))}
           </div>
