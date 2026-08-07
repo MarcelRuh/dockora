@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
-import type { ComposeProjectDetails } from '@dockora/shared';
+import type { ComposeProjectDetails, ContainerSummary } from '@dockora/shared';
 import {
   backupComposeProject,
   composeAction,
@@ -11,6 +11,7 @@ import {
   fetchComposeEnv,
   fetchComposeLogs,
   fetchComposeProject,
+  fetchContainers,
   saveComposeEnv,
   saveComposeYaml,
   validateComposeConfig,
@@ -19,7 +20,9 @@ import { useLocale } from '@/i18n/locale-provider';
 import { useAuth } from '@/components/auth/auth-provider';
 import { canAdmin, canOperate } from '@/lib/roles';
 import { composeStatusTone } from '@/lib/status';
+import { resolveContainerIconUrl, extractComposeServiceIcons } from '@/lib/container-icon';
 import { Button, Select, Textarea } from '@/components/ui/form-controls';
+import { ServiceIcon } from '@/components/ui/service-icon';
 import {
   ErrorBanner,
   LoadingState,
@@ -37,6 +40,7 @@ export function ComposeDetailPage({ id }: { id: string }) {
   const isAdmin = canAdmin(user?.role, authEnabled);
   const router = useRouter();
   const [project, setProject] = useState<ComposeProjectDetails | null>(null);
+  const [serviceContainers, setServiceContainers] = useState<ContainerSummary[]>([]);
   const [yaml, setYaml] = useState('');
   const [envContent, setEnvContent] = useState('');
   const [envFile, setEnvFile] = useState('.env');
@@ -70,6 +74,10 @@ export function ComposeDetailPage({ id }: { id: string }) {
           ? '.env'
           : (data.envFiles[0] ?? '.env');
       await loadEnv(preferred);
+      const containers = await fetchContainers().catch(() => [] as ContainerSummary[]);
+      setServiceContainers(
+        containers.filter((c) => c.composeProject === data.name),
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : t.compose.notFound);
       setProject(null);
@@ -313,7 +321,15 @@ export function ComposeDetailPage({ id }: { id: string }) {
       </Section>
 
       <Section title={t.compose.services}>
-        <p className="font-mono text-sm">{project.services.join(', ') || '—'}</p>
+        {project.services.length === 0 ? (
+          <p className="text-sm text-dockora-muted">—</p>
+        ) : (
+          <ServiceIconList
+            services={project.services}
+            yaml={yaml}
+            containers={serviceContainers}
+          />
+        )}
       </Section>
 
       <Section title={t.compose.logs}>
@@ -323,5 +339,46 @@ export function ComposeDetailPage({ id }: { id: string }) {
         <LogViewer content={logs} />
       </Section>
     </div>
+  );
+}
+
+function ServiceIconList({
+  services,
+  yaml,
+  containers,
+}: {
+  services: string[];
+  yaml: string;
+  containers: ContainerSummary[];
+}) {
+  const yamlIcons = extractComposeServiceIcons(yaml);
+  return (
+    <ul className="flex flex-wrap gap-3">
+      {services.map((service) => {
+        const fromContainer = containers.find(
+          (c) => c.labels['com.docker.compose.service'] === service || c.name === service,
+        );
+        const icon =
+          resolveContainerIconUrl(fromContainer?.labels) ?? yamlIcons[service] ?? null;
+        return (
+          <li
+            key={service}
+            className="inline-flex items-center gap-2 rounded-md border border-dockora-border bg-dockora-surface2/50 px-2.5 py-1.5"
+          >
+            <ServiceIcon url={icon} alt={service} size="sm" />
+            {fromContainer ? (
+              <Link
+                href={`/containers/${encodeURIComponent(fromContainer.id)}`}
+                className="font-mono text-sm text-dockora-accent hover:underline"
+              >
+                {service}
+              </Link>
+            ) : (
+              <span className="font-mono text-sm">{service}</span>
+            )}
+          </li>
+        );
+      })}
+    </ul>
   );
 }

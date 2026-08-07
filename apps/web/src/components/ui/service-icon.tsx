@@ -1,0 +1,51 @@
+'use client';
+
+import { useState } from 'react';
+import { cn } from '@/lib/utils';
+
+export function ServiceIcon({
+  url,
+  alt,
+  size = 'md',
+  className,
+}: {
+  url: string | null | undefined;
+  alt: string;
+  size?: 'sm' | 'md' | 'lg';
+  className?: string;
+}) {
+  const [failed, setFailed] = useState(false);
+  const dim = size === 'sm' ? 'h-5 w-5' : size === 'lg' ? 'h-10 w-10' : 'h-7 w-7';
+
+  if (!url || failed) {
+    return (
+      <span
+        aria-hidden
+        className={cn(
+          'inline-flex shrink-0 items-center justify-center rounded-md border border-dockora-border bg-dockora-surface2 font-mono text-[10px] uppercase text-dockora-muted',
+          dim,
+          className,
+        )}
+        title={alt}
+      >
+        {alt.slice(0, 1)}
+      </span>
+    );
+  }
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- arbitrary CDN icons from Compose labels
+    <img
+      src={url}
+      alt=""
+      title={alt}
+      width={size === 'sm' ? 20 : size === 'lg' ? 40 : 28}
+      height={size === 'sm' ? 20 : size === 'lg' ? 40 : 28}
+      loading="lazy"
+      decoding="async"
+      referrerPolicy="no-referrer"
+      onError={() => setFailed(true)}
+      className={cn('shrink-0 rounded-md object-contain', dim, className)}
+    />
+  );
+}

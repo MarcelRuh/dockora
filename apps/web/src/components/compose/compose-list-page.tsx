@@ -10,13 +10,16 @@ import {
   deleteComposeProject,
   fetchComposeBases,
   fetchComposeProjects,
+  fetchContainers,
 } from '@/lib/api';
 import { useLocale } from '@/i18n/locale-provider';
 import { useAuth } from '@/components/auth/auth-provider';
 import { canAdmin, canOperate } from '@/lib/roles';
 import { composeStatusTone } from '@/lib/status';
+import { resolveContainerIconUrl } from '@/lib/container-icon';
 import { Button, Input, Select, Textarea } from '@/components/ui/form-controls';
 import { ProgressBar } from '@/components/ui/progress-bar';
+import { ServiceIcon } from '@/components/ui/service-icon';
 import {
   DataTable,
   EmptyState,
@@ -44,6 +47,7 @@ export function ComposeListPage() {
   const router = useRouter();
   const [items, setItems] = useState<ComposeProjectSummary[]>([]);
   const [bases, setBases] = useState<Array<{ path: string; writable: boolean }>>([]);
+  const [projectIcons, setProjectIcons] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -78,12 +82,22 @@ export function ComposeListPage() {
     setLoading(true);
     setError(null);
     try {
-      const [projects, baseList] = await Promise.all([
+      const [projects, baseList, containers] = await Promise.all([
         fetchComposeProjects(),
         fetchComposeBases(),
+        fetchContainers().catch(() => []),
       ]);
       setItems(projects);
       setBases(baseList);
+      const icons: Record<string, string[]> = {};
+      for (const c of containers) {
+        const project = c.composeProject;
+        const url = resolveContainerIconUrl(c.labels);
+        if (!project || !url) continue;
+        const list = icons[project] ?? (icons[project] = []);
+        if (!list.includes(url)) list.push(url);
+      }
+      setProjectIcons(icons);
       const preferred =
         baseList.find((b) => b.writable && b.path === '/home')?.path ??
         baseList.find((b) => b.writable)?.path ??
@@ -193,9 +207,14 @@ export function ComposeListPage() {
     <Link
       key={`n-${p.id}`}
       href={`/compose/${encodeURIComponent(p.id)}`}
-      className="font-medium text-dockora-accent hover:underline"
+      className="inline-flex items-center gap-2 font-medium text-dockora-accent hover:underline"
     >
-      {p.name}
+      <span className="flex items-center -space-x-1.5">
+        {(projectIcons[p.name] ?? []).slice(0, 6).map((url) => (
+          <ServiceIcon key={url} url={url} alt={p.name} size="sm" className="ring-2 ring-dockora-bg" />
+        ))}
+      </span>
+      <span>{p.name}</span>
     </Link>,
     <StatusBadge key={`s-${p.id}`} status={composeStatusTone(p.status)} label={p.status} />,
     <span key={`p-${p.id}`} className="font-mono text-xs text-dockora-muted">

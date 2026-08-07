@@ -29,6 +29,8 @@ import {
   TabBar,
 } from '@/components/ui/page-parts';
 import { ProgressBar } from '@/components/ui/progress-bar';
+import { ServiceIcon } from '@/components/ui/service-icon';
+import { resolveContainerIconUrl } from '@/lib/container-icon';
 
 const ContainerTerminal = dynamic(
   () => import('@/components/terminal/container-terminal').then((m) => m.ContainerTerminal),
@@ -181,6 +183,13 @@ export function ContainerDetailPage({ id }: { id: string }) {
       <PageHeader
         title={container.name}
         subtitle={container.image}
+        leading={
+          <ServiceIcon
+            url={resolveContainerIconUrl(container.labels)}
+            alt={container.name}
+            size="lg"
+          />
+        }
         actions={
           <>
             <StatusBadge

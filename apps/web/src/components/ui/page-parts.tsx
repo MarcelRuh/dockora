@@ -6,10 +6,12 @@ export function PageHeader({
   title,
   subtitle,
   actions,
+  leading,
 }: {
-  title: string;
-  subtitle?: string;
+  title: React.ReactNode;
+  subtitle?: React.ReactNode;
   actions?: React.ReactNode;
+  leading?: React.ReactNode;
 }) {
   return (
     <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -17,7 +19,12 @@ export function PageHeader({
         <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-dockora-accent">
           Dockora
         </p>
-        <h1 className="font-display text-3xl font-extrabold tracking-tight sm:text-4xl">{title}</h1>
+        <div className="flex items-center gap-3">
+          {leading}
+          <h1 className="font-display text-3xl font-extrabold tracking-tight sm:text-4xl">
+            {title}
+          </h1>
+        </div>
         {subtitle ? (
           <p className="max-w-2xl text-sm leading-relaxed text-dockora-muted">{subtitle}</p>
         ) : null}

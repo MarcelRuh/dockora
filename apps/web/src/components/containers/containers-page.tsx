@@ -10,8 +10,10 @@ import { canAdmin, canOperate } from '@/lib/roles';
 import { containerStatusTone } from '@/lib/status';
 import { formatBytes, formatPercent, formatRelativeTime } from '@/lib/format';
 import { publishedPortHref, uniquePublishedPorts } from '@/lib/published-ports';
+import { resolveContainerIconUrl } from '@/lib/container-icon';
 import { Button, Input, Select } from '@/components/ui/form-controls';
 import { ProgressBar } from '@/components/ui/progress-bar';
+import { ServiceIcon } from '@/components/ui/service-icon';
 import {
   DataTable,
   EmptyState,
@@ -128,9 +130,10 @@ export function ContainersPage() {
     <Link
       key={`name-${c.id}`}
       href={`/containers/${encodeURIComponent(c.id)}`}
-      className="font-medium text-dockora-accent hover:underline"
+      className="inline-flex items-center gap-2 font-medium text-dockora-accent hover:underline"
     >
-      {c.name}
+      <ServiceIcon url={resolveContainerIconUrl(c.labels)} alt={c.name} size="sm" />
+      <span>{c.name}</span>
     </Link>,
     <StatusBadge key={`st-${c.id}`} status={containerStatusTone(c.status)} label={c.status} />,
     <span key={`img-${c.id}`} className="font-mono text-xs">
