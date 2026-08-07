@@ -198,6 +198,8 @@ export const messages = {
       createTitle: 'Compose-Projekt erstellen',
       createSubmit: 'Projekt anlegen',
       createError: 'Projekt konnte nicht erstellt werden',
+      createStartFailed:
+        'Projekt angelegt, Start fehlgeschlagen (oft Port-Konflikt – YAML-Ports prüfen)',
       invalidName: 'Ungültiger Projektname (Buchstaben, Zahlen, _ und -; max. 64)',
       invalidYaml: 'YAML muss einen services:-Block enthalten',
       basePath: 'Basis-Pfad',
@@ -726,6 +728,8 @@ export const messages = {
       createTitle: 'Create Compose project',
       createSubmit: 'Create project',
       createError: 'Failed to create project',
+      createStartFailed:
+        'Project created, but start failed (often a port conflict – check YAML ports)',
       invalidName: 'Invalid project name (letters, numbers, _ and -; max 64)',
       invalidYaml: 'YAML must contain a services: block',
       basePath: 'Base path',

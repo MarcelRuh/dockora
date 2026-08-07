@@ -45,7 +45,7 @@ const DEFAULT_YAML = `services:
   web:
     image: nginx:alpine
     ports:
-      - "8080:80"
+      - "18080:80"
     restart: unless-stopped
 `;
 
@@ -256,6 +256,7 @@ export function ComposeListPage() {
     setError(null);
     setCreateProgress({ percent: 8, step: 'validate' });
     let tick: ReturnType<typeof setInterval> | null = null;
+    let createdId: string | null = null;
     try {
       setCreateProgress({ percent: 22, step: 'write' });
       const project = await createComposeProject({
@@ -266,6 +267,7 @@ export function ComposeListPage() {
         envContent: envContent.trim() || undefined,
         start: false,
       });
+      createdId = project.id;
 
       if (startAfterCreate) {
         let percent = 55;
@@ -276,6 +278,19 @@ export function ComposeListPage() {
         }, 700);
         try {
           await composeAction(project.id, 'up');
+        } catch (err) {
+          if (tick) clearInterval(tick);
+          tick = null;
+          const msg = err instanceof Error ? err.message : t.common.failed;
+          setError(`${t.compose.createStartFailed}: ${msg}`);
+          setCreateProgress({ percent: 100, step: 'done' });
+          setShowCreate(false);
+          setName('');
+          setYaml(DEFAULT_YAML);
+          setEnvContent('');
+          await load();
+          router.push(`/compose/${encodeURIComponent(project.id)}`);
+          return;
         } finally {
           if (tick) clearInterval(tick);
           tick = null;
@@ -293,6 +308,9 @@ export function ComposeListPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : t.compose.createError);
       await load();
+      if (createdId) {
+        router.push(`/compose/${encodeURIComponent(createdId)}`);
+      }
     } finally {
       if (tick) clearInterval(tick);
       setCreating(false);

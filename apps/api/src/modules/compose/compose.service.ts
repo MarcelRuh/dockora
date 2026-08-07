@@ -508,7 +508,17 @@ export class ComposeService {
       const upArgs = ['--project-directory', projectDir, '-f', composePath];
       if (hasEnv) upArgs.push('--env-file', envPath);
       upArgs.push('up', '-d');
-      await execCompose(upArgs, { cwd: projectDir });
+      try {
+        await execCompose(upArgs, { cwd: projectDir });
+      } catch (error) {
+        const raw =
+          error instanceof Error
+            ? ((error as { stderr?: string }).stderr?.trim() || error.message)
+            : String(error);
+        throw new ComposeValidationError(
+          `Project created at ${projectDir}, but start failed: ${raw.split('\n').map((l) => l.trim()).filter(Boolean).reverse().find((l) => /^error\b/i.test(l) || /failed/i.test(l)) ?? raw}`,
+        );
+      }
     }
 
     return this.getDetails(id);

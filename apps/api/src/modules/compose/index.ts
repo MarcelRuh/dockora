@@ -271,7 +271,8 @@ function throwComposeError(app: FastifyInstance, error: unknown): never {
   }
 
   const err = error as { code?: number; killed?: boolean; message?: string; stderr?: string };
-  const message = err.stderr?.trim() || err.message || 'Compose operation failed';
+  const raw = err.stderr?.trim() || err.message || 'Compose operation failed';
+  const message = summarizeComposeCliError(raw);
 
   if (message.toLowerCase().includes('no such file')) {
     throw app.httpErrors.notFound(message);
@@ -279,5 +280,33 @@ function throwComposeError(app: FastifyInstance, error: unknown): never {
   if (err.code === 127 || message.includes('ENOENT')) {
     throw app.httpErrors.internalServerError('docker compose CLI not available');
   }
-  throw app.httpErrors.internalServerError(message);
+
+  // Port conflicts / start failures are user-fixable, not opaque 500s
+  const lower = message.toLowerCase();
+  if (
+    lower.includes('port is already allocated') ||
+    lower.includes('bind for') ||
+    lower.includes('address already in use') ||
+    lower.includes('failed to set up container networking') ||
+    lower.includes('conflict') ||
+    lower.includes('permission denied') ||
+    lower.includes('no such image') ||
+    lower.includes('error response from daemon')
+  ) {
+    throw app.httpErrors.badRequest(message);
+  }
+
+  throw app.httpErrors.badRequest(message);
+}
+
+/** Prefer the last actionable Error/… line from verbose `docker compose` output. */
+function summarizeComposeCliError(raw: string): string {
+  const lines = raw
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const errorLine = [...lines].reverse().find((l) => /^error\b/i.test(l) || /failed/i.test(l));
+  if (errorLine) return errorLine.length > 500 ? `${errorLine.slice(0, 500)}…` : errorLine;
+  if (raw.length > 600) return `${raw.slice(-600)}`;
+  return raw;
 }
