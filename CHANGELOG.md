@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [1.5.2] – 2026-08-07
+
+### Fixed
+
+- Proxy 502 after api/web recreate: nginx re-resolves Docker DNS for upstreams; self-update force-recreates the proxy container
+
 ## [1.5.1] – 2026-08-07
 
 ### Fixed

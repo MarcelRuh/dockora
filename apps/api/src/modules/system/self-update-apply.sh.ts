@@ -94,6 +94,13 @@ fi
 # shellcheck disable=SC2086
 docker compose \$PROFILES up -d --build
 
+# Nginx resolves upstream IPs at start; force-recreate so a stale web/api IP cannot 502
+if docker ps -a --format '{{.Names}}' | grep -qx 'dockora-proxy'; then
+  echo "==> Refreshing proxy (pick up new api/web IPs + nginx.conf)"
+  # shellcheck disable=SC2086
+  docker compose \$PROFILES up -d --force-recreate --no-deps proxy
+fi
+
 echo "==> Pruning Docker build cache"
 docker builder prune -af || true
 echo "==> Pruning dangling images"
