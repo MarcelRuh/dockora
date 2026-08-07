@@ -29,7 +29,7 @@ const envSchema = z.object({
   JWT_EXPIRES_IN: z.string().default('7d'),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
   RATE_LIMIT_TIME_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
-  COMPOSE_SEARCH_PATHS: z.string().default('/data/compose,/opt,/srv,/home'),
+  COMPOSE_SEARCH_PATHS: z.string().default('/home,/opt,/srv,/data/compose'),
   /** Kommagetrennte Pfade, die bei der Compose-Discovery übersprungen werden */
   COMPOSE_EXCLUDE_PATHS: z.string().default(''),
   /** Kommagetrennte Image-Tag-Prefixe die ausgeblendet werden (zusätzlich zu dockora-*) */

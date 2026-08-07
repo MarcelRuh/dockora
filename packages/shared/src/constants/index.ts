@@ -7,7 +7,7 @@ export type Locale = (typeof LOCALES)[number];
 export const DEFAULT_LOCALE: Locale = 'de';
 
 /** Standard-Compose-Suchpfade */
-export const DEFAULT_COMPOSE_SEARCH_PATHS = ['/data/compose', '/opt', '/srv', '/home'] as const;
+export const DEFAULT_COMPOSE_SEARCH_PATHS = ['/home', '/opt', '/srv', '/data/compose'] as const;
 
 /** Erkannte Compose-Dateinamen */
 export const COMPOSE_FILENAMES = [

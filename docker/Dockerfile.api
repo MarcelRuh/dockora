@@ -40,8 +40,11 @@ COPY --from=build /app/apps/api/package.json /app/apps/api/
 COPY --from=build /app/apps/api/prisma /app/apps/api/prisma
 COPY --from=build /app/apps/api/node_modules /app/apps/api/node_modules
 COPY --from=build /app/node_modules /app/node_modules
-RUN mkdir -p /data && chown -R dockora:dockora /data /app
-USER dockora
+COPY docker/api-entrypoint.sh /entrypoint.sh
+RUN mkdir -p /data /data/compose /home /srv \
+ && chown -R dockora:dockora /data /app \
+ && chmod +x /entrypoint.sh
 WORKDIR /app/apps/api
 EXPOSE 3001
-CMD ["sh", "-c", "node ./node_modules/prisma/build/index.js migrate deploy && node dist/main.js"]
+USER root
+ENTRYPOINT ["/entrypoint.sh"]

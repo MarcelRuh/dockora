@@ -65,7 +65,10 @@ export function ComposeListPage() {
       setItems(projects);
       setBases(baseList);
       const preferred =
-        baseList.find((b) => b.writable)?.path ?? baseList[0]?.path ?? '/data/compose';
+        baseList.find((b) => b.writable && b.path === '/home')?.path ??
+        baseList.find((b) => b.writable)?.path ??
+        baseList[0]?.path ??
+        '/home';
       setBasePath((prev) => prev || preferred);
     } catch (err) {
       setError(err instanceof Error ? err.message : t.compose.loadError);
