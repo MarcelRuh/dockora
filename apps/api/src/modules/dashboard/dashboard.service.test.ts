@@ -73,6 +73,7 @@ function createMocks(overrides?: {
   const hostMetrics: IHostMetrics = {
     getResources: vi.fn().mockResolvedValue({
       cpuPercent: 12.5,
+      cpuCores: 8,
       memoryUsedBytes: 4_000_000_000,
       memoryTotalBytes: 8_000_000_000,
       diskUsedBytes: 50_000_000_000,

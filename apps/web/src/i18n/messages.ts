@@ -83,6 +83,8 @@ export const messages = {
         cpu: 'CPU',
         memory: 'RAM',
         disk: 'Festplatte',
+        cores: '{count} Kerne',
+        core: '{count} Kern',
       },
       events: {
         title: 'Letzte Ereignisse',
@@ -500,6 +502,8 @@ export const messages = {
         cpu: 'CPU',
         memory: 'Memory',
         disk: 'Disk',
+        cores: '{count} cores',
+        core: '{count} core',
       },
       events: {
         title: 'Recent events',

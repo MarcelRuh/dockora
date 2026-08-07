@@ -32,6 +32,7 @@ export interface DashboardOverview {
   };
   resources: {
     cpuPercent: number | null;
+    cpuCores: number | null;
     memoryUsedBytes: number | null;
     memoryTotalBytes: number | null;
     diskUsedBytes: number | null;

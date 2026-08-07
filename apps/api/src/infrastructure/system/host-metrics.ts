@@ -41,6 +41,11 @@ export class HostMetricsService implements IHostMetrics {
       ? this.cpuPercentFromSample(parseProcStat(snap.stat))
       : await this.measureCpuPercent();
 
+    const cpuCores =
+      (snap?.stat ? countCpuCores(snap.stat) : null) ??
+      (await this.readCpuCoresFromProc()) ??
+      Math.max(os.cpus().length, 1);
+
     const disk =
       (snap?.df ? parseDfLine(snap.df) : null) ?? (await this.measureDisk(diskPath));
 
@@ -48,6 +53,7 @@ export class HostMetricsService implements IHostMetrics {
 
     return {
       cpuPercent,
+      cpuCores,
       memoryUsedBytes: memory.usedBytes,
       memoryTotalBytes: memory.totalBytes,
       diskUsedBytes: disk?.used ?? null,
@@ -55,6 +61,19 @@ export class HostMetricsService implements IHostMetrics {
       diskPath,
       temperatureC,
     };
+  }
+
+  private async readCpuCoresFromProc(): Promise<number | null> {
+    for (const root of this.procRoots) {
+      try {
+        const content = await fs.readFile(`${root}/stat`, 'utf8');
+        const cores = countCpuCores(content);
+        if (cores !== null) return cores;
+      } catch {
+        // try next
+      }
+    }
+    return null;
   }
 
   private async readMemoryFromProcRoots(): Promise<MemorySample | null> {
@@ -220,6 +239,15 @@ function parseProcStat(content: string): CpuSample | null {
   const idle = (parts[3] ?? 0) + (parts[4] ?? 0);
   const total = parts.reduce((a, b) => a + b, 0);
   return { idle, total };
+}
+
+/** Count `cpu0`…`cpuN` lines in /proc/stat (logical cores). */
+function countCpuCores(content: string): number | null {
+  let n = 0;
+  for (const line of content.split('\n')) {
+    if (/^cpu\d+/.test(line)) n += 1;
+  }
+  return n > 0 ? n : null;
 }
 
 async function readProcStatFile(filePath: string): Promise<CpuSample | null> {

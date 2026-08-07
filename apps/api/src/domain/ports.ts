@@ -107,6 +107,8 @@ export interface IDockerClient {
 
 export interface HostResources {
   cpuPercent: number | null;
+  /** Logical CPU cores (from host /proc/stat when available). */
+  cpuCores: number | null;
   memoryUsedBytes: number;
   memoryTotalBytes: number;
   diskUsedBytes: number | null;

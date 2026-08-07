@@ -77,7 +77,15 @@ function LiveResources({
 }: {
   overview: DashboardOverview;
   labels: {
-    resources: { title: string; cpu: string; memory: string; disk: string; realtime: string };
+    resources: {
+      title: string;
+      cpu: string;
+      memory: string;
+      disk: string;
+      realtime: string;
+      cores: string;
+      core: string;
+    };
   };
   locale: string;
 }) {
@@ -87,11 +95,21 @@ function LiveResources({
   );
   const diskPct = usageRatio(overview.resources.diskUsedBytes, overview.resources.diskTotalBytes);
 
+  const cores = overview.resources.cpuCores;
+  const coresLabel =
+    cores !== null && cores > 0
+      ? (cores === 1 ? labels.resources.core : labels.resources.cores).replace(
+          '{count}',
+          String(cores),
+        )
+      : null;
+
   const rows = [
     {
       key: 'cpu',
       label: labels.resources.cpu,
       primary: formatPercent(overview.resources.cpuPercent, locale),
+      secondary: coresLabel,
       ratio: overview.resources.cpuPercent,
     },
     {

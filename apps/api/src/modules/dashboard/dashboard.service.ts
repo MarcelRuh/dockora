@@ -34,6 +34,7 @@ export class DashboardService {
       containers: containersResult,
       resources: {
         cpuPercent: resources.cpuPercent,
+        cpuCores: resources.cpuCores,
         memoryUsedBytes: resources.memoryUsedBytes,
         memoryTotalBytes: resources.memoryTotalBytes,
         diskUsedBytes: resources.diskUsedBytes,
