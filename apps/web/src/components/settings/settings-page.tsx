@@ -23,6 +23,7 @@ import { UsersSection } from '@/components/settings/users-section';
 import { AuditSection } from '@/components/settings/audit-section';
 import { SelfUpdateSection } from '@/components/settings/self-update-section';
 import { PluginsSection } from '@/components/settings/plugins-section';
+import { TotpSection } from '@/components/settings/totp-section';
 
 const NOTIFICATION_EVENTS: NotificationEvent[] = [
   'container.started',
@@ -509,7 +510,12 @@ export function SettingsPageView() {
                   />
                 </Field>
               </SettingsPanel>
-              {authEnabled || settings.authEnabled ? <UsersSection /> : null}
+              {authEnabled || settings.authEnabled ? (
+                <>
+                  <UsersSection />
+                  {authEnabled ? <TotpSection /> : null}
+                </>
+              ) : null}
             </div>
           ) : null}
 

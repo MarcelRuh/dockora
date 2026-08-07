@@ -469,6 +469,33 @@ export async function login(email: string, password: string): Promise<AuthLoginR
   });
 }
 
+export async function loginTotp(tempToken: string, code: string): Promise<AuthLoginResponse> {
+  return request<AuthLoginResponse>('/auth/login/totp', {
+    method: 'POST',
+    body: JSON.stringify({ tempToken, code }),
+  });
+}
+
+export async function setupTotp(): Promise<import('@dockora/shared').AuthTotpSetupResponse> {
+  return request('/auth/totp/setup', { method: 'POST' });
+}
+
+export async function confirmTotp(
+  code: string,
+): Promise<import('@dockora/shared').AuthTotpConfirmResponse> {
+  return request('/auth/totp/confirm', {
+    method: 'POST',
+    body: JSON.stringify({ code }),
+  });
+}
+
+export async function disableTotp(password: string, code?: string): Promise<AuthUser> {
+  return request<AuthUser>('/auth/totp/disable', {
+    method: 'POST',
+    body: JSON.stringify({ password, code }),
+  });
+}
+
 export async function fetchCurrentUser(): Promise<AuthUser> {
   return request<AuthUser>('/auth/me');
 }

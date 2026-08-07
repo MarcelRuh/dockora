@@ -34,6 +34,7 @@ export function isPublicAuthRoute(method: string, url: string): boolean {
   if (method === 'GET' && path === `${API_PREFIX}/health`) return true;
   if (method === 'GET' && path === `${API_PREFIX}/auth/status`) return true;
   if (method === 'POST' && path === `${API_PREFIX}/auth/login`) return true;
+  if (method === 'POST' && path === `${API_PREFIX}/auth/login/totp`) return true;
 
   return false;
 }

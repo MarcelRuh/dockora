@@ -222,6 +222,7 @@ export interface AuthUser {
   email: string;
   displayName: string | null;
   role: UserRole;
+  totpEnabled: boolean;
 }
 
 export interface AuthStatusResponse {
@@ -229,7 +230,23 @@ export interface AuthStatusResponse {
 }
 
 export interface AuthLoginResponse {
-  token: string;
+  /** Present when login completed (no 2FA or after TOTP). */
+  token?: string;
+  user?: AuthUser;
+  /** Password ok, TOTP required. */
+  requiresTotp?: boolean;
+  /** Short-lived token for POST /auth/login/totp */
+  tempToken?: string;
+}
+
+export interface AuthTotpSetupResponse {
+  secret: string;
+  otpauthUrl: string;
+  qrDataUrl: string;
+}
+
+export interface AuthTotpConfirmResponse {
+  backupCodes: string[];
   user: AuthUser;
 }
 

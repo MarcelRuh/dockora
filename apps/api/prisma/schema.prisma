@@ -8,13 +8,18 @@ datasource db {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String
-  displayName  String?
-  role         String   @default("admin")
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id              String   @id @default(cuid())
+  email           String   @unique
+  passwordHash    String
+  displayName     String?
+  role            String   @default("admin")
+  totpEnabled     Boolean  @default(false)
+  /// AES-GCM encrypted TOTP secret (base64 payload)
+  totpSecretEnc   String?
+  /// JSON array of bcrypt hashes for one-time backup codes
+  totpBackupHashes String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
 
 model Setting {
