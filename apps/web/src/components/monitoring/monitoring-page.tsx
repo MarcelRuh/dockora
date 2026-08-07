@@ -14,14 +14,18 @@ import {
   LoadingState,
   PageHeader,
   StatusBadge,
+  TabBar,
 } from '@/components/ui/page-parts';
 import { ProgressBar } from '@/components/ui/progress-bar';
 import { PortCards } from '@/components/monitoring/port-cards';
 import { NetworkTopology } from '@/components/monitoring/network-topology';
 
+type MonitoringTab = 'overview' | 'network';
+
 export function MonitoringPage() {
   const { t, locale } = useLocale();
   const loc = locale === 'de' ? 'de-DE' : 'en-US';
+  const [tab, setTab] = useState<MonitoringTab>('overview');
   const [data, setData] = useState<MonitoringSnapshot | null>(null);
   const [containers, setContainers] = useState<ContainerSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,6 +53,11 @@ export function MonitoringPage() {
     return () => window.clearInterval(timer);
   }, [load]);
 
+  const tabs = [
+    { id: 'overview', label: t.monitoring.tabs.overview },
+    { id: 'network', label: t.monitoring.tabs.network },
+  ];
+
   const rows =
     data?.containers.map((c) => [
       c.name,
@@ -74,11 +83,13 @@ export function MonitoringPage() {
         }
       />
 
+      <TabBar tabs={tabs} active={tab} onChange={(id) => setTab(id as MonitoringTab)} />
+
       {error ? <ErrorBanner message={error} /> : null}
       {loading && !data ? <LoadingState message={t.common.loading} /> : null}
 
-      {data ? (
-        <>
+      {data && tab === 'overview' ? (
+        <div className="space-y-8">
           <div className="flex flex-wrap gap-3 text-sm text-dockora-muted">
             <span>
               Docker:{' '}
@@ -138,9 +149,6 @@ export function MonitoringPage() {
             )}
           </section>
 
-          <PortCards containers={containers} labels={t.monitoring.ports} />
-          <NetworkTopology containers={containers} labels={t.monitoring.topology} />
-
           <section className="space-y-3">
             <h2 className="font-display text-lg font-bold">{t.monitoring.containers}</h2>
             <DataTable
@@ -149,7 +157,14 @@ export function MonitoringPage() {
               empty={<EmptyState message={t.monitoring.emptyContainers} />}
             />
           </section>
-        </>
+        </div>
+      ) : null}
+
+      {data && tab === 'network' ? (
+        <div className="space-y-8">
+          <PortCards containers={containers} labels={t.monitoring.ports} />
+          <NetworkTopology containers={containers} labels={t.monitoring.topology} />
+        </div>
       ) : null}
     </div>
   );

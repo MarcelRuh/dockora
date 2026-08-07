@@ -287,6 +287,10 @@ export const messages = {
       containers: 'Container',
       alert: 'Alert',
       emptyContainers: 'Keine Container.',
+      tabs: {
+        overview: 'Übersicht',
+        network: 'Netzwerk',
+      },
       ports: {
         title: 'Freigegebene Ports',
         empty: 'Keine freigegebenen Host-Ports.',
@@ -721,6 +725,10 @@ export const messages = {
       containers: 'Containers',
       alert: 'Alert',
       emptyContainers: 'No containers.',
+      tabs: {
+        overview: 'Overview',
+        network: 'Network',
+      },
       ports: {
         title: 'Published ports',
         empty: 'No published host ports.',
