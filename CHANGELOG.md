@@ -5,6 +5,10 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [1.5.0] – 2026-08-07
+
+Finale Ops-Release: Host-Terminal, härtere Update-/Terminal-Pfade, zuverlässige Docker-Bereinigung und UX für Scheduler, Users und Backup-Restore.
+
 ### Added
 
 - Host terminal in main nav (`/terminal`): admin-only shell via host-agent `nsenter` into the LXC/host namespaces
@@ -26,6 +30,7 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 - Monitoring alert cooldown uses fingerprints so fluctuating CPU/disk numbers do not bypass dedup
 - Build-cache prune via API now uses `POST /build/prune?all=true` (dockerode's `pruneBuilder` ignored `all`)
+
 ## [1.2.3] – 2026-08-07
 
 ### Added
