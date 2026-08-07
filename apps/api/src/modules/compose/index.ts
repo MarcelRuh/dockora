@@ -90,9 +90,10 @@ export const composeModule: FastifyPluginAsync = async (app: FastifyInstance) =>
 
   app.get<{ Params: { id: string } }>(
     `${API_PREFIX}/compose/:id/logs`,
-    async (request): Promise<string> => {
+    async (request): Promise<{ logs: string }> => {
       try {
-        return await service.logs(request.params.id);
+        // Wrap as JSON — bare strings are sent as text by Fastify and break the web client JSON.parse
+        return { logs: await service.logs(request.params.id) };
       } catch (error) {
         throwComposeError(app, error);
       }
@@ -101,9 +102,10 @@ export const composeModule: FastifyPluginAsync = async (app: FastifyInstance) =>
 
   app.get<{ Params: { id: string } }>(
     `${API_PREFIX}/compose/:id/config`,
-    async (request): Promise<string> => {
+    async (request): Promise<{ config: string }> => {
       try {
-        return await service.validateConfig(request.params.id);
+        // `docker compose config` returns YAML; wrap so the response is valid JSON
+        return { config: await service.validateConfig(request.params.id) };
       } catch (error) {
         throwComposeError(app, error);
       }
