@@ -53,15 +53,12 @@ export function DashboardView({
         <div className="space-y-8">
           <EngineStrip overview={data} labels={t.dashboard} />
           <LiveResources overview={data} labels={t.dashboard} locale={loc} />
-          <div className="grid gap-4 lg:grid-cols-2">
-            <EventsPanel events={data.recentEvents} labels={t.dashboard.events} locale={loc} />
-            <AsideColumn
-              notifications={data.notifications}
-              updatesAvailable={data.updatesAvailable}
-              labels={t.dashboard}
-              locale={loc}
-            />
-          </div>
+          <AsideColumn
+            notifications={data.notifications}
+            updatesAvailable={data.updatesAvailable}
+            labels={t.dashboard}
+            locale={loc}
+          />
           {error ? (
             <p className="text-xs text-dockora-warning">
               {t.dashboard.staleWarning}: {error}
@@ -245,41 +242,6 @@ function EngineStrip({
   );
 }
 
-function EventsPanel({
-  events,
-  labels,
-  locale,
-}: {
-  events: DashboardOverview['recentEvents'];
-  labels: { title: string; empty: string };
-  locale: string;
-}) {
-  return (
-    <section className="rounded-2xl border border-dockora-border bg-dockora-surface/80">
-      <h2 className="border-b border-dockora-border px-4 py-3 font-display text-base font-bold">
-        {labels.title}
-      </h2>
-      {events.length === 0 ? (
-        <p className="px-4 py-6 text-sm text-dockora-muted">{labels.empty}</p>
-      ) : (
-        <ul className="divide-y divide-dockora-border">
-          {events.map((event) => (
-            <li key={event.id} className="flex items-start justify-between gap-3 px-4 py-3 text-sm">
-              <div className="min-w-0">
-                <p className="truncate font-medium">{event.message}</p>
-                <p className="mt-0.5 font-mono text-[11px] text-dockora-muted">{event.type}</p>
-              </div>
-              <time className="shrink-0 font-mono text-[11px] text-dockora-muted">
-                {formatRelativeTime(event.timestamp, locale)}
-              </time>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
-
 function AsideColumn({
   notifications,
   updatesAvailable,
@@ -295,7 +257,7 @@ function AsideColumn({
   locale: string;
 }) {
   return (
-    <div className="space-y-4">
+    <div className="grid gap-4 lg:grid-cols-2">
       <section className="rounded-2xl border border-dockora-border bg-dockora-surface/80 px-4 py-4">
         <h2 className="font-display text-base font-bold">{labels.updates.title}</h2>
         <p
