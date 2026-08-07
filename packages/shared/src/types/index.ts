@@ -50,7 +50,8 @@ export type NotificationEvent =
   | 'update.installed'
   | 'error'
   | 'backup.completed'
-  | 'restore.completed';
+  | 'restore.completed'
+  | 'system';
 
 export type UserRole = 'admin' | 'operator' | 'viewer';
 

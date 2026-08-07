@@ -221,6 +221,38 @@ export class DockerodeClient implements IDockerClient {
     };
   }
 
+  async pruneBuildCache(): Promise<{ spaceReclaimed: number }> {
+    // dockerode.pruneBuilder() ignores `all` and only clears unused cache.
+    // Engine API: POST /build/prune?all=true ≈ `docker builder prune -af`
+    type Modem = {
+      dial: (
+        opts: Record<string, unknown>,
+        cb: (err: Error | null, data?: { SpaceReclaimed?: number }) => void,
+      ) => void;
+      Promise: PromiseConstructor;
+    };
+    const modem = (this.docker as unknown as { modem: Modem }).modem;
+    const result = await new modem.Promise<{ SpaceReclaimed?: number }>((resolve, reject) => {
+      modem.dial(
+        {
+          path: '/build/prune?all=true',
+          method: 'POST',
+          statusCodes: { 200: true, 500: 'server error' },
+        },
+        (err, data) => {
+          if (err) reject(err);
+          else resolve(data ?? {});
+        },
+      );
+    });
+    try {
+      await this.docker.pruneImages({ filters: { dangling: ['true'] } });
+    } catch {
+      // dangling image prune is best-effort
+    }
+    return { spaceReclaimed: result.SpaceReclaimed ?? 0 };
+  }
+
   async getBuildCacheBytes(): Promise<number> {
     try {
       const df = (await this.docker.df()) as {
@@ -382,6 +414,10 @@ export class OfflineDockerClient implements IDockerClient {
   }
 
   async pruneImages(): Promise<{ imagesDeleted: number; spaceReclaimed: number }> {
+    OfflineDockerClient.offline();
+  }
+
+  async pruneBuildCache(): Promise<{ spaceReclaimed: number }> {
     OfflineDockerClient.offline();
   }
 

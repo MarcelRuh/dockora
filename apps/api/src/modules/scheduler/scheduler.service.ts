@@ -8,7 +8,7 @@ export type JobCallback = () => Promise<void>;
 const DEFAULT_JOBS: Array<{ type: JobType; cron: string; preset?: string }> = [
   { type: 'update_check', cron: '0 * * * *', preset: 'custom' },
   { type: 'backup', cron: '0 2 * * *', preset: 'daily' },
-  { type: 'cleanup', cron: '0 3 * * 0', preset: 'weekly' },
+  { type: 'cleanup', cron: '0 3 * * *', preset: 'daily' },
   { type: 'healthcheck', cron: '*/5 * * * *', preset: 'custom' },
 ];
 
@@ -33,6 +33,16 @@ export class SchedulerService {
             preset: job.preset,
             enabled: true,
           },
+        });
+      } else if (
+        job.type === 'cleanup' &&
+        existing.cron === '0 3 * * 0' &&
+        job.cron === '0 3 * * *'
+      ) {
+        // Migrate legacy weekly cleanup → daily (build-cache fills quickly)
+        await prisma.scheduledJob.update({
+          where: { id: existing.id },
+          data: { cron: job.cron, preset: job.preset },
         });
       }
     }

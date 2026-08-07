@@ -14,6 +14,7 @@ export const messages = {
       network: 'Netzwerk',
       backups: 'Backups',
       logs: 'Logs',
+      terminal: 'Terminal',
       settings: 'Einstellungen',
     },
     common: {
@@ -126,9 +127,10 @@ export const messages = {
       removeConfirm: 'Container wirklich entfernen?',
       removeConsequences: [
         'Der Container wird gestoppt und gelöscht.',
-        'Volumes bleiben erhalten (sofern nicht anders konfiguriert).',
-        'Netzwerk-Aliases entfallen.',
+        'Bei Compose: Wenn keine Container des Projekts mehr laufen, wird der Projektordner (inkl. compose.yaml, .env, lokale appdata) gelöscht.',
+        'Docker-Volumes bleiben erhalten, sofern nicht separat entfernt.',
       ],
+      deleteProjectDirConfirm: 'Compose-Projektordner mitlöschen (wenn letzter Container)',
       bulkStop: 'Stoppen',
       bulkRestart: 'Neustart',
       bulkRemove: 'Entfernen',
@@ -175,6 +177,13 @@ export const messages = {
         error: 'Terminal-Verbindung fehlgeschlagen',
         unauthorized: 'Nicht autorisiert – bitte neu anmelden (Admin/Operator).',
       },
+    },
+    hostTerminal: {
+      title: 'Host-Terminal',
+      subtitle: 'Interaktive Shell auf dem LXC-/Docker-Host (via host-agent).',
+      hint: 'Nur für Admins. Die Sitzung läuft per nsenter im Host-Namespace – volle Systemrechte.',
+      error: 'Host-Terminal-Verbindung fehlgeschlagen',
+      unauthorized: 'Nicht autorisiert – bitte als Admin neu anmelden.',
     },
     compose: {
       title: 'Compose',
@@ -242,7 +251,7 @@ export const messages = {
       ],
       deleteConsequences: [
         'Container werden gestoppt und entfernt.',
-        'compose.yaml und .env werden gelöscht.',
+        'Der gesamte Projektordner wird gelöscht (compose.yaml, .env, lokale Daten wie appdata).',
         'Netzwerke des Projekts entfallen.',
       ],
       previewTitle: 'Änderungsvorschau',
@@ -600,6 +609,7 @@ export const messages = {
       network: 'Network',
       backups: 'Backups',
       logs: 'Logs',
+      terminal: 'Terminal',
       settings: 'Settings',
     },
     common: {
@@ -712,9 +722,10 @@ export const messages = {
       removeConfirm: 'Remove this container?',
       removeConsequences: [
         'The container will be stopped and deleted.',
-        'Volumes remain (unless configured otherwise).',
-        'Network aliases are removed.',
+        'For Compose: when no project containers remain, the project folder (compose.yaml, .env, local appdata) is deleted.',
+        'Docker volumes remain unless removed separately.',
       ],
+      deleteProjectDirConfirm: 'Also delete Compose project folder (when last container)',
       bulkStop: 'Stop',
       bulkRestart: 'Restart',
       bulkRemove: 'Remove',
@@ -761,6 +772,13 @@ export const messages = {
         error: 'Terminal connection failed',
         unauthorized: 'Unauthorized – sign in again (admin/operator).',
       },
+    },
+    hostTerminal: {
+      title: 'Host terminal',
+      subtitle: 'Interactive shell on the LXC/Docker host (via host-agent).',
+      hint: 'Admins only. Session uses nsenter into the host namespaces – full system access.',
+      error: 'Host terminal connection failed',
+      unauthorized: 'Unauthorized – sign in again as admin.',
     },
     compose: {
       title: 'Compose',
@@ -828,7 +846,7 @@ export const messages = {
       ],
       deleteConsequences: [
         'Containers will be stopped and removed.',
-        'compose.yaml and .env will be deleted.',
+        'The entire project folder will be deleted (compose.yaml, .env, local data such as appdata).',
         'Project networks will be removed.',
       ],
       previewTitle: 'Change preview',

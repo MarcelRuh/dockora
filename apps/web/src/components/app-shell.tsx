@@ -22,6 +22,7 @@ const NAV_ITEMS = [
   { key: 'network', href: '/network', ready: true },
   { key: 'backups', href: '/backups', ready: true },
   { key: 'logs', href: '/logs', ready: true },
+  { key: 'terminal', href: '/terminal', ready: true },
   { key: 'settings', href: '/settings', ready: true },
 ] as const;
 

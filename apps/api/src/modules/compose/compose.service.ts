@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { accessSync, constants, existsSync } from 'node:fs';
-import { access, copyFile, mkdir, readFile, rm, unlink, writeFile } from 'node:fs/promises';
+import { access, copyFile, mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import YAML from 'yaml';
@@ -24,6 +24,7 @@ import {
   readComposeYaml,
   resolveComposeStatus,
 } from './compose-discovery.js';
+import { deleteProjectDirectory } from './safe-project-dir.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -107,7 +108,19 @@ export class ComposeService {
     const args = await buildComposeArgs(project, action);
     await execCompose(args, { cwd: project.path });
     if (action === 'build') {
-      await pruneDockerBuildCache().catch(() => undefined);
+      try {
+        const pruned = await this.deps.docker.pruneBuildCache();
+        const mb = Math.round(pruned.spaceReclaimed / (1024 * 1024));
+        return {
+          ok: true,
+          message: `Compose build succeeded for ${project.name}. Build cache pruned (${mb} MiB).`,
+        };
+      } catch {
+        return {
+          ok: true,
+          message: `Compose build succeeded for ${project.name} (build-cache prune failed)`,
+        };
+      }
     }
     return { ok: true, message: `Compose ${action} succeeded for ${project.name}` };
   }
@@ -576,11 +589,10 @@ export class ComposeService {
     }
 
     if (removeFiles) {
-      assertSafeProjectDir(project.path, this.deps.searchPaths);
-      await rm(project.path, { recursive: true, force: true });
+      await deleteProjectDirectory(project.path, this.deps.searchPaths);
       return {
         ok: true,
-        message: `Compose project ${project.name} stopped and files deleted (${project.path})`,
+        message: `Compose project ${project.name} stopped and project folder deleted (${project.path})`,
       };
     }
 
@@ -610,36 +622,6 @@ export class ComposeNotFoundError extends Error {
 
 export class ComposeValidationError extends Error {
   readonly statusCode = 400;
-}
-
-/** Verhindert Löschen von Root-/Suchpfaden selbst. */
-function assertSafeProjectDir(projectPath: string, searchPaths: string[]): void {
-  const resolved = path.resolve(projectPath);
-  const forbidden = new Set([
-    '/',
-    '/opt',
-    '/srv',
-    '/home',
-    '/var',
-    '/usr',
-    '/etc',
-    '/root',
-    ...searchPaths.map((p) => path.resolve(p)),
-  ]);
-
-  if (forbidden.has(resolved) || resolved === path.parse(resolved).root) {
-    throw new ComposeValidationError(
-      `Refusing to delete protected path: ${resolved}. Delete only project subdirectories.`,
-    );
-  }
-
-  const underSearch = searchPaths.some((sp) => {
-    const base = path.resolve(sp);
-    return resolved.startsWith(base + path.sep);
-  });
-  if (!underSearch) {
-    throw new ComposeValidationError(`Project path is outside search paths: ${resolved}`);
-  }
 }
 
 async function withEnvFile(
@@ -700,19 +682,6 @@ async function execCompose(
     maxBuffer: 4 * 1024 * 1024,
     cwd: options?.cwd,
   });
-}
-
-/** Drop BuildKit cache after compose builds (images/containers stay). */
-async function pruneDockerBuildCache(): Promise<void> {
-  await execFileAsync('docker', ['builder', 'prune', '-af'], {
-    timeout: 120_000,
-    maxBuffer: 1024 * 1024,
-  });
-  // Dangling intermediate layers from multi-stage builds
-  await execFileAsync('docker', ['image', 'prune', '-f'], {
-    timeout: 120_000,
-    maxBuffer: 1024 * 1024,
-  }).catch(() => undefined);
 }
 
 function hintMissingEnv(message: string, hadEnvAttempt: boolean): string {

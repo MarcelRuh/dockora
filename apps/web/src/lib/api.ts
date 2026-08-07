@@ -137,7 +137,7 @@ export async function fetchContainerLogs(id: string, tail = 200): Promise<string
 export async function containerAction(
   id: string,
   action: ContainerAction,
-  body?: { force?: boolean },
+  body?: { force?: boolean; deleteProjectDir?: boolean },
 ): Promise<ActionResult> {
   return request<ActionResult>(`/containers/${encodeURIComponent(id)}/${action}`, {
     method: 'POST',

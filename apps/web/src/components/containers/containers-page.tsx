@@ -60,6 +60,7 @@ export function ContainersPage() {
   const [confirm, setConfirm] = useState<null | {
     action: 'stop' | 'restart' | 'remove';
     ids: string[];
+    deleteProjectDir?: boolean;
   }>(null);
 
   useEffect(() => {
@@ -122,7 +123,7 @@ export function ContainersPage() {
   }, [load]);
   const runAction = async (id: string, action: 'start' | 'stop' | 'restart' | 'remove') => {
     if (action === 'remove') {
-      setConfirm({ action: 'remove', ids: [id] });
+      setConfirm({ action: 'remove', ids: [id], deleteProjectDir: true });
       return;
     }
     setBusy(id);
@@ -136,7 +137,11 @@ export function ContainersPage() {
     }
   };
 
-  const runBulk = async (action: 'stop' | 'restart' | 'remove', ids: string[]) => {
+  const runBulk = async (
+    action: 'stop' | 'restart' | 'remove',
+    ids: string[],
+    opts?: { deleteProjectDir?: boolean },
+  ) => {
     setConfirm(null);
     setError(null);
     for (let i = 0; i < ids.length; i++) {
@@ -146,7 +151,13 @@ export function ContainersPage() {
         t.common.bulkProgress.replace('{done}', String(i + 1)).replace('{total}', String(ids.length)),
       );
       try {
-        await containerAction(id, action, action === 'remove' ? { force: true } : undefined);
+        await containerAction(
+          id,
+          action,
+          action === 'remove'
+            ? { force: true, deleteProjectDir: opts?.deleteProjectDir !== false }
+            : undefined,
+        );
       } catch (err) {
         setError(err instanceof Error ? err.message : t.common.failed);
         break;
@@ -316,7 +327,7 @@ export function ContainersPage() {
                 size="sm"
                 variant="danger"
                 disabled={Boolean(busy)}
-                onClick={() => setConfirm({ action: 'remove', ids: selectedIds })}
+                onClick={() => setConfirm({ action: 'remove', ids: selectedIds, deleteProjectDir: true })}
               >
                 {t.containers.bulkRemove}
               </Button>
@@ -426,9 +437,25 @@ export function ContainersPage() {
         onCancel={() => setConfirm(null)}
         onConfirm={() => {
           if (!confirm) return;
-          void runBulk(confirm.action, confirm.ids);
+          void runBulk(confirm.action, confirm.ids, {
+            deleteProjectDir: confirm.deleteProjectDir,
+          });
         }}
-      />
+      >
+        {confirm?.action === 'remove' ? (
+          <label className="mt-3 flex cursor-pointer items-start gap-2 text-sm text-dockora-muted">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-3.5 w-3.5 accent-dockora-pink"
+              checked={confirm.deleteProjectDir !== false}
+              onChange={(e) =>
+                setConfirm((c) => (c ? { ...c, deleteProjectDir: e.target.checked } : c))
+              }
+            />
+            <span>{t.containers.deleteProjectDirConfirm}</span>
+          </label>
+        ) : null}
+      </ConfirmDialog>
     </div>
   );
 }

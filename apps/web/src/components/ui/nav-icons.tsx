@@ -120,6 +120,16 @@ export function IconSettings(props: IconProps) {
   );
 }
 
+export function IconTerminal(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="m7 10 2.5 2.5L7 15" />
+      <path d="M12 15h5" />
+    </svg>
+  );
+}
+
 export const NAV_ICONS = {
   dashboard: IconDashboard,
   containers: IconContainers,
@@ -130,5 +140,6 @@ export const NAV_ICONS = {
   network: IconNetwork,
   backups: IconBackups,
   logs: IconLogs,
+  terminal: IconTerminal,
   settings: IconSettings,
 } as const;

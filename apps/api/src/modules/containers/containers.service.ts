@@ -8,9 +8,16 @@ import type {
 } from '@dockora/shared';
 import { isDockoraSelfContainer } from '../../domain/dockora-self.js';
 import type { DockerContainerDetails, DockerContainerInfo, IDockerClient } from '../../domain/ports.js';
+import {
+  COMPOSE_PROJECT_LABEL,
+  COMPOSE_WORKING_DIR_LABEL,
+  deleteProjectDirectory,
+} from '../compose/safe-project-dir.js';
 
 export interface ContainersServiceDeps {
   docker: IDockerClient;
+  /** Compose search paths – used when deleting project folders after container remove. */
+  searchPaths?: string[];
 }
 
 const STATS_CACHE_TTL_MS = 4_000;
@@ -73,11 +80,63 @@ export class ContainersService {
   async action(
     id: string,
     action: ContainerAction,
-    options?: { force?: boolean },
+    options?: { force?: boolean; deleteProjectDir?: boolean },
   ): Promise<ActionResult> {
     this.statsCache.delete(id);
+
+    let projectMeta: { workingDir: string; projectName: string } | null = null;
+    if (action === 'remove' && options?.deleteProjectDir !== false) {
+      try {
+        const details = await this.deps.docker.inspectContainer(id);
+        const workingDir = details.labels[COMPOSE_WORKING_DIR_LABEL]?.trim();
+        const projectName =
+          details.labels[COMPOSE_PROJECT_LABEL]?.trim() || details.composeProject?.trim();
+        if (workingDir && projectName) {
+          projectMeta = { workingDir, projectName };
+        }
+      } catch {
+        // inspect failed – still try remove
+      }
+    }
+
     await this.deps.docker.containerAction(id, action, options);
+
+    if (action === 'remove' && projectMeta && options?.deleteProjectDir !== false) {
+      const folderMsg = await this.maybeDeleteComposeProjectDir(projectMeta);
+      if (folderMsg) {
+        return { ok: true, message: `Container remove succeeded. ${folderMsg}` };
+      }
+    }
+
     return { ok: true, message: `Container ${action} succeeded` };
+  }
+
+  /**
+   * Deletes the Compose project folder when no containers of that project remain.
+   */
+  private async maybeDeleteComposeProjectDir(meta: {
+    workingDir: string;
+    projectName: string;
+  }): Promise<string | null> {
+    const searchPaths = this.deps.searchPaths ?? [];
+    if (searchPaths.length === 0) return null;
+
+    const remaining = (await this.deps.docker.listContainers(true)).filter((c) => {
+      const name = c.labels[COMPOSE_PROJECT_LABEL] || c.composeProject;
+      const dir = c.labels[COMPOSE_WORKING_DIR_LABEL];
+      return name === meta.projectName || dir === meta.workingDir;
+    });
+
+    if (remaining.length > 0) {
+      return null;
+    }
+
+    try {
+      await deleteProjectDirectory(meta.workingDir, searchPaths);
+      return `Project folder deleted (${meta.workingDir}).`;
+    } catch (error) {
+      return `Project folder not deleted: ${error instanceof Error ? error.message : String(error)}`;
+    }
   }
 
   async logs(id: string, tail = 200): Promise<string> {
@@ -170,9 +229,8 @@ async function mapPool<T>(
   let index = 0;
   const runners = Array.from({ length: limit }, async () => {
     while (index < items.length) {
-      const current = items[index]!;
-      index += 1;
-      await worker(current);
+      const current = index++;
+      await worker(items[current]!);
     }
   });
   await Promise.all(runners);

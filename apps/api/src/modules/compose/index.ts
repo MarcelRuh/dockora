@@ -13,6 +13,7 @@ import {
   ComposeService,
   ComposeValidationError,
 } from './compose.service.js';
+import { UnsafeProjectPathError } from './safe-project-dir.js';
 import { destructiveRateLimit } from '../../presentation/http/destructive-rate-limit.js';
 
 const COMPOSE_ACTIONS = new Set<ComposeAction>([
@@ -259,7 +260,7 @@ function throwComposeError(app: FastifyInstance, error: unknown): never {
   if (error instanceof ComposeNotFoundError) {
     throw app.httpErrors.notFound(error.message);
   }
-  if (error instanceof ComposeValidationError) {
+  if (error instanceof ComposeValidationError || error instanceof UnsafeProjectPathError) {
     throw app.httpErrors.badRequest(error.message);
   }
 

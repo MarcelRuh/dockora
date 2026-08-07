@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Weekly Docker housekeeping for Dockora hosts (safety net).
-# Build cache is also pruned immediately after install/self-update/compose build.
+# Daily Docker housekeeping for Dockora hosts (safety net).
+# Build cache is also pruned by the API (scheduler cleanup / healthcheck threshold / compose build).
 # Safe: keeps running containers/images/volumes; clears BuildKit cache + dangling objects.
 set -euo pipefail
 

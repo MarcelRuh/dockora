@@ -1,12 +1,12 @@
 [Unit]
-Description=Run Dockora Docker cleanup every 7 days
+Description=Run Dockora Docker cleanup daily
 Documentation=file:///opt/dockora/scripts/docker-cleanup.sh
 
 [Timer]
-# Every Sunday 03:30 local time (±1h jitter)
-OnCalendar=Sun *-*-* 03:30:00
+# Every day 03:30 local time (±30m jitter) – build cache grows fast with frequent rebuilds
+OnCalendar=*-*-* 03:30:00
 Persistent=true
-RandomizedDelaySec=1h
+RandomizedDelaySec=30m
 Unit=dockora-docker-cleanup.service
 
 [Install]

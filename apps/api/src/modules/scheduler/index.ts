@@ -87,11 +87,60 @@ export const schedulerModule: FastifyPluginAsync = async (app: FastifyInstance) 
         'info',
       );
     }
+
+    try {
+      const before = await app.docker.getBuildCacheBytes();
+      const pruned = await app.docker.pruneBuildCache();
+      const after = await app.docker.getBuildCacheBytes();
+      const freedMiB = Math.max(0, Math.round(pruned.spaceReclaimed / (1024 * 1024)));
+      if (freedMiB > 50 || before - after > 50 * 1024 * 1024) {
+        await notifications.notify(
+          'system',
+          'Docker-Cleanup',
+          `Build-Cache bereinigt (~${freedMiB} MiB freigegeben).`,
+          'info',
+        );
+      }
+      app.log.info(
+        { freedMiB, beforeBytes: before, afterBytes: after },
+        'Scheduled build-cache prune',
+      );
+    } catch (error) {
+      app.log.warn(
+        { err: error instanceof Error ? error.message : String(error) },
+        'Scheduled build-cache prune failed',
+      );
+    }
   });
 
   scheduler.registerCallback('healthcheck', async () => {
     const snapshot = await monitoring.getSnapshot();
-    const fresh = filterAlertsWithCooldown(snapshot.alerts);
+
+    // Auto-prune when build-cache alert would fire – don't wait for weekly timer
+    const cacheAlert = snapshot.alerts.find((a) => /build cache/i.test(a));
+    if (cacheAlert) {
+      try {
+        const pruned = await app.docker.pruneBuildCache();
+        const freedMiB = Math.round(pruned.spaceReclaimed / (1024 * 1024));
+        app.log.info({ freedMiB }, 'Auto-pruned build cache after monitoring threshold');
+        if (freedMiB > 0) {
+          await notifications.notify(
+            'system',
+            'Build-Cache Auto-Prune',
+            `${cacheAlert} → ${freedMiB} MiB freigegeben.`,
+            'info',
+          );
+        }
+      } catch (error) {
+        app.log.warn(
+          { err: error instanceof Error ? error.message : String(error) },
+          'Auto build-cache prune failed',
+        );
+      }
+    }
+
+    const freshSnapshot = cacheAlert ? await monitoring.getSnapshot() : snapshot;
+    const fresh = filterAlertsWithCooldown(freshSnapshot.alerts);
     if (fresh.length > 0) {
       await notifications.notify(
         'error',

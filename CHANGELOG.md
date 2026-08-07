@@ -7,6 +7,8 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ### Added
 
+- Host terminal in main nav (`/terminal`): admin-only shell via host-agent `nsenter` into the LXC/host namespaces
+- Compose/container delete removes the project folder (compose.yaml, .env, local appdata) when the stack is gone
 - Update apply returns structured result (`step`, `rolledBack`, prune stats); unused images pruned after successful update
 - Backup restore dry-run preview with selective apply flags (files / settings / volumes)
 - Scheduler: real `nextRunAt`, `lastError`, human-readable job labels
@@ -14,11 +16,16 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 - Plugin loader: path sandbox (realpath under PLUGIN_DIR), name allowlist, register timeout
 - Destructive rate limits on container kill/remove, backups, and image prune
 - Terminal: idle timeout (15m), message rate limit, JWT via Sec-WebSocket-Protocol
+- Scheduler `cleanup` also prunes Docker build cache; healthcheck auto-prunes when build-cache threshold is exceeded
+
+### Changed
+
+- Default / systemd Docker cleanup schedule: weekly → daily (build cache fills quickly with rebuilds)
 
 ### Fixed
 
 - Monitoring alert cooldown uses fingerprints so fluctuating CPU/disk numbers do not bypass dedup
-
+- Build-cache prune via API now uses `POST /build/prune?all=true` (dockerode's `pruneBuilder` ignored `all`)
 ## [1.2.3] – 2026-08-07
 
 ### Added

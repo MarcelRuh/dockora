@@ -29,7 +29,10 @@ const DESTRUCTIVE_CONTAINER_ACTIONS = new Set<ContainerAction>(['kill', 'remove'
  * Container-Modul – Liste, Details, Aktionen, Logs und Stats.
  */
 export const containersModule: FastifyPluginAsync = async (app: FastifyInstance) => {
-  const service = new ContainersService({ docker: app.docker });
+  const service = new ContainersService({
+    docker: app.docker,
+    searchPaths: app.config.composeSearchPaths,
+  });
 
   app.get<{ Querystring: ContainerFilter }>(
     `${API_PREFIX}/containers`,
@@ -100,7 +103,7 @@ export const containersModule: FastifyPluginAsync = async (app: FastifyInstance)
 
   app.post<{
     Params: { id: string; action: string };
-    Body: { force?: boolean };
+    Body: { force?: boolean; deleteProjectDir?: boolean };
   }>(
     `${API_PREFIX}/containers/:id/:action`,
     {
@@ -118,8 +121,12 @@ export const containersModule: FastifyPluginAsync = async (app: FastifyInstance)
       if (!CONTAINER_ACTIONS.has(action)) {
         throw app.httpErrors.badRequest(`Unknown container action: ${request.params.action}`);
       }
+      const body = request.body ?? {};
       const result = await withDockerError(app, () =>
-        service.action(request.params.id, action, request.body ?? {}),
+        service.action(request.params.id, action, {
+          force: body.force,
+          deleteProjectDir: body.deleteProjectDir,
+        }),
       );
       if (DESTRUCTIVE_CONTAINER_ACTIONS.has(action)) {
         void auditService.record({
@@ -127,6 +134,9 @@ export const containersModule: FastifyPluginAsync = async (app: FastifyInstance)
           actorId: actorIdFromRequest(request),
           resource: 'container',
           resourceId: request.params.id,
+          metadata: {
+            deleteProjectDir: body.deleteProjectDir !== false,
+          },
         });
       }
       return result;

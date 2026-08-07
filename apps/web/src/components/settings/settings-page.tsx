@@ -35,6 +35,7 @@ const NOTIFICATION_EVENTS: NotificationEvent[] = [
   'error',
   'backup.completed',
   'restore.completed',
+  'system',
 ];
 
 type SettingsTab =
