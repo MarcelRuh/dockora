@@ -11,6 +11,7 @@ export const messages = {
       images: 'Images',
       updates: 'Updates',
       monitoring: 'Monitoring',
+      network: 'Netzwerk',
       backups: 'Backups',
       logs: 'Logs',
       settings: 'Einstellungen',
@@ -287,10 +288,12 @@ export const messages = {
       containers: 'Container',
       alert: 'Alert',
       emptyContainers: 'Keine Container.',
-      tabs: {
-        overview: 'Übersicht',
-        network: 'Netzwerk',
-      },
+    },
+
+    network: {
+      title: 'Netzwerk',
+      subtitle: 'Freigegebene Ports und Container-Netzwerk-Topologie.',
+      loadError: 'Netzwerkdaten konnten nicht geladen werden',
       ports: {
         title: 'Freigegebene Ports',
         empty: 'Keine freigegebenen Host-Ports.',
@@ -449,6 +452,7 @@ export const messages = {
       images: 'Images',
       updates: 'Updates',
       monitoring: 'Monitoring',
+      network: 'Network',
       backups: 'Backups',
       logs: 'Logs',
       settings: 'Settings',
@@ -725,10 +729,12 @@ export const messages = {
       containers: 'Containers',
       alert: 'Alert',
       emptyContainers: 'No containers.',
-      tabs: {
-        overview: 'Overview',
-        network: 'Network',
-      },
+    },
+
+    network: {
+      title: 'Network',
+      subtitle: 'Published ports and container network topology.',
+      loadError: 'Failed to load network data',
       ports: {
         title: 'Published ports',
         empty: 'No published host ports.',

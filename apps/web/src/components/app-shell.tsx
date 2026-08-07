@@ -15,6 +15,7 @@ const NAV_ITEMS = [
   { key: 'images', href: '/images', ready: true },
   { key: 'updates', href: '/updates', ready: true },
   { key: 'monitoring', href: '/monitoring', ready: true },
+  { key: 'network', href: '/network', ready: true },
   { key: 'backups', href: '/backups', ready: true },
   { key: 'logs', href: '/logs', ready: true },
   { key: 'settings', href: '/settings', ready: true },

@@ -1,8 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import type { ContainerSummary, MonitoringSnapshot } from '@dockora/shared';
-import { fetchContainers, fetchMonitoring } from '@/lib/api';
+import type { MonitoringSnapshot } from '@dockora/shared';
+import { fetchMonitoring } from '@/lib/api';
 import { useLocale } from '@/i18n/locale-provider';
 import { formatPercent, formatRelativeTime } from '@/lib/format';
 import { containerStatusTone } from '@/lib/status';
@@ -14,31 +14,19 @@ import {
   LoadingState,
   PageHeader,
   StatusBadge,
-  TabBar,
 } from '@/components/ui/page-parts';
 import { ProgressBar } from '@/components/ui/progress-bar';
-import { PortCards } from '@/components/monitoring/port-cards';
-import { NetworkTopology } from '@/components/monitoring/network-topology';
-
-type MonitoringTab = 'overview' | 'network';
 
 export function MonitoringPage() {
   const { t, locale } = useLocale();
   const loc = locale === 'de' ? 'de-DE' : 'en-US';
-  const [tab, setTab] = useState<MonitoringTab>('overview');
   const [data, setData] = useState<MonitoringSnapshot | null>(null);
-  const [containers, setContainers] = useState<ContainerSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const [snap, list] = await Promise.all([
-        fetchMonitoring(),
-        fetchContainers({ includeSelf: true }),
-      ]);
-      setData(snap);
-      setContainers(list);
+      setData(await fetchMonitoring());
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : t.monitoring.loadError);
@@ -52,11 +40,6 @@ export function MonitoringPage() {
     const timer = window.setInterval(() => void load(), 8_000);
     return () => window.clearInterval(timer);
   }, [load]);
-
-  const tabs = [
-    { id: 'overview', label: t.monitoring.tabs.overview },
-    { id: 'network', label: t.monitoring.tabs.network },
-  ];
 
   const rows =
     data?.containers.map((c) => [
@@ -83,13 +66,11 @@ export function MonitoringPage() {
         }
       />
 
-      <TabBar tabs={tabs} active={tab} onChange={(id) => setTab(id as MonitoringTab)} />
-
       {error ? <ErrorBanner message={error} /> : null}
       {loading && !data ? <LoadingState message={t.common.loading} /> : null}
 
-      {data && tab === 'overview' ? (
-        <div className="space-y-8">
+      {data ? (
+        <>
           <div className="flex flex-wrap gap-3 text-sm text-dockora-muted">
             <span>
               Docker:{' '}
@@ -157,14 +138,7 @@ export function MonitoringPage() {
               empty={<EmptyState message={t.monitoring.emptyContainers} />}
             />
           </section>
-        </div>
-      ) : null}
-
-      {data && tab === 'network' ? (
-        <div className="space-y-8">
-          <PortCards containers={containers} labels={t.monitoring.ports} />
-          <NetworkTopology containers={containers} labels={t.monitoring.topology} />
-        </div>
+        </>
       ) : null}
     </div>
   );
