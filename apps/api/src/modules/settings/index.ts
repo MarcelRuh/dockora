@@ -6,7 +6,23 @@ import {
   PrismaSettingsRepository,
   SettingsService,
 } from './settings.service.js';
-import { maskWebhookUrl, shouldKeepWebhook } from './secret-hygiene.js';
+import {
+  maskSecret,
+  maskWebhookUrl,
+  shouldKeepSecret,
+  shouldKeepWebhook,
+} from './secret-hygiene.js';
+
+const SECRET_KEYS = ['discordWebhookUrl', 'ghcrToken', 'lscrToken'] as const;
+
+function maskSettingsSecrets(settings: AppSettings): AppSettings {
+  return {
+    ...settings,
+    discordWebhookUrl: maskWebhookUrl(settings.discordWebhookUrl),
+    ghcrToken: maskSecret(settings.ghcrToken),
+    lscrToken: maskSecret(settings.lscrToken),
+  };
+}
 
 export const settingsModule: FastifyPluginAsync = async (app: FastifyInstance) => {
   const service = new SettingsService(new PrismaSettingsRepository());
@@ -17,10 +33,7 @@ export const settingsModule: FastifyPluginAsync = async (app: FastifyInstance) =
       composeSearchPaths: app.config.composeSearchPaths,
       autoUpdateImages: app.config.autoUpdateEnabled,
     });
-    return {
-      ...settings,
-      discordWebhookUrl: maskWebhookUrl(settings.discordWebhookUrl),
-    };
+    return maskSettingsSecrets(settings);
   });
 
   app.put<{ Body: Partial<AppSettings> }>(
@@ -31,24 +44,34 @@ export const settingsModule: FastifyPluginAsync = async (app: FastifyInstance) =
       if (shouldKeepWebhook(patch.discordWebhookUrl)) {
         delete patch.discordWebhookUrl;
       }
+      if (shouldKeepSecret(patch.ghcrToken)) {
+        delete patch.ghcrToken;
+      }
+      if (shouldKeepSecret(patch.lscrToken)) {
+        delete patch.lscrToken;
+      }
       const updated = await service.updateSettings(patch);
       if ('authEnabled' in patch) {
         invalidateAuthEnabledCache();
       }
-      const keys = Object.keys(patch).filter((k) => k !== 'discordWebhookUrl');
+      const keys = Object.keys(patch).filter(
+        (k) => !(SECRET_KEYS as readonly string[]).includes(k),
+      );
       void auditService.record({
         action: 'settings.update',
         actorId: actorIdFromRequest(request),
         resource: 'settings',
         metadata: {
           keys,
-          webhookUpdated: 'discordWebhookUrl' in (request.body ?? {}) && !shouldKeepWebhook(request.body?.discordWebhookUrl),
+          webhookUpdated:
+            'discordWebhookUrl' in (request.body ?? {}) &&
+            !shouldKeepWebhook(request.body?.discordWebhookUrl),
+          registryTokensUpdated:
+            ('ghcrToken' in (request.body ?? {}) && !shouldKeepSecret(request.body?.ghcrToken)) ||
+            ('lscrToken' in (request.body ?? {}) && !shouldKeepSecret(request.body?.lscrToken)),
         },
       });
-      return {
-        ...updated,
-        discordWebhookUrl: maskWebhookUrl(updated.discordWebhookUrl),
-      };
+      return maskSettingsSecrets(updated);
     },
   );
 };

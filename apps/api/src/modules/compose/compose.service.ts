@@ -8,6 +8,7 @@ import type {
   ActionResult,
   BackupInfo,
   ComposeAction,
+  ComposeChangePreview,
   ComposeProjectDetails,
   ComposeProjectSummary,
 } from '@dockora/shared';
@@ -147,6 +148,91 @@ export class ComposeService {
           : 'Invalid compose config';
       throw new ComposeValidationError(hintMissingEnv(message, hadEnv));
     }
+  }
+
+  /** Diff resolved compose config vs currently running project containers. */
+  async previewChanges(id: string): Promise<ComposeChangePreview> {
+    const project = await this.resolveProject(id);
+    const [resolvedYaml, containers, sourceYaml] = await Promise.all([
+      this.validateConfig(id),
+      this.deps.docker.listContainers(true),
+      readComposeYaml(project.absoluteComposePath),
+    ]);
+
+    const desired = extractServiceImages(resolvedYaml);
+    const desiredNames = new Set(Object.keys(desired));
+
+    const running = containers.filter(
+      (c) =>
+        (c.composeProject ?? c.labels['com.docker.compose.project'] ?? '') === project.name,
+    );
+    const currentByService = new Map<string, { image: string; id: string }>();
+    for (const c of running) {
+      const svc =
+        c.composeService ?? c.labels['com.docker.compose.service'] ?? c.name.replace(/^\//, '');
+      currentByService.set(svc, { image: c.image, id: c.id });
+    }
+    const currentNames = new Set(currentByService.keys());
+
+    const servicesAdded = [...desiredNames].filter((s) => !currentNames.has(s)).sort();
+    const servicesRemoved = [...currentNames].filter((s) => !desiredNames.has(s)).sort();
+
+    const imageChanges: ComposeChangePreview['imageChanges'] = [];
+    for (const service of desiredNames) {
+      const desiredImage = desired[service] ?? null;
+      const current = currentByService.get(service);
+      if (!current) continue;
+      if (normalizeImageRef(current.image) !== normalizeImageRef(desiredImage ?? '')) {
+        imageChanges.push({
+          service,
+          currentImage: current.image,
+          desiredImage,
+        });
+      }
+    }
+
+    // Env: only keys explicitly set under `environment:` in the project YAML
+    // (ignore env_file dumps which would create false positives).
+    const envChangedServices: string[] = [];
+    try {
+      const sourceDoc = YAML.parse(sourceYaml) as {
+        services?: Record<string, { environment?: unknown }>;
+      };
+      const resolvedDoc = YAML.parse(resolvedYaml) as {
+        services?: Record<string, { environment?: unknown }>;
+      };
+      const explicitKeys = extractExplicitEnvKeys(sourceDoc.services ?? {});
+      const resolvedEnvs = extractServiceEnvMaps(resolvedDoc.services ?? {});
+
+      await Promise.all(
+        Object.entries(explicitKeys).map(async ([service, keys]) => {
+          if (keys.size === 0) return;
+          const current = currentByService.get(service);
+          if (!current) return;
+          const desiredEnv = pickEnvKeys(resolvedEnvs[service] ?? {}, keys);
+          if (Object.keys(desiredEnv).length === 0) return;
+          try {
+            const details = await this.deps.docker.inspectContainer(current.id);
+            if (composeEnvDiffers(desiredEnv, details.env)) {
+              envChangedServices.push(service);
+            }
+          } catch {
+            // skip if inspect fails
+          }
+        }),
+      );
+    } catch {
+      // ignore parse issues
+    }
+
+    return {
+      projectId: id,
+      projectName: project.name,
+      servicesAdded,
+      servicesRemoved,
+      imageChanges,
+      envChangedServices: envChangedServices.sort(),
+    };
   }
 
   async updateYaml(id: string, content: string): Promise<ComposeProjectDetails> {
@@ -645,4 +731,90 @@ export function pinServiceImage(yamlContent: string, serviceName: string, imageR
     throw new Error(`Service "${serviceName}" is not a mapping`);
   }
   return String(doc);
+}
+
+function extractServiceImages(resolvedYaml: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  try {
+    const doc = YAML.parse(resolvedYaml) as {
+      services?: Record<string, { image?: string }>;
+    };
+    for (const [name, cfg] of Object.entries(doc.services ?? {})) {
+      if (cfg?.image) out[name] = String(cfg.image);
+    }
+  } catch {
+    // ignore
+  }
+  return out;
+}
+
+function normalizeImageRef(image: string): string {
+  return image.trim().replace(/^docker\.io\//, '').replace(/:latest$/, '');
+}
+
+/** Parse compose `environment` (map or list) into KEY → value. */
+function parseComposeEnvironment(environment: unknown): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!environment) return out;
+  if (Array.isArray(environment)) {
+    for (const entry of environment) {
+      if (typeof entry !== 'string') continue;
+      const i = entry.indexOf('=');
+      if (i < 0) out[entry] = '';
+      else out[entry.slice(0, i)] = entry.slice(i + 1);
+    }
+    return out;
+  }
+  if (typeof environment === 'object') {
+    for (const [k, v] of Object.entries(environment as Record<string, unknown>)) {
+      out[k] = v == null ? '' : String(v);
+    }
+  }
+  return out;
+}
+
+function extractServiceEnvMaps(
+  services: Record<string, { environment?: unknown }>,
+): Record<string, Record<string, string>> {
+  const out: Record<string, Record<string, string>> = {};
+  for (const [name, cfg] of Object.entries(services)) {
+    out[name] = parseComposeEnvironment(cfg?.environment);
+  }
+  return out;
+}
+
+/** Keys from source YAML `environment:` only (not env_file). */
+function extractExplicitEnvKeys(
+  services: Record<string, { environment?: unknown }>,
+): Record<string, Set<string>> {
+  const out: Record<string, Set<string>> = {};
+  for (const [name, cfg] of Object.entries(services)) {
+    out[name] = new Set(Object.keys(parseComposeEnvironment(cfg?.environment)));
+  }
+  return out;
+}
+
+function pickEnvKeys(
+  env: Record<string, string>,
+  keys: Set<string>,
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const key of keys) {
+    if (key in env) out[key] = env[key]!;
+  }
+  return out;
+}
+
+/** True when any key defined in compose differs from the running container Env. */
+function composeEnvDiffers(desired: Record<string, string>, containerEnv: string[]): boolean {
+  const current: Record<string, string> = {};
+  for (const entry of containerEnv) {
+    const i = entry.indexOf('=');
+    if (i < 0) current[entry] = '';
+    else current[entry.slice(0, i)] = entry.slice(i + 1);
+  }
+  for (const [key, value] of Object.entries(desired)) {
+    if ((current[key] ?? '') !== String(value)) return true;
+  }
+  return false;
 }

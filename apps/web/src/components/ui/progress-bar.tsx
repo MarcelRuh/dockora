@@ -27,7 +27,7 @@ export function ProgressBar({
   return (
     <div
       className={cn(
-        'h-1.5 w-full overflow-hidden rounded-sm border border-dockora-border bg-dockora-surface2',
+        'h-2 w-full overflow-hidden border border-dockora-border bg-dockora-surface2',
         className,
       )}
       role="progressbar"
@@ -38,10 +38,14 @@ export function ProgressBar({
       <div
         className={cn(
           'h-full transition-[width] duration-500',
-          resolvedTone === 'accent' && 'bg-dockora-accent',
-          resolvedTone === 'success' && 'bg-dockora-success',
-          resolvedTone === 'warning' && 'bg-dockora-warning',
-          resolvedTone === 'danger' && 'bg-dockora-danger',
+          resolvedTone === 'accent' &&
+            'bg-gradient-to-r from-dockora-pink to-dockora-purple shadow-[0_0_12px_rgba(255,0,110,0.55)]',
+          resolvedTone === 'success' &&
+            'bg-dockora-success shadow-[0_0_12px_rgba(6,214,160,0.55)]',
+          resolvedTone === 'warning' &&
+            'bg-dockora-warning shadow-[0_0_12px_rgba(255,214,10,0.45)]',
+          resolvedTone === 'danger' &&
+            'bg-dockora-danger shadow-[0_0_12px_rgba(255,84,0,0.55)]',
         )}
         style={{ width: `${pct}%` }}
       />

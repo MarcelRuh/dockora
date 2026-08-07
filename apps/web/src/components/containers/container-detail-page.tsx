@@ -166,7 +166,7 @@ export function ContainerDetailPage({ id }: { id: string }) {
   if (!container) {
     return (
       <div className="space-y-4">
-        <Link href="/containers" className="text-sm text-dockora-accent hover:underline">
+        <Link href="/containers" className="dockora-link text-sm">
           ← {t.common.back}
         </Link>
         <ErrorBanner message={error ?? t.containers.notFound} />
@@ -176,7 +176,7 @@ export function ContainerDetailPage({ id }: { id: string }) {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <Link href="/containers" className="text-sm text-dockora-accent hover:underline">
+      <Link href="/containers" className="dockora-link text-sm">
         ← {t.common.back}
       </Link>
 

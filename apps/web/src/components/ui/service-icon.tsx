@@ -22,7 +22,7 @@ export function ServiceIcon({
       <span
         aria-hidden
         className={cn(
-          'inline-flex shrink-0 items-center justify-center rounded-sm border border-dockora-border bg-dockora-surface2 font-mono text-[10px] uppercase text-dockora-muted',
+          'inline-flex shrink-0 items-center justify-center border border-[rgba(131,56,236,0.35)] bg-white/[0.04] font-mono text-[10px] uppercase text-dockora-muted',
           dim,
           className,
         )}

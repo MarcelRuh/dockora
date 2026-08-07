@@ -1,17 +1,23 @@
 import type { Metadata } from 'next';
-import { Bricolage_Grotesque, IBM_Plex_Mono } from 'next/font/google';
+import { Inter, Orbitron, JetBrains_Mono } from 'next/font/google';
 import { ThemeProvider } from '@/components/theme-provider';
 import { AuthProvider } from '@/components/auth/auth-provider';
 import { LocaleProvider } from '@/i18n/locale-provider';
 import './globals.css';
 
-const bricolage = Bricolage_Grotesque({
+const inter = Inter({
   subsets: ['latin'],
-  variable: '--font-display',
-  weight: ['400', '500', '600', '700', '800'],
+  variable: '--font-sans',
+  weight: ['300', '400', '500', '600', '700'],
 });
 
-const ibmPlexMono = IBM_Plex_Mono({
+const orbitron = Orbitron({
+  subsets: ['latin'],
+  variable: '--font-display',
+  weight: ['500', '700', '800', '900'],
+});
+
+const jetbrains = JetBrains_Mono({
   subsets: ['latin'],
   variable: '--font-mono',
   weight: ['400', '500', '600', '700'],
@@ -24,8 +30,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="de" suppressHydrationWarning>
-      <body className={`${bricolage.variable} ${ibmPlexMono.variable} font-sans antialiased`}>
+    <html lang="de" className="dark" suppressHydrationWarning>
+      <body
+        className={`${inter.variable} ${orbitron.variable} ${jetbrains.variable} font-sans antialiased`}
+      >
         <ThemeProvider>
           <LocaleProvider>
             <AuthProvider>{children}</AuthProvider>

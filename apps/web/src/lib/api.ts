@@ -186,6 +186,10 @@ export async function validateComposeConfig(id: string): Promise<string> {
   return request<string>(`/compose/${encodeURIComponent(id)}/config`);
 }
 
+export async function previewComposeChanges(id: string): Promise<import('@dockora/shared').ComposeChangePreview> {
+  return request(`/compose/${encodeURIComponent(id)}/preview`);
+}
+
 export async function fetchComposeLogs(id: string): Promise<string> {
   return request<string>(`/compose/${encodeURIComponent(id)}/logs`);
 }

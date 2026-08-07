@@ -12,16 +12,19 @@ import {
   fetchComposeLogs,
   fetchComposeProject,
   fetchContainers,
+  previewComposeChanges,
   saveComposeEnv,
   saveComposeYaml,
   validateComposeConfig,
 } from '@/lib/api';
+import { formatComposePreviewLines } from '@/lib/compose-preview';
 import { useLocale } from '@/i18n/locale-provider';
 import { useAuth } from '@/components/auth/auth-provider';
 import { canAdmin, canOperate } from '@/lib/roles';
 import { composeStatusTone } from '@/lib/status';
 import { resolveContainerIconUrl, extractComposeServiceIcons } from '@/lib/container-icon';
 import { Button, Select, Textarea } from '@/components/ui/form-controls';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ServiceIcon } from '@/components/ui/service-icon';
 import {
   ErrorBanner,
@@ -32,6 +35,13 @@ import {
   StatusBadge,
   SuccessBanner,
 } from '@/components/ui/page-parts';
+
+type ConfirmKind = 'up' | 'down' | 'restart' | 'delete';
+type ConfirmState = {
+  kind: ConfirmKind;
+  consequences: string[];
+  removeVolumes?: boolean;
+};
 
 export function ComposeDetailPage({ id }: { id: string }) {
   const { t } = useLocale();
@@ -51,6 +61,8 @@ export function ComposeDetailPage({ id }: { id: string }) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [confirm, setConfirm] = useState<ConfirmState | null>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
 
   const loadEnv = useCallback(
     async (fileName: string) => {
@@ -164,31 +176,56 @@ export function ComposeDetailPage({ id }: { id: string }) {
     }
   };
 
-  const runAction = async (action: 'up' | 'down' | 'restart' | 'pull' | 'build') => {
-    setBusy(true);
+  const openConfirm = async (kind: ConfirmKind) => {
+    if (!project) return;
+    setConfirmBusy(true);
+    setError(null);
     try {
-      await composeAction(id, action);
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t.common.failed);
+      let consequences: string[] = [];
+      if (kind === 'up' || kind === 'delete') {
+        try {
+          const preview = await previewComposeChanges(id);
+          consequences = formatComposePreviewLines(preview, t.compose);
+        } catch {
+          /* preview optional */
+        }
+      }
+      if (kind === 'down') consequences = [...t.compose.downConsequences];
+      if (kind === 'restart') consequences = [...t.compose.restartConsequences];
+      if (kind === 'delete') consequences = [...consequences, ...t.compose.deleteConsequences];
+      setConfirm({
+        kind,
+        consequences,
+        removeVolumes: kind === 'delete' ? false : undefined,
+      });
     } finally {
-      setBusy(false);
+      setConfirmBusy(false);
     }
   };
 
-  const handleDelete = async () => {
-    if (!project) return;
-    const confirmed = window.confirm(t.compose.deleteConfirm.replace('{name}', project.name));
-    if (!confirmed) return;
-    const removeVolumes = window.confirm(t.compose.deleteVolumesConfirm);
-
+  const executeConfirm = async () => {
+    if (!confirm || !project) return;
+    const { kind, removeVolumes } = confirm;
+    setConfirm(null);
     setBusy(true);
     setError(null);
     try {
-      await deleteComposeProject(id, { removeFiles: true, removeVolumes });
-      router.push('/compose');
+      if (kind === 'delete') {
+        await deleteComposeProject(id, { removeFiles: true, removeVolumes: Boolean(removeVolumes) });
+        router.push('/compose');
+        return;
+      }
+      await composeAction(id, kind);
+      await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.compose.deleteError);
+      setError(
+        err instanceof Error
+          ? err.message
+          : kind === 'delete'
+            ? t.compose.deleteError
+            : t.common.failed,
+      );
+    } finally {
       setBusy(false);
     }
   };
@@ -198,7 +235,7 @@ export function ComposeDetailPage({ id }: { id: string }) {
   if (!project) {
     return (
       <div className="space-y-4">
-        <Link href="/compose" className="text-sm text-dockora-accent hover:underline">
+        <Link href="/compose" className="dockora-link text-sm">
           ← {t.common.back}
         </Link>
         <ErrorBanner message={error ?? t.compose.notFound} />
@@ -210,7 +247,7 @@ export function ComposeDetailPage({ id }: { id: string }) {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <Link href="/compose" className="text-sm text-dockora-accent hover:underline">
+      <Link href="/compose" className="dockora-link text-sm">
         ← {t.common.back}
       </Link>
 
@@ -221,27 +258,38 @@ export function ComposeDetailPage({ id }: { id: string }) {
           <>
             <StatusBadge status={composeStatusTone(project.status)} label={project.status} />
             {canOps ? (
-              <Button variant="primary" disabled={busy} onClick={() => void runAction('up')}>
+              <Button
+                variant="primary"
+                disabled={busy || confirmBusy}
+                onClick={() => void openConfirm('up')}
+              >
                 {t.compose.up}
               </Button>
             ) : null}
             {isAdmin ? (
-              <Button disabled={busy} onClick={() => void runAction('down')}>
+              <Button disabled={busy || confirmBusy} onClick={() => void openConfirm('down')}>
                 {t.compose.down}
               </Button>
             ) : null}
             {canOps ? (
-              <Button disabled={busy} onClick={() => void runAction('restart')}>
+              <Button
+                disabled={busy || confirmBusy}
+                onClick={() => void openConfirm('restart')}
+              >
                 {t.compose.restart}
               </Button>
             ) : null}
             {canOps ? (
-              <Button disabled={busy} onClick={() => void handleBackup()}>
+              <Button disabled={busy || confirmBusy} onClick={() => void handleBackup()}>
                 {t.compose.backup}
               </Button>
             ) : null}
             {isAdmin ? (
-              <Button variant="danger" disabled={busy} onClick={() => void handleDelete()}>
+              <Button
+                variant="danger"
+                disabled={busy || confirmBusy}
+                onClick={() => void openConfirm('delete')}
+              >
                 {t.common.delete}
               </Button>
             ) : null}
@@ -289,7 +337,7 @@ export function ComposeDetailPage({ id }: { id: string }) {
                 setError(err instanceof Error ? err.message : t.common.failed),
               );
             }}
-            className="w-auto font-mono text-sm"
+            className="w-auto min-w-[12rem] font-mono text-sm"
           >
             {envChoices.map((f) => (
               <option key={f} value={f}>
@@ -338,6 +386,49 @@ export function ComposeDetailPage({ id }: { id: string }) {
         </Button>
         <LogViewer content={logs} />
       </Section>
+
+      <ConfirmDialog
+        open={Boolean(confirm)}
+        title={
+          confirm?.kind === 'delete'
+            ? t.common.delete
+            : confirm?.kind === 'down'
+              ? t.compose.down
+              : confirm?.kind === 'restart'
+                ? t.compose.restart
+                : t.compose.previewTitle
+        }
+        description={
+          confirm?.kind === 'delete'
+            ? t.compose.deleteConfirm.replace('{name}', project.name)
+            : confirm?.kind === 'down'
+              ? t.compose.downConfirm.replace('{name}', project.name)
+              : confirm?.kind === 'restart'
+                ? t.compose.restartConfirm.replace('{name}', project.name)
+                : t.compose.upConfirm.replace('{name}', project.name)
+        }
+        consequences={confirm?.consequences}
+        confirmLabel={t.common.confirm}
+        cancelLabel={t.common.cancel}
+        danger={confirm?.kind === 'delete' || confirm?.kind === 'down'}
+        busy={busy || confirmBusy}
+        onCancel={() => setConfirm(null)}
+        onConfirm={() => void executeConfirm()}
+      >
+        {confirm?.kind === 'delete' ? (
+          <label className="flex cursor-pointer items-start gap-2 text-sm text-dockora-muted">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-3.5 w-3.5 accent-dockora-pink"
+              checked={Boolean(confirm.removeVolumes)}
+              onChange={(e) =>
+                setConfirm((c) => (c ? { ...c, removeVolumes: e.target.checked } : c))
+              }
+            />
+            <span>{t.compose.deleteVolumesConfirm}</span>
+          </label>
+        ) : null}
+      </ConfirmDialog>
     </div>
   );
 }
@@ -369,7 +460,7 @@ function ServiceIconList({
             {fromContainer ? (
               <Link
                 href={`/containers/${encodeURIComponent(fromContainer.id)}`}
-                className="font-mono text-sm text-dockora-accent hover:underline"
+                className="font-mono dockora-link text-sm"
               >
                 {service}
               </Link>

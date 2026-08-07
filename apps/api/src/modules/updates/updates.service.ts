@@ -13,22 +13,30 @@ import type { ComposeService } from '../compose/compose.service.js';
 import type Docker from 'dockerode';
 import { waitForContainerHealthy } from './health-wait.js';
 
+type RegistryAuth = {
+  token: string;
+  username: string;
+};
+
 export interface UpdatesServiceDeps {
   docker: IDockerClient;
   compose?: ComposeService;
+  getRegistryAuth?: () => Promise<{ ghcrToken: string; lscrToken: string }>;
 }
 
 export class UpdatesService {
   constructor(private readonly deps: UpdatesServiceDeps) {}
 
   async listCached(): Promise<UpdateCheckResult[]> {
+    await this.pruneStaleCache().catch(() => undefined);
     const rows = await prisma.updateCheckCache.findMany({
-      orderBy: { checkedAt: 'desc' },
+      orderBy: [{ updateAvailable: 'desc' }, { checkedAt: 'desc' }],
     });
     return rows.map(mapRow);
   }
 
   async countAvailable(): Promise<number> {
+    await this.pruneStaleCache().catch(() => undefined);
     return prisma.updateCheckCache.count({
       where: { updateAvailable: true },
     });
@@ -56,7 +64,67 @@ export class UpdatesService {
       }
     }
 
+    // Alte Cache-Einträge (z. B. nach Recreate mit neuer Container-ID) entfernen
+    await this.pruneStaleCache(containers.map((c) => c.id));
+
     return results;
+  }
+
+  private async resolveAuth(registryHost: string): Promise<RegistryAuth | undefined> {
+    if (!this.deps.getRegistryAuth) return undefined;
+    const creds = await this.deps.getRegistryAuth();
+    const host = registryHost.toLowerCase();
+    if (host.includes('lscr.io')) {
+      const token = creds.lscrToken.trim() || creds.ghcrToken.trim();
+      return token ? { token, username: 'token' } : undefined;
+    }
+    if (host.includes('ghcr.io')) {
+      const token = creds.ghcrToken.trim();
+      return token ? { token, username: 'token' } : undefined;
+    }
+    return undefined;
+  }
+
+  /**
+   * Behält nur den aktuellen Stand: eine Zeile pro laufendem Container.
+   * Verwaiste IDs und ältere Duplikate (gleicher Name) werden gelöscht.
+   */
+  private async pruneStaleCache(liveIds?: string[]): Promise<void> {
+    let ids = liveIds;
+    if (!ids) {
+      const containers = (await this.deps.docker.listContainers(true)).filter(
+        (c) => !isDockoraSelfContainer(c),
+      );
+      ids = containers.map((c) => c.id);
+    }
+
+    // Bei leerer Liste (Docker offline / Fehler) nichts löschen
+    if (ids.length === 0) return;
+
+    await prisma.updateCheckCache.deleteMany({
+      where: { containerId: { notIn: ids } },
+    });
+
+    // Sicherheit: pro Container-Name nur den neuesten Check behalten
+    const rows = await prisma.updateCheckCache.findMany({
+      orderBy: { checkedAt: 'desc' },
+      select: { containerId: true, containerName: true },
+    });
+    const seenNames = new Set<string>();
+    const duplicateIds: string[] = [];
+    for (const row of rows) {
+      const key = row.containerName.replace(/^\//, '').toLowerCase();
+      if (seenNames.has(key)) {
+        duplicateIds.push(row.containerId);
+      } else {
+        seenNames.add(key);
+      }
+    }
+    if (duplicateIds.length > 0) {
+      await prisma.updateCheckCache.deleteMany({
+        where: { containerId: { in: duplicateIds } },
+      });
+    }
   }
 
   async checkContainer(
@@ -79,7 +147,7 @@ export class UpdatesService {
     }
 
     try {
-      remoteDigest = await fetchRemoteDigest(parsed);
+      remoteDigest = await fetchRemoteDigest(parsed, await this.resolveAuth(parsed.registryHost));
     } catch (err) {
       const remoteErr = err instanceof Error ? err.message : String(err);
       error = error ? `${error}; Remote: ${remoteErr}` : remoteErr;
@@ -328,20 +396,21 @@ function mapRow(row: {
 
 async function fetchRemoteDigest(
   parsed: ReturnType<typeof parseImageRef>,
+  auth?: RegistryAuth,
 ): Promise<string | null> {
   switch (parsed.registry) {
     case 'dockerhub':
       return fetchDockerHubDigest(parsed);
     case 'ghcr':
-      return fetchOciDigest('ghcr.io', parsed);
+      return fetchOciDigest('ghcr.io', parsed, auth);
     case 'quay':
-      return fetchOciDigest('quay.io', parsed);
+      return fetchOciDigest('quay.io', parsed, auth);
     case 'gitea':
     case 'gitlab':
     case 'private':
-      return fetchOciDigest(parsed.registryHost, parsed);
+      return fetchOciDigest(parsed.registryHost, parsed, auth);
     default:
-      return fetchOciDigest(parsed.registryHost, parsed);
+      return fetchOciDigest(parsed.registryHost, parsed, auth);
   }
 }
 
@@ -360,15 +429,16 @@ async function fetchDockerHubDigest(
     throw new Error('Docker Hub auth returned no token');
   }
 
-  return fetchManifestDigest('registry-1.docker.io', repoPath, parsed.tag, token);
+  return fetchManifestDigest('registry-1.docker.io', repoPath, parsed.tag, { bearer: token });
 }
 
 async function fetchOciDigest(
   registryHost: string,
   parsed: ReturnType<typeof parseImageRef>,
+  auth?: RegistryAuth,
 ): Promise<string | null> {
   const repoPath = apiRepositoryPath(parsed);
-  return fetchManifestDigest(registryHost, repoPath, parsed.tag);
+  return fetchManifestDigest(registryHost, repoPath, parsed.tag, { registryAuth: auth });
 }
 
 const MANIFEST_ACCEPT = [
@@ -378,18 +448,26 @@ const MANIFEST_ACCEPT = [
   'application/vnd.docker.distribution.manifest.v2+json',
 ].join(', ');
 
+type ManifestAuth = {
+  bearer?: string;
+  registryAuth?: RegistryAuth;
+};
+
 async function fetchManifestDigest(
   registryHost: string,
   repoPath: string,
   tag: string,
-  token?: string,
+  auth?: ManifestAuth,
 ): Promise<string | null> {
   const url = `https://${registryHost}/v2/${repoPath}/manifests/${tag}`;
   const headers: Record<string, string> = {
     Accept: MANIFEST_ACCEPT,
   };
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
+  if (auth?.bearer) {
+    headers.Authorization = `Bearer ${auth.bearer}`;
+  } else if (auth?.registryAuth?.token) {
+    // Try PAT as Bearer first (works for many GHCR packages)
+    headers.Authorization = `Bearer ${auth.registryAuth.token}`;
   }
 
   let res = await request(url, { headers });
@@ -397,8 +475,7 @@ async function fetchManifestDigest(
   // OCI registries (ghcr, lscr→ghcr, …) often require a Bearer challenge first
   if (res.statusCode === 401) {
     const challenge = parseWwwAuthenticate(res.headers['www-authenticate']);
-    const bearer = await fetchRegistryBearerToken(challenge, repoPath);
-    // Drain previous body before retry
+    const bearer = await fetchRegistryBearerToken(challenge, repoPath, auth?.registryAuth);
     await res.body.dump().catch(() => undefined);
     if (!bearer) {
       throw new Error(`Registry auth required (${registryHost})`);
@@ -458,14 +535,21 @@ function parseWwwAuthenticate(header: string | string[] | undefined): WwwAuthCha
 async function fetchRegistryBearerToken(
   challenge: WwwAuthChallenge | null,
   repoPath: string,
+  registryAuth?: RegistryAuth,
 ): Promise<string | null> {
   if (!challenge?.realm) return null;
   const url = new URL(challenge.realm);
   if (challenge.service) url.searchParams.set('service', challenge.service);
   url.searchParams.set('scope', challenge.scope ?? `repository:${repoPath}:pull`);
 
+  const headers: Record<string, string> = {};
+  if (registryAuth?.token) {
+    const basic = Buffer.from(`${registryAuth.username}:${registryAuth.token}`).toString('base64');
+    headers.Authorization = `Basic ${basic}`;
+  }
+
   try {
-    const tokenRes = await request(url.toString());
+    const tokenRes = await request(url.toString(), { headers });
     if (tokenRes.statusCode >= 400) {
       await tokenRes.body.dump().catch(() => undefined);
       return null;

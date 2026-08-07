@@ -8,6 +8,7 @@ import { useAuth } from '@/components/auth/auth-provider';
 import { canAdmin } from '@/lib/roles';
 import { cn } from '@/lib/utils';
 import { Button, Input, Label, Select } from '@/components/ui/form-controls';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   AccentPanel,
   ErrorBanner,
@@ -68,6 +69,7 @@ export function SettingsPageView() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [tab, setTab] = useState<SettingsTab>('general');
+  const [pendingTab, setPendingTab] = useState<SettingsTab | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -125,7 +127,8 @@ export function SettingsPageView() {
 
   const requestTabChange = (next: SettingsTab) => {
     if (next === tab) return;
-    if (dirty && FORM_TABS.includes(tab) && !window.confirm(t.settings.unsavedConfirm)) {
+    if (dirty && FORM_TABS.includes(tab)) {
+      setPendingTab(next);
       return;
     }
     setTab(next);
@@ -218,7 +221,7 @@ export function SettingsPageView() {
                 className={cn(
                   'block w-full rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors',
                   tab === item.id
-                    ? 'bg-dockora-accent text-dockora-accentFg'
+                    ? 'bg-gradient-to-br from-dockora-pink to-dockora-purple text-white shadow-neon'
                     : 'text-dockora-muted hover:bg-dockora-surface2 hover:text-dockora-text',
                 )}
               >
@@ -237,6 +240,7 @@ export function SettingsPageView() {
                     value={settings.locale}
                     onChange={(e) => patch('locale', e.target.value as AppSettings['locale'])}
                     disabled={!isAdmin}
+                    className="w-full"
                   >
                     <option value="de">Deutsch</option>
                     <option value="en">English</option>
@@ -247,6 +251,7 @@ export function SettingsPageView() {
                     value={settings.theme}
                     onChange={(e) => patch('theme', e.target.value as AppSettings['theme'])}
                     disabled={!isAdmin}
+                    className="w-full"
                   >
                     <option value="dark">dark</option>
                     <option value="light">light</option>
@@ -319,6 +324,26 @@ export function SettingsPageView() {
                       onChange={(v) => patch('autoUpdateImages', v)}
                       yes={t.common.yes}
                       no={t.common.no}
+                    />
+                  </Field>
+                  <Field label={t.settings.fields.ghcrToken} hint={t.settings.hints.ghcrToken}>
+                    <Input
+                      type="password"
+                      autoComplete="off"
+                      value={settings.ghcrToken}
+                      onChange={(e) => patch('ghcrToken', e.target.value)}
+                      disabled={!isAdmin}
+                      placeholder={t.settings.fields.tokenPlaceholder}
+                    />
+                  </Field>
+                  <Field label={t.settings.fields.lscrToken} hint={t.settings.hints.lscrToken}>
+                    <Input
+                      type="password"
+                      autoComplete="off"
+                      value={settings.lscrToken}
+                      onChange={(e) => patch('lscrToken', e.target.value)}
+                      disabled={!isAdmin}
+                      placeholder={t.settings.fields.tokenPlaceholder}
                     />
                   </Field>
                 </div>
@@ -405,6 +430,7 @@ export function SettingsPageView() {
                       patch('backupFormat', e.target.value as AppSettings['backupFormat'])
                     }
                     disabled={!isAdmin}
+                    className="w-full"
                   >
                     <option value="zip">zip</option>
                     <option value="tar">tar</option>
@@ -418,6 +444,7 @@ export function SettingsPageView() {
                       patch('backupSchedule', e.target.value as AppSettings['backupSchedule'])
                     }
                     disabled={!isAdmin}
+                    className="w-full"
                   >
                     <option value="off">off</option>
                     <option value="daily">daily</option>
@@ -503,6 +530,20 @@ export function SettingsPageView() {
           ) : null}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={Boolean(pendingTab)}
+        title={t.settings.unsavedConfirm}
+        description={t.settings.unsavedConfirm}
+        confirmLabel={t.common.confirm}
+        cancelLabel={t.common.cancel}
+        danger
+        onCancel={() => setPendingTab(null)}
+        onConfirm={() => {
+          if (pendingTab) setTab(pendingTab);
+          setPendingTab(null);
+        }}
+      />
     </div>
   );
 }

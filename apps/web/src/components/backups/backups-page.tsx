@@ -14,6 +14,7 @@ import { useAuth } from '@/components/auth/auth-provider';
 import { canAdmin } from '@/lib/roles';
 import { formatBytes, formatRelativeTime } from '@/lib/format';
 import { Button } from '@/components/ui/form-controls';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   DataTable,
   EmptyState,
@@ -34,6 +35,7 @@ export function BackupsPage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [includeVolumes, setIncludeVolumes] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -95,7 +97,6 @@ export function BackupsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm(t.backups.deleteConfirm)) return;
     setBusy(true);
     try {
       await deleteBackup(id);
@@ -127,13 +128,18 @@ export function BackupsPage() {
     <span key={`inc-${b.id}`} className="text-xs text-dockora-muted">
       {b.includes.join(', ') || '—'}
     </span>,
-    <div key={`act-${b.id}`} className="flex flex-wrap gap-1">
+    <div key={`act-${b.id}`} className="inline-flex flex-nowrap items-center gap-1.5">
       {isAdmin ? (
         <>
-          <Button disabled={busy} onClick={() => void handleRestore(b.id, b.name)}>
+          <Button size="sm" disabled={busy} onClick={() => void handleRestore(b.id, b.name)}>
             {t.backups.restore}
           </Button>
-          <Button variant="danger" disabled={busy} onClick={() => void handleDelete(b.id)}>
+          <Button
+            size="sm"
+            variant="danger"
+            disabled={busy}
+            onClick={() => setDeleteId(b.id)}
+          >
             {t.common.delete}
           </Button>
         </>
@@ -179,6 +185,8 @@ export function BackupsPage() {
 
       {!loading ? (
         <DataTable
+          stickyFirst
+          stickyLast
           headers={[
             t.common.name,
             t.backups.format,
@@ -191,6 +199,23 @@ export function BackupsPage() {
           empty={<EmptyState message={t.backups.empty} />}
         />
       ) : null}
+
+      <ConfirmDialog
+        open={Boolean(deleteId)}
+        title={t.common.delete}
+        description={t.backups.deleteConfirm}
+        consequences={[...t.backups.deleteConsequences]}
+        confirmLabel={t.common.confirm}
+        cancelLabel={t.common.cancel}
+        danger
+        busy={busy}
+        onCancel={() => setDeleteId(null)}
+        onConfirm={() => {
+          const id = deleteId;
+          setDeleteId(null);
+          if (id) void handleDelete(id);
+        }}
+      />
     </div>
   );
 }

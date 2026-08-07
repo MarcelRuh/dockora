@@ -116,6 +116,17 @@ export const composeModule: FastifyPluginAsync = async (app: FastifyInstance) =>
     },
   );
 
+  app.get<{ Params: { id: string } }>(
+    `${API_PREFIX}/compose/:id/preview`,
+    async (request) => {
+      try {
+        return await service.previewChanges(request.params.id);
+      } catch (error) {
+        throwComposeError(app, error);
+      }
+    },
+  );
+
   app.put<{ Params: { id: string }; Body: { content: string } }>(
     `${API_PREFIX}/compose/:id/yaml`,
     async (request): Promise<ComposeProjectDetails> => {

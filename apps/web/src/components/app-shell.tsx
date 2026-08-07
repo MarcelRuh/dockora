@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { useLocale } from '@/i18n/locale-provider';
 import { useTheme } from '@/components/theme-provider';
@@ -8,6 +9,7 @@ import { cn } from '@/lib/utils';
 import type { Locale } from '@dockora/shared';
 import { AuthLogoutButton } from '@/components/auth/auth-provider';
 import { NAV_ICONS } from '@/components/ui/nav-icons';
+import { NeonAtmosphere, NeonParticles } from '@/components/ui/neon-particles';
 
 const NAV_ITEMS = [
   { key: 'dashboard', href: '/', ready: true },
@@ -22,14 +24,112 @@ const NAV_ITEMS = [
   { key: 'settings', href: '/settings', ready: true },
 ] as const;
 
-export function AppShell({ children }: { children: React.ReactNode }) {
-  const { t, locale, setLocale } = useLocale();
-  const { theme, toggleTheme } = useTheme();
+function NavList({
+  onNavigate,
+  compact = false,
+}: {
+  onNavigate?: () => void;
+  compact?: boolean;
+}) {
+  const { t } = useLocale();
   const pathname = usePathname();
 
   return (
-    <div className="relative flex min-h-screen">
-      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-dockora-railBorder bg-dockora-rail text-dockora-railText md:flex">
+    <ul className={cn('space-y-0.5', compact && 'space-y-0')}>
+      {NAV_ITEMS.map((item, index) => {
+        const active = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
+        const Icon = NAV_ICONS[item.key];
+        const className = cn(
+          'flex items-center gap-2.5 px-3 py-2.5 text-sm font-medium uppercase tracking-wide transition-all',
+          compact ? 'py-2' : 'animate-in fade-in',
+          active
+            ? 'dockora-nav-active'
+            : 'text-dockora-railMuted hover:bg-dockora-accentSoft hover:text-white hover:shadow-[0_0_16px_rgba(255,0,110,0.15)]',
+        );
+
+        return (
+          <li key={item.key} style={compact ? undefined : { animationDelay: `${index * 20}ms` }}>
+            {item.ready ? (
+              <Link href={item.href} className={className} onClick={onNavigate}>
+                <Icon className="h-4 w-4 opacity-90" />
+                <span>{t.nav[item.key]}</span>
+              </Link>
+            ) : (
+              <span className={className}>
+                <Icon className="h-4 w-4 opacity-40" />
+                <span>{t.nav[item.key]}</span>
+              </span>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function LocaleThemeControls({ dense = false }: { dense?: boolean }) {
+  const { t, locale, setLocale } = useLocale();
+  const { theme, toggleTheme } = useTheme();
+
+  return (
+    <div className={cn('flex gap-2', dense && 'items-center')}>
+      <select
+        aria-label={t.locale.label}
+        className={cn(
+          'dockora-field dockora-select font-mono text-xs',
+          dense ? 'px-2 py-1' : 'flex-1 px-3 py-1.5',
+        )}
+        value={locale}
+        onChange={(e) => setLocale(e.target.value as Locale)}
+      >
+        <option value="de">DE</option>
+        <option value="en">EN</option>
+      </select>
+      <button
+        type="button"
+        onClick={toggleTheme}
+        className={cn(
+          'dockora-field font-mono text-xs uppercase tracking-wider transition-shadow hover:border-dockora-pink hover:shadow-neon-pink',
+          dense ? 'px-2 py-1' : 'px-3 py-1.5',
+        )}
+        aria-label={t.theme.toggle}
+      >
+        {theme === 'dark' ? t.theme.light : t.theme.dark}
+      </button>
+    </div>
+  );
+}
+
+export function AppShell({ children }: { children: React.ReactNode }) {
+  const { t } = useLocale();
+  const pathname = usePathname();
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  useEffect(() => {
+    setDrawerOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setDrawerOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = '';
+    };
+  }, [drawerOpen]);
+
+  return (
+    <div className="relative flex min-h-screen overflow-hidden">
+      <div className="pointer-events-none fixed inset-0 z-0">
+        <NeonParticles />
+        <NeonAtmosphere />
+      </div>
+
+      <aside className="relative z-10 sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-dockora-railBorder bg-dockora-rail/90 text-dockora-railText backdrop-blur-xl md:flex">
         <Link
           href="/"
           className="group flex flex-col gap-3 border-b border-dockora-railBorder px-5 py-6 transition-opacity hover:opacity-95"
@@ -38,7 +138,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             Dk
           </span>
           <span>
-            <span className="block font-display text-2xl font-extrabold tracking-tight">
+            <span className="dockora-logo-gradient block text-2xl uppercase tracking-[0.12em]">
               {t.appName}
             </span>
             <span className="mt-1 block font-mono text-[10px] uppercase tracking-[0.18em] text-dockora-railMuted">
@@ -48,119 +148,106 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </Link>
 
         <nav className="flex-1 overflow-y-auto px-2 py-4">
-          <ul className="space-y-0.5">
-            {NAV_ITEMS.map((item, index) => {
-              const active = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
-              const Icon = NAV_ICONS[item.key];
-              const className = cn(
-                'flex items-center gap-2.5 rounded-md px-3 py-2.5 text-sm font-medium transition-colors animate-in slide-in',
-                active
-                  ? 'dockora-nav-active'
-                  : 'text-dockora-railMuted hover:bg-white/5 hover:text-dockora-railText',
-              );
-
-              return (
-                <li key={item.key} style={{ animationDelay: `${index * 20}ms` }}>
-                  {item.ready ? (
-                    <Link href={item.href} className={className}>
-                      <Icon className="h-4 w-4 opacity-90" />
-                      <span>{t.nav[item.key]}</span>
-                    </Link>
-                  ) : (
-                    <span className={className}>
-                      <Icon className="h-4 w-4 opacity-40" />
-                      <span>{t.nav[item.key]}</span>
-                    </span>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
+          <NavList />
         </nav>
 
         <div className="space-y-2 border-t border-dockora-railBorder px-3 py-4">
-          <div className="flex gap-2">
-            <select
-              aria-label={t.locale.label}
-              className="flex-1 rounded-md border border-dockora-railBorder bg-white/5 px-2 py-1.5 font-mono text-xs text-dockora-railText outline-none focus:border-dockora-accent"
-              value={locale}
-              onChange={(e) => setLocale(e.target.value as Locale)}
-            >
-              <option value="de">DE</option>
-              <option value="en">EN</option>
-            </select>
-            <button
-              type="button"
-              onClick={toggleTheme}
-              className="rounded-md border border-dockora-railBorder bg-white/5 px-3 py-1.5 font-mono text-xs uppercase tracking-wider text-dockora-railText hover:border-dockora-accent"
-              aria-label={t.theme.toggle}
-            >
-              {theme === 'dark' ? t.theme.light : t.theme.dark}
-            </button>
-          </div>
+          <LocaleThemeControls />
           <AuthLogoutButton />
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-40 flex items-center justify-between gap-3 border-b border-dockora-border bg-dockora-bg/90 px-4 py-3 backdrop-blur-md md:hidden">
-          <Link href="/" className="flex items-center gap-2.5">
-            <span className="dockora-brand-mark flex h-9 w-9 items-center justify-center text-sm">
-              Dk
-            </span>
-            <span className="font-display text-xl font-extrabold tracking-tight">{t.appName}</span>
-          </Link>
+      <div className="relative z-10 flex min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-40 flex items-center justify-between gap-3 border-b border-dockora-border bg-dockora-bg/80 px-4 py-3 backdrop-blur-xl md:hidden">
           <div className="flex items-center gap-2">
-            <select
-              aria-label={t.locale.label}
-              className="rounded-md border border-dockora-border bg-dockora-surface px-2 py-1 font-mono text-xs"
-              value={locale}
-              onChange={(e) => setLocale(e.target.value as Locale)}
-            >
-              <option value="de">DE</option>
-              <option value="en">EN</option>
-            </select>
             <button
               type="button"
-              onClick={toggleTheme}
-              className="rounded-md border border-dockora-border bg-dockora-surface px-2 py-1 font-mono text-xs"
+              className="dockora-field flex h-9 w-9 items-center justify-center"
+              aria-label={t.common.menu}
+              aria-expanded={drawerOpen}
+              onClick={() => setDrawerOpen(true)}
             >
-              {theme === 'dark' ? t.theme.light : t.theme.dark}
+              <span className="sr-only">{t.common.menu}</span>
+              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M4 7h16M4 12h16M4 17h16" />
+              </svg>
             </button>
+            <Link href="/" className="flex items-center gap-2.5">
+              <span className="dockora-brand-mark flex h-9 w-9 items-center justify-center text-sm">
+                Dk
+              </span>
+              <span className="dockora-logo-gradient text-xl uppercase tracking-[0.1em]">
+                {t.appName}
+              </span>
+            </Link>
           </div>
+          <LocaleThemeControls dense />
         </header>
 
-        <nav className="flex gap-1 overflow-x-auto border-b border-dockora-border bg-dockora-surface/70 px-2 py-2 md:hidden">
-          {NAV_ITEMS.map((item) => {
-            const active = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
-            const Icon = NAV_ICONS[item.key];
-            return item.ready ? (
-              <Link
-                key={item.key}
-                href={item.href}
-                className={cn(
-                  'inline-flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold',
-                  active
-                    ? 'bg-dockora-accentSoft text-dockora-accent'
-                    : 'text-dockora-muted hover:bg-dockora-surface2 hover:text-dockora-text',
-                )}
-              >
-                <Icon className="h-3.5 w-3.5" />
-                <span>{t.nav[item.key]}</span>
-              </Link>
-            ) : (
-              <span
-                key={item.key}
-                className="inline-flex shrink-0 items-center gap-1.5 px-2.5 py-1.5 text-xs text-dockora-muted"
-              >
-                <Icon className="h-3.5 w-3.5 opacity-50" />
-                <span>{t.nav[item.key]}</span>
-              </span>
-            );
-          })}
+        <nav className="flex items-center gap-2 border-b border-dockora-border bg-dockora-surface/60 px-3 py-2 backdrop-blur-md md:hidden">
+          <button
+            type="button"
+            onClick={() => setDrawerOpen(true)}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wide text-dockora-muted hover:bg-dockora-surface2 hover:text-dockora-text"
+          >
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M4 7h16M4 12h16M4 17h16" />
+            </svg>
+            {t.common.menu}
+          </button>
+          <span className="truncate font-mono text-[10px] uppercase tracking-wider text-dockora-muted">
+            {NAV_ITEMS.find((item) =>
+              item.href === '/' ? pathname === '/' : pathname.startsWith(item.href),
+            )
+              ? t.nav[
+                  NAV_ITEMS.find((item) =>
+                    item.href === '/' ? pathname === '/' : pathname.startsWith(item.href),
+                  )!.key
+                ]
+              : t.appName}
+          </span>
         </nav>
 
-        <main className="mx-auto w-full max-w-shell flex-1 px-4 py-8 sm:px-6 sm:py-10">{children}</main>
+        {drawerOpen ? (
+          <div className="fixed inset-0 z-50 md:hidden" role="presentation">
+            <button
+              type="button"
+              className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+              aria-label={t.common.close}
+              onClick={() => setDrawerOpen(false)}
+            />
+            <aside
+              className="absolute inset-y-0 left-0 flex w-[min(18rem,88vw)] flex-col border-r border-dockora-railBorder bg-dockora-rail text-dockora-railText shadow-neon animate-in slide-in-from-left duration-200"
+              role="dialog"
+              aria-modal="true"
+              aria-label={t.common.menu}
+            >
+              <div className="flex items-center justify-between border-b border-dockora-railBorder px-4 py-4">
+                <span className="dockora-logo-gradient text-lg uppercase tracking-[0.12em]">
+                  {t.appName}
+                </span>
+                <button
+                  type="button"
+                  className="dockora-field px-2 py-1 font-mono text-xs uppercase"
+                  onClick={() => setDrawerOpen(false)}
+                >
+                  {t.common.close}
+                </button>
+              </div>
+              <nav className="flex-1 overflow-y-auto px-2 py-3">
+                <NavList compact onNavigate={() => setDrawerOpen(false)} />
+              </nav>
+              <div className="space-y-2 border-t border-dockora-railBorder px-3 py-4">
+                <LocaleThemeControls />
+                <AuthLogoutButton />
+              </div>
+            </aside>
+          </div>
+        ) : null}
+
+        <main className="mx-auto w-full max-w-shell flex-1 px-4 py-8 sm:px-6 sm:py-10 xl:px-8">
+          {children}
+        </main>
       </div>
     </div>
   );

@@ -1,6 +1,10 @@
 import type { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { API_PREFIX, type UpdateCheckResult } from '@dockora/shared';
 import { ComposeService } from '../compose/compose.service.js';
+import {
+  PrismaSettingsRepository,
+  SettingsService,
+} from '../settings/settings.service.js';
 import { UpdatesService } from './updates.service.js';
 
 export const updatesModule: FastifyPluginAsync = async (app: FastifyInstance) => {
@@ -9,7 +13,15 @@ export const updatesModule: FastifyPluginAsync = async (app: FastifyInstance) =>
     searchPaths: app.config.composeSearchPaths,
     excludePaths: app.config.composeExcludePaths,
   });
-  const service = new UpdatesService({ docker: app.docker, compose });
+  const settings = new SettingsService(new PrismaSettingsRepository());
+  const service = new UpdatesService({
+    docker: app.docker,
+    compose,
+    getRegistryAuth: async () => {
+      const s = await settings.getSettings();
+      return { ghcrToken: s.ghcrToken, lscrToken: s.lscrToken };
+    },
+  });
 
   app.decorate('updatesService', service);
 

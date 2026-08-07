@@ -7,6 +7,7 @@ import type { AuthUser } from '@dockora/shared';
 import { useLocale } from '@/i18n/locale-provider';
 import { Button, Input } from '@/components/ui/form-controls';
 import { ErrorBanner } from '@/components/ui/page-parts';
+import { NeonAtmosphere, NeonParticles } from '@/components/ui/neon-particles';
 
 type AuthContextValue = {
   authEnabled: boolean;
@@ -40,30 +41,40 @@ function LoginForm({ onSuccess }: { onSuccess: () => void }) {
   };
 
   return (
-    <div className="mx-auto flex min-h-[60vh] max-w-md flex-col justify-center space-y-6">
-      <div className="space-y-2 text-center">
-        <h1 className="text-2xl font-semibold">{t.auth.title}</h1>
-        <p className="text-sm text-dockora-muted">{t.auth.subtitle}</p>
+    <div className="relative min-h-screen overflow-hidden">
+      <div className="pointer-events-none absolute inset-0 z-0">
+        <NeonParticles />
+        <NeonAtmosphere />
       </div>
-      <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
-        <div>
-          <label className="mb-1 block text-sm text-dockora-muted">{t.auth.email}</label>
-          <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+      <div className="relative z-10 mx-auto flex min-h-screen max-w-md flex-col justify-center space-y-6 px-4">
+        <div className="space-y-2 text-center">
+          <p className="dockora-logo-gradient text-3xl uppercase tracking-[0.14em]">Dockora</p>
+          <h1 className="dockora-title-gradient text-2xl">{t.auth.title}</h1>
+          <p className="text-sm text-dockora-muted">{t.auth.subtitle}</p>
         </div>
-        <div>
-          <label className="mb-1 block text-sm text-dockora-muted">{t.auth.password}</label>
-          <Input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-        </div>
-        {error ? <ErrorBanner message={error} /> : null}
-        <Button type="submit" variant="primary" className="w-full" disabled={submitting}>
-          {t.auth.login}
-        </Button>
-      </form>
+        <form
+          onSubmit={(e) => void handleSubmit(e)}
+          className="dockora-panel space-y-4 p-6 shadow-neon"
+        >
+          <div>
+            <label className="mb-1 block text-sm text-dockora-muted">{t.auth.email}</label>
+            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm text-dockora-muted">{t.auth.password}</label>
+            <Input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
+          {error ? <ErrorBanner message={error} /> : null}
+          <Button type="submit" variant="primary" className="w-full" disabled={submitting}>
+            {t.auth.login}
+          </Button>
+        </form>
+      </div>
     </div>
   );
 }

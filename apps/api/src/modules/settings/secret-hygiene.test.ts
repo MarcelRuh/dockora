@@ -25,8 +25,12 @@ describe('secret-hygiene', () => {
     const out = redactSettingsForBackup({
       locale: 'de',
       discordWebhookUrl: 'https://discord.com/api/webhooks/1/secret',
+      ghcrToken: 'ghp_secret',
+      lscrToken: 'lscr_secret',
     });
     expect(out.discordWebhookUrl).toBe('');
+    expect(out.ghcrToken).toBe('');
+    expect(out.lscrToken).toBe('');
     expect(out.locale).toBe('de');
   });
 
@@ -34,8 +38,12 @@ describe('secret-hygiene', () => {
     const out = stripSecretsFromRestoredSettings({
       locale: 'en',
       discordWebhookUrl: 'https://discord.com/api/webhooks/1/secret',
+      ghcrToken: 'ghp_secret',
+      lscrToken: 'lscr_secret',
     });
     expect(out.discordWebhookUrl).toBeUndefined();
+    expect(out.ghcrToken).toBeUndefined();
+    expect(out.lscrToken).toBeUndefined();
     expect(out.locale).toBe('en');
   });
 });

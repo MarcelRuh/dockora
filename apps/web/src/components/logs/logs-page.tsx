@@ -5,7 +5,7 @@ import type { LogEntry, LogLevel } from '@dockora/shared';
 import { fetchLogs } from '@/lib/api';
 import { useLocale } from '@/i18n/locale-provider';
 import { logLevelTone } from '@/lib/status';
-import { Button, Input, Select } from '@/components/ui/form-controls';
+import { Button, Input, Select, FilterBar } from '@/components/ui/form-controls';
 import {
   DataTable,
   EmptyState,
@@ -60,14 +60,18 @@ export function LogsPageView() {
     <div className="space-y-6 animate-in fade-in duration-500">
       <PageHeader title={t.logs.title} subtitle={t.logs.subtitle} />
 
-      <div className="flex flex-wrap gap-3">
+      <FilterBar>
         <Input
           placeholder={t.logs.container}
           value={container}
           onChange={(e) => setContainer(e.target.value)}
           className="max-w-xs"
         />
-        <Select value={level} onChange={(e) => setLevel(e.target.value as LogLevel | '')}>
+        <Select
+          value={level}
+          onChange={(e) => setLevel(e.target.value as LogLevel | '')}
+          aria-label={t.logs.level}
+        >
           <option value="">{t.common.all}</option>
           <option value="debug">debug</option>
           <option value="info">info</option>
@@ -84,7 +88,7 @@ export function LogsPageView() {
           {t.common.filter}
         </Button>
         <Button onClick={() => void load()}>{t.common.refresh}</Button>
-      </div>
+      </FilterBar>
 
       {error ? <ErrorBanner message={error} /> : null}
       {loading ? <LoadingState message={t.common.loading} /> : null}

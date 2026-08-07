@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { fetchAuditLogs } from '@/lib/api';
 import { useLocale } from '@/i18n/locale-provider';
 import { formatRelativeTime } from '@/lib/format';
-import { Button, Input } from '@/components/ui/form-controls';
+import { Button, Input, FilterBar } from '@/components/ui/form-controls';
 import { ErrorBanner, Section } from '@/components/ui/page-parts';
 
 type AuditRow = Awaited<ReturnType<typeof fetchAuditLogs>>[number];
@@ -42,21 +42,35 @@ export function AuditSection() {
 
   return (
     <Section title={t.settings.sections.audit}>
-      <div className="mb-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+      <FilterBar className="mb-3">
         <Input
           placeholder={t.settings.audit.filterAction}
           value={action}
           onChange={(e) => setAction(e.target.value)}
+          className="min-w-[10rem] flex-1"
         />
         <Input
           placeholder={t.settings.audit.filterResource}
           value={resource}
           onChange={(e) => setResource(e.target.value)}
+          className="min-w-[10rem] flex-1"
         />
-        <Input type="datetime-local" value={since} onChange={(e) => setSince(e.target.value)} />
-        <Input type="datetime-local" value={until} onChange={(e) => setUntil(e.target.value)} />
-        <Button onClick={() => void load()}>{t.common.refresh}</Button>
-      </div>
+        <Input
+          type="datetime-local"
+          value={since}
+          onChange={(e) => setSince(e.target.value)}
+          className="min-w-[11rem]"
+        />
+        <Input
+          type="datetime-local"
+          value={until}
+          onChange={(e) => setUntil(e.target.value)}
+          className="min-w-[11rem]"
+        />
+        <Button variant="primary" onClick={() => void load()}>
+          {t.common.refresh}
+        </Button>
+      </FilterBar>
       {error ? <ErrorBanner message={error} /> : null}
       <ul className="divide-y divide-dockora-border rounded-md border border-dockora-border">
         {rows.map((row) => (

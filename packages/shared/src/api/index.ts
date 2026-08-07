@@ -158,6 +158,21 @@ export interface UpdateCheckResult {
   error?: string;
 }
 
+export interface ComposeImageChange {
+  service: string;
+  currentImage: string | null;
+  desiredImage: string | null;
+}
+
+export interface ComposeChangePreview {
+  projectId: string;
+  projectName: string;
+  servicesAdded: string[];
+  servicesRemoved: string[];
+  imageChanges: ComposeImageChange[];
+  envChangedServices: string[];
+}
+
 export interface BackupInfo {
   id: string;
   name: string;
@@ -189,6 +204,10 @@ export interface AppSettings {
   timezone: string;
   updateCheckIntervalMinutes: number;
   autoUpdateImages: boolean;
+  /** GitHub Container Registry PAT (ghcr.io) */
+  ghcrToken: string;
+  /** LinuxServer / lscr.io Token (optional; falls leer wird ghcrToken genutzt) */
+  lscrToken: string;
   backupRetentionDays: number;
   backupFormat: BackupFormat;
   backupSchedule: SchedulePreset | 'off';

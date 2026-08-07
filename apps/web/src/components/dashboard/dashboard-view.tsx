@@ -20,23 +20,26 @@ export function DashboardView({
 
   return (
     <div className="space-y-8 animate-in fade-in">
-      <header className="flex flex-col gap-4 border-b border-dockora-border pb-5 sm:flex-row sm:items-end sm:justify-between">
-        <div className="space-y-2">
-          <p className="font-mono text-[11px] font-medium uppercase tracking-[0.2em] text-dockora-accent">
-            Dockora · {t.dashboard.live.live}
-          </p>
-          <h1 className="font-display text-4xl font-extrabold tracking-tight sm:text-5xl">
-            {t.dashboard.title}
-          </h1>
-          <p className="max-w-xl text-sm text-dockora-muted sm:text-base">{t.dashboard.subtitle}</p>
+      <header className="space-y-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className="space-y-2">
+            <p className="dockora-section-tag">
+              Dockora · {t.dashboard.live.live}
+            </p>
+            <h1 className="dockora-title-gradient text-4xl tracking-tight sm:text-5xl">
+              {t.dashboard.title}
+            </h1>
+            <p className="max-w-xl text-sm text-dockora-muted sm:text-base">{t.dashboard.subtitle}</p>
+          </div>
+          <LiveBadge
+            state={state}
+            lastUpdated={lastUpdated}
+            labels={t.dashboard.live}
+            locale={loc}
+            onRefresh={() => void refresh()}
+          />
         </div>
-        <LiveBadge
-          state={state}
-          lastUpdated={lastUpdated}
-          labels={t.dashboard.live}
-          locale={loc}
-          onRefresh={() => void refresh()}
-        />
+        <div className="dockora-neon-line" />
       </header>
 
       {state === 'error' && !data ? (
@@ -131,22 +134,15 @@ function LiveResources({
   return (
     <section className="space-y-4">
       <div className="flex items-baseline justify-between gap-3">
-        <h2 className="font-display text-lg font-bold tracking-tight">{labels.resources.title}</h2>
-        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-dockora-accent">
-          {labels.resources.realtime}
-        </p>
+        <h2 className="dockora-title-gradient text-lg tracking-tight">{labels.resources.title}</h2>
+        <p className="dockora-section-tag !mb-0">{labels.resources.realtime}</p>
       </div>
       <div className="grid gap-3 sm:grid-cols-3">
         {rows.map((row) => (
-          <div
-            key={row.key}
-            className="space-y-3 border border-dockora-border bg-dockora-surface p-4"
-          >
+          <div key={row.key} className="dockora-panel space-y-3 p-4">
             <div className="flex items-baseline justify-between gap-2">
               <p className="text-sm font-medium text-dockora-muted">{row.label}</p>
-              <p className="font-mono text-2xl font-bold tabular-nums text-dockora-accent">
-                {row.primary}
-              </p>
+              <p className="dockora-stat-gradient font-mono text-2xl tabular-nums">{row.primary}</p>
             </div>
             <ProgressBar value={row.ratio} />
             {row.secondary ? (
@@ -175,15 +171,15 @@ function LiveBadge({
   const isLive = state === 'ready' || state === 'loading';
 
   return (
-    <div className="flex items-center gap-3 self-start border border-dockora-border bg-dockora-surface px-3 py-2 sm:self-auto">
+    <div className="dockora-panel flex items-center gap-3 self-start px-3 py-2 sm:self-auto">
       <div className="flex items-center gap-2 text-xs">
         <span
           className={cn(
-            'h-2 w-2 rounded-sm',
-            isLive ? 'dockora-pulse bg-dockora-accent' : 'bg-dockora-danger',
+            'h-2 w-2 rounded-full',
+            isLive ? 'dockora-pulse bg-dockora-pink shadow-neon-pink' : 'bg-dockora-danger',
           )}
         />
-        <span className="font-semibold">
+        <span className="font-semibold uppercase tracking-wide">
           {state === 'loading' && !lastUpdated ? labels.updating : labels.live}
         </span>
         {lastUpdated ? (
@@ -248,11 +244,10 @@ function EngineStrip({
           className: 'font-mono',
         },
       ].map((item) => (
-        <div
-          key={item.label}
-          className="border border-dockora-border bg-dockora-surface px-4 py-4"
-        >
-          <p className="text-xs font-medium text-dockora-muted">{item.label}</p>
+        <div key={item.label} className="dockora-panel px-4 py-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-dockora-muted">
+            {item.label}
+          </p>
           <p className={cn('mt-1 text-lg font-semibold', item.className)}>{item.value}</p>
         </div>
       ))}
@@ -276,8 +271,8 @@ function AsideColumn({
 }) {
   return (
     <div className="grid gap-3 lg:grid-cols-2">
-      <section className="border border-dockora-border bg-dockora-surface px-4 py-4">
-        <h2 className="font-display text-base font-bold">{labels.updates.title}</h2>
+      <section className="dockora-panel px-4 py-4">
+        <h2 className="dockora-title-gradient text-base">{labels.updates.title}</h2>
         <p
           className={cn(
             'mt-2 text-sm',
@@ -290,14 +285,17 @@ function AsideColumn({
         </p>
       </section>
 
-      <section className="border border-dockora-border bg-dockora-surface px-4 py-4">
-        <h2 className="font-display text-base font-bold">{labels.notifications.title}</h2>
+      <section className="dockora-panel px-4 py-4">
+        <h2 className="dockora-title-gradient text-base">{labels.notifications.title}</h2>
         {notifications.length === 0 ? (
           <p className="mt-2 text-sm text-dockora-muted">{labels.notifications.empty}</p>
         ) : (
           <ul className="mt-3 space-y-2">
             {notifications.map((n) => (
-              <li key={n.id} className="border border-dockora-border bg-dockora-surface2/40 px-3 py-2">
+              <li
+                key={n.id}
+                className="border border-dockora-border bg-dockora-surface2/40 px-3 py-2"
+              >
                 <p className="text-sm font-medium">{n.title}</p>
                 <p className="text-xs text-dockora-muted">{n.message}</p>
                 <time className="font-mono text-[11px] text-dockora-muted">

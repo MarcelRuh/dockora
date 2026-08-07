@@ -11,6 +11,7 @@ import {
 import { useLocale } from '@/i18n/locale-provider';
 import { useAuth } from '@/components/auth/auth-provider';
 import { Button, Input, Select } from '@/components/ui/form-controls';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ErrorBanner, Section, SuccessBanner } from '@/components/ui/page-parts';
 
 export function UsersSection() {
@@ -24,6 +25,7 @@ export function UsersSection() {
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [role, setRole] = useState<UserRole>('viewer');
+  const [pendingDelete, setPendingDelete] = useState<AuthUser | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -74,7 +76,6 @@ export function UsersSection() {
   };
 
   const handleDelete = async (u: AuthUser) => {
-    if (!window.confirm(t.settings.users.deleteConfirm.replace('{email}', u.email))) return;
     setBusy(true);
     setError(null);
     setSuccess(null);
@@ -115,7 +116,7 @@ export function UsersSection() {
               <Button
                 variant="danger"
                 disabled={busy || me?.id === u.id}
-                onClick={() => void handleDelete(u)}
+                onClick={() => setPendingDelete(u)}
               >
                 {t.common.delete}
               </Button>
@@ -127,7 +128,10 @@ export function UsersSection() {
         ) : null}
       </ul>
 
-      <form onSubmit={(e) => void handleCreate(e)} className="grid gap-3 sm:grid-cols-2">
+      <form
+        onSubmit={(e) => void handleCreate(e)}
+        className="dockora-field-group grid gap-3 sm:grid-cols-2"
+      >
         <Input
           type="email"
           placeholder={t.settings.users.email}
@@ -148,7 +152,7 @@ export function UsersSection() {
           value={displayName}
           onChange={(e) => setDisplayName(e.target.value)}
         />
-        <Select value={role} onChange={(e) => setRole(e.target.value as UserRole)}>
+        <Select value={role} onChange={(e) => setRole(e.target.value as UserRole)} className="w-full">
           <option value="admin">admin</option>
           <option value="operator">operator</option>
           <option value="viewer">viewer</option>
@@ -157,6 +161,27 @@ export function UsersSection() {
           {t.settings.users.create}
         </Button>
       </form>
+
+      <ConfirmDialog
+        open={Boolean(pendingDelete)}
+        title={t.common.delete}
+        description={
+          pendingDelete
+            ? t.settings.users.deleteConfirm.replace('{email}', pendingDelete.email)
+            : undefined
+        }
+        consequences={[...t.settings.users.deleteConsequences]}
+        confirmLabel={t.common.confirm}
+        cancelLabel={t.common.cancel}
+        danger
+        busy={busy}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => {
+          const u = pendingDelete;
+          setPendingDelete(null);
+          if (u) void handleDelete(u);
+        }}
+      />
     </Section>
   );
 }

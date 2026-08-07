@@ -7,7 +7,8 @@ import { useLocale } from '@/i18n/locale-provider';
 import { useAuth } from '@/components/auth/auth-provider';
 import { canAdmin, canOperate } from '@/lib/roles';
 import { formatBytes, formatRelativeTime } from '@/lib/format';
-import { Button, Input } from '@/components/ui/form-controls';
+import { Button, Input, FilterBar } from '@/components/ui/form-controls';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   DataTable,
   EmptyState,
@@ -17,6 +18,10 @@ import {
   StatusBadge,
   SuccessBanner,
 } from '@/components/ui/page-parts';
+
+type ConfirmState =
+  | { kind: 'pruneAll' }
+  | { kind: 'remove'; id: string };
 
 export function ImagesPage() {
   const { t, locale } = useLocale();
@@ -30,6 +35,7 @@ export function ImagesPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [confirm, setConfirm] = useState<ConfirmState | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -65,8 +71,7 @@ export function ImagesPage() {
     }
   };
 
-  const handlePrune = async (danglingOnly: boolean) => {
-    if (!danglingOnly && !window.confirm(t.images.pruneAllConfirm)) return;
+  const runPrune = async (danglingOnly: boolean) => {
     setBusy(true);
     setError(null);
     setSuccess(null);
@@ -89,8 +94,15 @@ export function ImagesPage() {
     }
   };
 
-  const handleRemove = async (id: string) => {
-    if (!window.confirm(t.images.removeConfirm)) return;
+  const handlePrune = (danglingOnly: boolean) => {
+    if (!danglingOnly) {
+      setConfirm({ kind: 'pruneAll' });
+      return;
+    }
+    void runPrune(true);
+  };
+
+  const runRemove = async (id: string) => {
     setBusy(true);
     try {
       await removeImage(id);
@@ -118,58 +130,102 @@ export function ImagesPage() {
       {img.usedBy.join(', ') || '—'}
     </span>,
     isAdmin ? (
-      <Button key={`r-${img.id}`} variant="danger" disabled={busy} onClick={() => void handleRemove(img.id)}>
+      <Button
+        key={`a-${img.id}`}
+        size="sm"
+        variant="danger"
+        disabled={busy}
+        onClick={() => setConfirm({ kind: 'remove', id: img.id })}
+      >
         {t.images.remove}
       </Button>
-    ) : (
-      '—'
-    ),
+    ) : null,
   ]);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <PageHeader title={t.images.title} subtitle={t.images.subtitle} />
+      <PageHeader
+        title={t.images.title}
+        subtitle={t.images.subtitle}
+        actions={<Button onClick={() => void load()}>{t.common.refresh}</Button>}
+      />
 
-      <form onSubmit={(e) => void handlePull(e)} className="flex flex-wrap gap-2">
-        {canOps ? (
-          <>
+      {canOps ? (
+        <form onSubmit={(e) => void handlePull(e)}>
+          <FilterBar>
             <Input
-              placeholder={t.images.pullPlaceholder}
               value={pullRef}
               onChange={(e) => setPullRef(e.target.value)}
+              placeholder={t.images.pullPlaceholder}
               className="max-w-md"
+              disabled={busy}
             />
-            <Button type="submit" variant="primary" disabled={busy}>
+            <Button type="submit" variant="primary" disabled={busy || !pullRef.trim()}>
               {t.images.pull}
             </Button>
-          </>
-        ) : null}
-        {isAdmin ? (
-          <>
-            <Button type="button" disabled={busy} onClick={() => void handlePrune(true)}>
-              {t.images.prune}
-            </Button>
-            <Button type="button" disabled={busy} onClick={() => void handlePrune(false)}>
-              {t.images.pruneAll}
-            </Button>
-          </>
-        ) : null}
-        <Button type="button" onClick={() => void load()}>
-          {t.common.refresh}
-        </Button>
-      </form>
+            {isAdmin ? (
+              <>
+                <Button type="button" disabled={busy} onClick={() => handlePrune(true)}>
+                  {t.images.prune}
+                </Button>
+                <Button
+                  type="button"
+                  variant="danger"
+                  disabled={busy}
+                  onClick={() => handlePrune(false)}
+                >
+                  {t.images.pruneAll}
+                </Button>
+              </>
+            ) : null}
+          </FilterBar>
+        </form>
+      ) : null}
 
       {error ? <ErrorBanner message={error} /> : null}
       {success ? <SuccessBanner message={success} /> : null}
       {loading ? <LoadingState message={t.common.loading} /> : null}
-
       {!loading ? (
         <DataTable
-          headers={[t.common.name, t.images.tags, t.images.dangling, t.common.size, t.common.created, t.images.usedBy, t.common.actions]}
+          stickyLast
+          headers={[
+            'ID',
+            t.images.tags,
+            t.images.dangling,
+            t.common.size,
+            t.common.created,
+            t.images.usedBy,
+            t.common.actions,
+          ]}
           rows={rows}
           empty={<EmptyState message={t.images.empty} />}
         />
       ) : null}
+
+      <ConfirmDialog
+        open={Boolean(confirm)}
+        title={confirm?.kind === 'pruneAll' ? t.images.pruneAll : t.images.remove}
+        description={
+          confirm?.kind === 'pruneAll' ? t.images.pruneAllConfirm : t.images.removeConfirm
+        }
+        consequences={
+          confirm?.kind === 'pruneAll'
+            ? [...t.images.pruneAllConsequences]
+            : [...t.images.removeConsequences]
+        }
+        confirmLabel={t.common.confirm}
+        cancelLabel={t.common.cancel}
+        danger
+        busy={busy}
+        onCancel={() => setConfirm(null)}
+        onConfirm={() => {
+          const c = confirm;
+          setConfirm(null);
+          if (!c) return;
+          if (c.kind === 'pruneAll') void runPrune(false);
+          else void runRemove(c.id);
+        }}
+      />
     </div>
   );
 }

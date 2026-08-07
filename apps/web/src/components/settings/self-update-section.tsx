@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { applySelfUpdate, fetchSelfUpdateStatus } from '@/lib/api';
 import { useLocale } from '@/i18n/locale-provider';
 import { Button } from '@/components/ui/form-controls';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ErrorBanner, Section, SuccessBanner } from '@/components/ui/page-parts';
 
 type SelfStatus = Awaited<ReturnType<typeof fetchSelfUpdateStatus>>;
@@ -33,6 +34,7 @@ export function SelfUpdateSection() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -55,7 +57,6 @@ export function SelfUpdateSection() {
   }, [status?.updating, busy, load]);
 
   const handleApply = async () => {
-    if (!window.confirm(t.settings.selfUpdate.confirm)) return;
     setBusy(true);
     setError(null);
     setSuccess(null);
@@ -148,7 +149,7 @@ export function SelfUpdateSection() {
             <Button
               variant="primary"
               disabled={busy || !status.enabled || (!status.updateAvailable && !status.updating)}
-              onClick={() => void handleApply()}
+              onClick={() => setConfirmOpen(true)}
             >
               {busy || status.updating
                 ? t.settings.selfUpdate.applying
@@ -157,6 +158,22 @@ export function SelfUpdateSection() {
           </div>
         </div>
       ) : null}
+
+      <ConfirmDialog
+        open={confirmOpen}
+        title={t.settings.selfUpdate.apply}
+        description={t.settings.selfUpdate.confirm}
+        consequences={[...t.settings.selfUpdate.consequences]}
+        confirmLabel={t.common.confirm}
+        cancelLabel={t.common.cancel}
+        danger
+        busy={busy}
+        onCancel={() => setConfirmOpen(false)}
+        onConfirm={() => {
+          setConfirmOpen(false);
+          void handleApply();
+        }}
+      />
     </Section>
   );
 }

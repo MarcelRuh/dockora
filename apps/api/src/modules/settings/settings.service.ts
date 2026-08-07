@@ -18,6 +18,8 @@ const DEFAULTS: AppSettings = {
   timezone: 'Europe/Berlin',
   updateCheckIntervalMinutes: 60,
   autoUpdateImages: false,
+  ghcrToken: '',
+  lscrToken: '',
   backupRetentionDays: 14,
   backupFormat: 'tar.gz',
   backupSchedule: 'daily',
@@ -81,6 +83,8 @@ export class SettingsService {
       autoUpdateImages: stored.autoUpdateImages
         ? stored.autoUpdateImages === 'true'
         : base.autoUpdateImages,
+      ghcrToken: stored.ghcrToken ?? base.ghcrToken,
+      lscrToken: stored.lscrToken ?? base.lscrToken,
       backupRetentionDays: num(stored.backupRetentionDays, base.backupRetentionDays),
       backupFormat: (stored.backupFormat as BackupFormat) ?? base.backupFormat,
       backupSchedule: (stored.backupSchedule as AppSettings['backupSchedule']) ?? base.backupSchedule,

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ContainerFilter, ContainerSummary } from '@dockora/shared';
 import { containerAction, fetchContainers } from '@/lib/api';
 import { useLocale } from '@/i18n/locale-provider';
@@ -11,7 +11,8 @@ import { containerStatusTone } from '@/lib/status';
 import { formatBytes, formatPercent, formatRelativeTime } from '@/lib/format';
 import { publishedPortHref, uniquePublishedPorts } from '@/lib/published-ports';
 import { resolveContainerIconUrl } from '@/lib/container-icon';
-import { Button, Input, Select } from '@/components/ui/form-controls';
+import { Button, Input, Select, FilterBar, buttonClassName } from '@/components/ui/form-controls';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ProgressBar } from '@/components/ui/progress-bar';
 import { ServiceIcon } from '@/components/ui/service-icon';
 import {
@@ -54,6 +55,12 @@ export function ContainersPage() {
   const [filter, setFilter] = useState<ContainerFilter>({ status: 'all' });
   const [busy, setBusy] = useState<string | null>(null);
   const [pageHost, setPageHost] = useState('localhost');
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkProgress, setBulkProgress] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<null | {
+    action: 'stop' | 'restart' | 'remove';
+    ids: string[];
+  }>(null);
 
   useEffect(() => {
     setPageHost(window.location.hostname);
@@ -114,10 +121,13 @@ export function ContainersPage() {
     return () => window.clearInterval(id);
   }, [load]);
   const runAction = async (id: string, action: 'start' | 'stop' | 'restart' | 'remove') => {
-    if (action === 'remove' && !window.confirm(t.containers.removeConfirm)) return;
+    if (action === 'remove') {
+      setConfirm({ action: 'remove', ids: [id] });
+      return;
+    }
     setBusy(id);
     try {
-      await containerAction(id, action, action === 'remove' ? { force: true } : undefined);
+      await containerAction(id, action);
       await load({ silent: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : t.common.failed);
@@ -126,17 +136,63 @@ export function ContainersPage() {
     }
   };
 
+  const runBulk = async (action: 'stop' | 'restart' | 'remove', ids: string[]) => {
+    setConfirm(null);
+    setError(null);
+    for (let i = 0; i < ids.length; i++) {
+      const id = ids[i]!;
+      setBusy(id);
+      setBulkProgress(
+        t.common.bulkProgress.replace('{done}', String(i + 1)).replace('{total}', String(ids.length)),
+      );
+      try {
+        await containerAction(id, action, action === 'remove' ? { force: true } : undefined);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : t.common.failed);
+        break;
+      }
+    }
+    setBusy(null);
+    setBulkProgress(null);
+    setSelected(new Set());
+    await load({ silent: true });
+  };
+
+  const allSelected = items.length > 0 && items.every((c) => selected.has(c.id));
+  const toggleAll = () => {
+    if (allSelected) setSelected(new Set());
+    else setSelected(new Set(items.map((c) => c.id)));
+  };
+  const toggleOne = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const selectedIds = useMemo(() => [...selected], [selected]);
+
   const rows = items.map((c) => [
+    <input
+      key={`sel-${c.id}`}
+      type="checkbox"
+      className="h-4 w-4 accent-dockora-pink"
+      checked={selected.has(c.id)}
+      onChange={() => toggleOne(c.id)}
+      aria-label={c.name}
+    />,
     <Link
       key={`name-${c.id}`}
       href={`/containers/${encodeURIComponent(c.id)}`}
-      className="inline-flex items-center gap-2 font-medium text-dockora-accent hover:underline"
+      className="dockora-link inline-flex items-center gap-2 font-medium"
     >
       <ServiceIcon url={resolveContainerIconUrl(c.labels)} alt={c.name} size="sm" />
       <span>{c.name}</span>
     </Link>,
     <StatusBadge key={`st-${c.id}`} status={containerStatusTone(c.status)} label={c.status} />,
-    <span key={`img-${c.id}`} className="font-mono text-xs">
+    <span key={`img-${c.id}`} className="font-mono text-xs text-dockora-muted">
       {c.image}
     </span>,
     <ResourceCell
@@ -172,25 +228,26 @@ export function ContainersPage() {
                 target="_blank"
                 rel="noopener noreferrer"
                 title={port}
-                className="text-dockora-accent hover:underline"
+                className="dockora-link-muted"
               >
                 {label}
               </a>
             );
           })}
     </div>,
-    <time key={`cr-${c.id}`} className="text-xs text-dockora-muted">
+    <time key={`cr-${c.id}`} className="font-mono text-xs text-dockora-muted">
       {formatRelativeTime(c.createdAt, loc)}
     </time>,
-    <div key={`act-${c.id}`} className="flex flex-wrap gap-1">
+    <div key={`act-${c.id}`} className="inline-flex flex-nowrap items-center gap-1.5">
       <Link
         href={`/containers/${encodeURIComponent(c.id)}`}
-        className="inline-flex items-center justify-center rounded-lg border border-dockora-border bg-dockora-surface px-3 py-1.5 text-xs font-semibold tracking-wide text-dockora-fg transition-colors hover:border-dockora-accent/50"
+        className={buttonClassName({ size: 'sm' })}
       >
         {t.containers.detail}
       </Link>
       {canOps && c.status !== 'running' ? (
         <Button
+          size="sm"
           variant="primary"
           disabled={busy === c.id}
           onClick={() => void runAction(c.id, 'start')}
@@ -199,17 +256,18 @@ export function ContainersPage() {
         </Button>
       ) : null}
       {canOps && c.status === 'running' ? (
-        <Button disabled={busy === c.id} onClick={() => void runAction(c.id, 'stop')}>
+        <Button size="sm" disabled={busy === c.id} onClick={() => void runAction(c.id, 'stop')}>
           {t.containers.stop}
         </Button>
       ) : null}
       {canOps ? (
-        <Button disabled={busy === c.id} onClick={() => void runAction(c.id, 'restart')}>
+        <Button size="sm" disabled={busy === c.id} onClick={() => void runAction(c.id, 'restart')}>
           {t.containers.restart}
         </Button>
       ) : null}
       {isAdmin ? (
         <Button
+          size="sm"
           variant="danger"
           disabled={busy === c.id}
           onClick={() => void runAction(c.id, 'remove')}
@@ -232,7 +290,42 @@ export function ContainersPage() {
         }
       />
 
-      <div className="flex flex-wrap gap-3">
+      {selectedIds.length > 0 && canOps ? (
+        <FilterBar className="justify-between">
+          <p className="font-mono text-xs text-dockora-muted">
+            {t.common.selected.replace('{count}', String(selectedIds.length))}
+            {bulkProgress ? ` · ${bulkProgress}` : null}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              disabled={Boolean(busy)}
+              onClick={() => setConfirm({ action: 'stop', ids: selectedIds })}
+            >
+              {t.containers.bulkStop}
+            </Button>
+            <Button
+              size="sm"
+              disabled={Boolean(busy)}
+              onClick={() => setConfirm({ action: 'restart', ids: selectedIds })}
+            >
+              {t.containers.bulkRestart}
+            </Button>
+            {isAdmin ? (
+              <Button
+                size="sm"
+                variant="danger"
+                disabled={Boolean(busy)}
+                onClick={() => setConfirm({ action: 'remove', ids: selectedIds })}
+              >
+                {t.containers.bulkRemove}
+              </Button>
+            ) : null}
+          </div>
+        </FilterBar>
+      ) : null}
+
+      <FilterBar>
         <Input
           placeholder={t.containers.filterName}
           value={filter.name ?? ''}
@@ -253,21 +346,27 @@ export function ContainersPage() {
               status: e.target.value as ContainerFilter['status'],
             }))
           }
+          aria-label={t.containers.filterStatus}
         >
           <option value="all">{t.common.all}</option>
           <option value="running">{t.common.running}</option>
           <option value="exited">{t.common.stopped}</option>
           <option value="paused">paused</option>
         </Select>
-        <Button onClick={() => void load()}>{t.common.filter}</Button>
-      </div>
+        <Button variant="primary" onClick={() => void load()}>
+          {t.common.filter}
+        </Button>
+      </FilterBar>
 
       {error ? <ErrorBanner message={error} /> : null}
       {loading ? <LoadingState message={t.common.loading} /> : null}
 
       {!loading ? (
         <DataTable
+          stickyFirst
+          stickyLast
           headers={[
+            '',
             t.common.name,
             t.common.status,
             t.common.image,
@@ -285,19 +384,62 @@ export function ContainersPage() {
       {!loading && items.length > 0 ? (
         <p className="font-mono text-xs text-dockora-muted">
           {items.length} container(s) · {t.containers.stats.polling}
+          {' · '}
+          <label className="inline-flex cursor-pointer items-center gap-1.5">
+            <input
+              type="checkbox"
+              className="h-3.5 w-3.5 accent-dockora-pink"
+              checked={allSelected}
+              onChange={toggleAll}
+            />
+            {t.common.selectAll}
+          </label>
         </p>
       ) : null}
+
+      <ConfirmDialog
+        open={Boolean(confirm)}
+        title={
+          confirm?.action === 'remove'
+            ? t.containers.remove
+            : confirm?.action === 'stop'
+              ? t.containers.bulkStop
+              : t.containers.bulkRestart
+        }
+        description={
+          confirm?.action === 'remove'
+            ? (confirm.ids.length > 1
+                ? t.containers.bulkRemoveConfirm
+                : t.containers.removeConfirm
+              ).replace('{count}', String(confirm.ids.length))
+            : confirm?.action === 'stop'
+              ? t.containers.bulkStopConfirm.replace('{count}', String(confirm.ids.length))
+              : t.containers.bulkRestartConfirm.replace('{count}', String(confirm?.ids.length ?? 0))
+        }
+        consequences={
+          confirm?.action === 'remove' ? [...t.containers.removeConsequences] : undefined
+        }
+        confirmLabel={t.common.confirm}
+        cancelLabel={t.common.cancel}
+        danger={confirm?.action === 'remove'}
+        busy={Boolean(busy)}
+        onCancel={() => setConfirm(null)}
+        onConfirm={() => {
+          if (!confirm) return;
+          void runBulk(confirm.action, confirm.ids);
+        }}
+      />
     </div>
   );
 }
 
 function ResourceCell({ value, label }: { value: number | null | undefined; label: string }) {
   if (value == null) {
-    return <span className="text-xs text-dockora-muted">—</span>;
+    return <span className="font-mono text-xs text-dockora-muted">—</span>;
   }
   return (
-    <div className="min-w-[7rem] space-y-1">
-      <p className="font-mono text-xs tabular-nums">{label}</p>
+    <div className="min-w-[7.5rem] space-y-1.5">
+      <p className="font-mono text-xs tabular-nums text-dockora-text">{label}</p>
       <ProgressBar value={value} className="h-1.5" />
     </div>
   );
