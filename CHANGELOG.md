@@ -3,6 +3,24 @@
 All notable changes to this project are documented here.
 Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
+## [1.2.3] – 2026-08-07
+
+### Added
+
+- Login with optional TOTP two-factor authentication
+- Official Dockora logo / favicon in nav and login
+- Registry tokens for GHCR/LSCR update checks; compose preview, bulk actions, confirms, mobile drawer
+- Monitoring: build-cache size + configurable disk/build-cache alert thresholds
+- Automatic Docker build-cache (and dangling image) prune after install, self-update, and compose build
+
+### Fixed
+
+- Sidebar nav needed a second click after route changes (AppShell remount)
+- Compose create errors were cleared by reload; `privileged` / `network_mode: host` allowed again
+- Update checks failing as “manifest error” with invalid registry tokens (challenge + anonymous fallback)
+- Create flow keeps form/YAML on start failure; sticky error/progress
+- Update rows show the full registry error text
+
 ## [1.2.2] – 2026-08-06
 
 ### Fixed
