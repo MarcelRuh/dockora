@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { formatHostBinding, parsePortBinding, parsePortBindings } from './parse-ports';
+import {
+  formatHostBinding,
+  parsePortBinding,
+  parsePortBindings,
+  uniquePublishedPorts,
+} from './parse-ports';
 
 describe('parsePortBinding', () => {
   it('parses published host port', () => {
@@ -24,6 +29,17 @@ describe('parsePortBinding', () => {
     });
   });
 
+  it('parses IPv6 all-interfaces publish', () => {
+    expect(parsePortBinding(':::3000->3000/tcp')).toEqual({
+      raw: ':::3000->3000/tcp',
+      published: true,
+      hostIp: '::',
+      hostPort: '3000',
+      containerPort: '3000',
+      protocol: 'tcp',
+    });
+  });
+
   it('parses internal-only ports', () => {
     expect(parsePortBinding('5432/tcp')).toEqual({
       raw: '5432/tcp',
@@ -40,10 +56,11 @@ describe('parsePortBinding', () => {
   });
 });
 
-describe('parsePortBindings / formatHostBinding', () => {
-  it('filters published only when mapped', () => {
-    const all = parsePortBindings(['8080->80/tcp', '90/tcp']);
-    expect(all.filter((p) => p.published)).toHaveLength(1);
-    expect(formatHostBinding(all[0]!)).toBe(':8080');
+describe('uniquePublishedPorts', () => {
+  it('dedupes ipv4/ipv6 dual binds', () => {
+    const all = parsePortBindings(['3000->3000/tcp', ':::3000->3000/tcp']);
+    const unique = uniquePublishedPorts(all);
+    expect(unique).toHaveLength(1);
+    expect(formatHostBinding(unique[0]!)).toBe(':3000');
   });
 });

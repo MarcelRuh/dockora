@@ -17,7 +17,7 @@ import {
   type Edge,
   type NodeProps,
 } from '@xyflow/react';
-import { parsePortBindings } from '@/lib/parse-ports';
+import { parsePortBindings, uniquePublishedPorts } from '@/lib/parse-ports';
 import { cn } from '@/lib/utils';
 
 export interface TopologyLabels {
@@ -136,9 +136,7 @@ function buildGraph(
   };
 
   containers.forEach((c, index) => {
-    const published = parsePortBindings(c.ports)
-      .filter((p) => p.published)
-      .map((p) => p.raw);
+    const published = uniquePublishedPorts(parsePortBindings(c.ports)).map((p) => p.raw);
 
     nodes.push({
       id: `ctr-${c.id}`,

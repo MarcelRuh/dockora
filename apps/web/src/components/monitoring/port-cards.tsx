@@ -2,7 +2,7 @@
 
 import type { ContainerSummary } from '@dockora/shared';
 import Link from 'next/link';
-import { formatHostBinding, parsePortBindings } from '@/lib/parse-ports';
+import { formatHostBinding, parsePortBindings, uniquePublishedPorts } from '@/lib/parse-ports';
 import { containerStatusTone } from '@/lib/status';
 import { StatusBadge } from '@/components/ui/page-parts';
 
@@ -29,9 +29,9 @@ export interface PublishedPortCard {
 export function collectPublishedPorts(containers: ContainerSummary[]): PublishedPortCard[] {
   const cards: PublishedPortCard[] = [];
   for (const c of containers) {
-    for (const port of parsePortBindings(c.ports).filter((p) => p.published)) {
+    for (const port of uniquePublishedPorts(parsePortBindings(c.ports))) {
       cards.push({
-        key: `${c.id}-${port.raw}`,
+        key: `${c.id}-${port.hostPort}-${port.containerPort}-${port.protocol}`,
         containerId: c.id,
         containerName: c.name,
         status: c.status,
