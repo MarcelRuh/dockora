@@ -13,7 +13,14 @@ export interface ContainersServiceDeps {
   docker: IDockerClient;
 }
 
+const STATS_CACHE_TTL_MS = 4_000;
+
 export class ContainersService {
+  private readonly statsCache = new Map<
+    string,
+    { expiresAt: number; stats: ContainerStatsSnapshot }
+  >();
+
   constructor(private readonly deps: ContainersServiceDeps) {}
 
   async list(filters: ContainerFilter = {}): Promise<ContainerSummary[]> {
@@ -36,26 +43,24 @@ export class ContainersService {
       return summaries;
     }
 
-    await Promise.all(
-      summaries.map(async (summary) => {
-        if (summary.status !== 'running') {
-          summary.cpuPercent = null;
-          summary.memoryPercent = null;
-          summary.memoryUsageBytes = null;
-          return;
-        }
-        try {
-          const stats = await this.deps.docker.getContainerStats(summary.id);
-          summary.cpuPercent = stats.cpuPercent;
-          summary.memoryPercent = stats.memoryPercent;
-          summary.memoryUsageBytes = stats.memoryUsageBytes;
-        } catch {
-          summary.cpuPercent = null;
-          summary.memoryPercent = null;
-          summary.memoryUsageBytes = null;
-        }
-      }),
-    );
+    await mapPool(summaries, 3, async (summary) => {
+      if (summary.status !== 'running') {
+        summary.cpuPercent = null;
+        summary.memoryPercent = null;
+        summary.memoryUsageBytes = null;
+        return;
+      }
+      try {
+        const stats = await this.stats(summary.id);
+        summary.cpuPercent = stats.cpuPercent;
+        summary.memoryPercent = stats.memoryPercent;
+        summary.memoryUsageBytes = stats.memoryUsageBytes;
+      } catch {
+        summary.cpuPercent = null;
+        summary.memoryPercent = null;
+        summary.memoryUsageBytes = null;
+      }
+    });
 
     return summaries;
   }
@@ -70,6 +75,7 @@ export class ContainersService {
     action: ContainerAction,
     options?: { force?: boolean },
   ): Promise<ActionResult> {
+    this.statsCache.delete(id);
     await this.deps.docker.containerAction(id, action, options);
     return { ok: true, message: `Container ${action} succeeded` };
   }
@@ -79,7 +85,13 @@ export class ContainersService {
   }
 
   async stats(id: string): Promise<ContainerStatsSnapshot> {
-    return this.deps.docker.getContainerStats(id);
+    const cached = this.statsCache.get(id);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.stats;
+    }
+    const stats = await this.deps.docker.getContainerStats(id);
+    this.statsCache.set(id, { expiresAt: Date.now() + STATS_CACHE_TTL_MS, stats });
+    return stats;
   }
 
   streamLogs(
@@ -145,4 +157,23 @@ function toDetails(c: DockerContainerDetails): ContainerDetails {
     sizeRw: c.sizeRw,
     sizeRootFs: c.sizeRootFs,
   };
+}
+
+/** Run async work with limited parallelism (Docker stats are expensive ~1s each). */
+async function mapPool<T>(
+  items: T[],
+  concurrency: number,
+  worker: (item: T) => Promise<void>,
+): Promise<void> {
+  if (items.length === 0) return;
+  const limit = Math.max(1, Math.min(concurrency, items.length));
+  let index = 0;
+  const runners = Array.from({ length: limit }, async () => {
+    while (index < items.length) {
+      const current = items[index]!;
+      index += 1;
+      await worker(current);
+    }
+  });
+  await Promise.all(runners);
 }

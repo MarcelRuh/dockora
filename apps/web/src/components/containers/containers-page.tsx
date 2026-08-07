@@ -21,7 +21,24 @@ import {
   StatusBadge,
 } from '@/components/ui/page-parts';
 
-const STATS_POLL_MS = 5000;
+const STATS_POLL_MS = 10_000;
+
+function mergePreservingStats(
+  previous: ContainerSummary[],
+  next: ContainerSummary[],
+): ContainerSummary[] {
+  const prevById = new Map(previous.map((c) => [c.id, c]));
+  return next.map((c) => {
+    const old = prevById.get(c.id);
+    if (!old) return c;
+    return {
+      ...c,
+      cpuPercent: c.cpuPercent ?? old.cpuPercent,
+      memoryPercent: c.memoryPercent ?? old.memoryPercent,
+      memoryUsageBytes: c.memoryUsageBytes ?? old.memoryUsageBytes,
+    };
+  });
+}
 
 export function ContainersPage() {
   const { t, locale } = useLocale();
@@ -40,20 +57,47 @@ export function ContainersPage() {
     setPageHost(window.location.hostname);
   }, []);
 
+  const enrichStats = useCallback(
+    async (listFilter: ContainerFilter) => {
+      try {
+        const data = await fetchContainers({ ...listFilter, includeStats: true });
+        setItems((prev) => {
+          const byId = new Map(data.map((c) => [c.id, c]));
+          return prev.map((row) => {
+            const fresh = byId.get(row.id);
+            if (!fresh) return row;
+            return {
+              ...row,
+              cpuPercent: fresh.cpuPercent ?? row.cpuPercent,
+              memoryPercent: fresh.memoryPercent ?? row.memoryPercent,
+              memoryUsageBytes: fresh.memoryUsageBytes ?? row.memoryUsageBytes,
+            };
+          });
+        });
+      } catch {
+        // list already shown; stats stay empty/previous
+      }
+    },
+    [],
+  );
+
   const load = useCallback(
     async (opts?: { silent?: boolean }) => {
       if (!opts?.silent) setLoading(true);
       setError(null);
       try {
-        const data = await fetchContainers({ ...filter, includeStats: true });
-        setItems(data);
+        // Fast path: list without Docker stats (~instant)
+        const data = await fetchContainers(filter);
+        setItems((prev) => mergePreservingStats(prev, data));
+        if (!opts?.silent) setLoading(false);
+        // Slow path: CPU/RAM in background (does not block the table)
+        void enrichStats(filter);
       } catch (err) {
         setError(err instanceof Error ? err.message : t.containers.loadError);
-      } finally {
         if (!opts?.silent) setLoading(false);
       }
     },
-    [filter, t.containers.loadError],
+    [enrichStats, filter, t.containers.loadError],
   );
 
   useEffect(() => {
@@ -67,7 +111,6 @@ export function ContainersPage() {
     }, STATS_POLL_MS);
     return () => window.clearInterval(id);
   }, [load]);
-
   const runAction = async (id: string, action: 'start' | 'stop' | 'restart' | 'remove') => {
     if (action === 'remove' && !window.confirm(t.containers.removeConfirm)) return;
     setBusy(id);
