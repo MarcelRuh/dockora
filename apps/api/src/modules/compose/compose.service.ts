@@ -353,7 +353,22 @@ export class ComposeService {
       // ENOENT → ok
     }
 
-    await mkdir(projectDir, { recursive: true });
+    try {
+      // Basis-Suchpfad und Projektordner anlegen, falls noch nicht vorhanden
+      await mkdir(basePath, { recursive: true });
+      await mkdir(projectDir, { recursive: true });
+    } catch (error) {
+      const err = error as NodeJS.ErrnoException;
+      if (err.code === 'EROFS' || err.code === 'EACCES') {
+        throw new ComposeValidationError(
+          `Cannot create project directory ${projectDir}: filesystem is read-only or not writable. ` +
+            'Mount COMPOSE_SEARCH_PATHS read-write into the API container.',
+        );
+      }
+      throw new ComposeValidationError(
+        `Cannot create project directory ${projectDir}: ${err.message ?? String(error)}`,
+      );
+    }
 
     const envPath = path.join(projectDir, '.env');
     const hasEnv = Boolean(input.envContent?.trim());

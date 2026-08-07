@@ -37,7 +37,8 @@ The API **refuses to start** in `NODE_ENV=production` with weak JWT/bootstrap se
 
 - Persist `/data` (`dockora-data` volume) for SQLite + backups
 - Mount the Docker socket read/write only if you accept the privilege model
-- Mount compose search paths read-only where possible
+- Mount `COMPOSE_SEARCH_PATHS` **read-write** so Dockora can create Compose projects on disk
+- Keep the install tree (`DOCKORA_INSTALL_DIR`) separate; self-update uses a one-shot writer
 
 ## Reverse proxy (external)
 

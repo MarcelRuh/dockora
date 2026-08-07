@@ -41,10 +41,10 @@ services:
       - /usr/libexec/docker/cli-plugins:/usr/libexec/docker/cli-plugins:ro
       # Installationsbaum nur lesen (Update schreibt der One-Shot-Updater auf dem Host-Pfad)
       - ${DOCKORA_INSTALL_DIR:-/opt/dockora}:/dockora-install:ro
-      # Compose-Discovery (read-only)
-      - /opt:/opt:ro
-      - /srv:/srv:ro
-      - /home:/home:ro
+      # Compose-Discovery + Create (rw – sonst schlägt Projekt-Anlegen fehl)
+      - /opt:/opt
+      - /srv:/srv
+      - /home:/home
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3001/api/v1/health"]
       interval: 30s
