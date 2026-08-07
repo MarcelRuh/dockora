@@ -7,6 +7,7 @@ import type { AuthUser } from '@dockora/shared';
 import { useLocale } from '@/i18n/locale-provider';
 import { Button, Input } from '@/components/ui/form-controls';
 import { ErrorBanner } from '@/components/ui/page-parts';
+import { BrandLogoWide } from '@/components/ui/brand-logo';
 import { NeonAtmosphere, NeonParticles } from '@/components/ui/neon-particles';
 
 type AuthContextValue = {
@@ -77,8 +78,10 @@ function LoginForm({ onSuccess }: { onSuccess: () => void }) {
       </div>
       <div className="relative z-10 mx-auto flex min-h-screen max-w-md flex-col justify-center space-y-6 px-4">
         <div className="space-y-2 text-center">
-          <p className="dockora-logo-gradient text-3xl uppercase tracking-[0.14em]">Dockora</p>
-          <h1 className="dockora-title-gradient text-2xl">{t.auth.title}</h1>
+          <div className="mx-auto w-48">
+            <BrandLogoWide priority />
+          </div>
+          <h1 className="sr-only">{t.auth.title}</h1>
           <p className="text-sm text-dockora-muted">
             {tempToken ? t.auth.totpSubtitle : t.auth.subtitle}
           </p>

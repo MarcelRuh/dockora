@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import type { Locale } from '@dockora/shared';
 import { AuthLogoutButton } from '@/components/auth/auth-provider';
 import { NAV_ICONS } from '@/components/ui/nav-icons';
+import { BrandLogo, BrandLogoWide } from '@/components/ui/brand-logo';
 import { NeonAtmosphere, NeonParticles } from '@/components/ui/neon-particles';
 
 const NAV_ITEMS = [
@@ -132,19 +133,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <aside className="relative z-10 sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-dockora-railBorder bg-dockora-rail/90 text-dockora-railText backdrop-blur-xl md:flex">
         <Link
           href="/"
-          className="group flex flex-col gap-3 border-b border-dockora-railBorder px-5 py-6 transition-opacity hover:opacity-95"
+          className="group block border-b border-dockora-railBorder px-4 py-4 transition-opacity hover:opacity-95"
+          aria-label={t.appName}
         >
-          <span className="dockora-brand-mark flex h-11 w-11 items-center justify-center font-display text-lg">
-            Dk
-          </span>
-          <span>
-            <span className="dockora-logo-gradient block text-2xl uppercase tracking-[0.12em]">
-              {t.appName}
-            </span>
-            <span className="mt-1 block font-mono text-[10px] uppercase tracking-[0.18em] text-dockora-railMuted">
-              {t.tagline}
-            </span>
-          </span>
+          <BrandLogoWide priority />
         </Link>
 
         <nav className="flex-1 overflow-y-auto px-2 py-4">
@@ -172,13 +164,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <path d="M4 7h16M4 12h16M4 17h16" />
               </svg>
             </button>
-            <Link href="/" className="flex items-center gap-2.5">
-              <span className="dockora-brand-mark flex h-9 w-9 items-center justify-center text-sm">
-                Dk
-              </span>
-              <span className="dockora-logo-gradient text-xl uppercase tracking-[0.1em]">
-                {t.appName}
-              </span>
+            <Link href="/" className="flex items-center" aria-label={t.appName}>
+              <BrandLogo size="sm" priority />
             </Link>
           </div>
           <LocaleThemeControls dense />
@@ -222,10 +209,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               aria-modal="true"
               aria-label={t.common.menu}
             >
-              <div className="flex items-center justify-between border-b border-dockora-railBorder px-4 py-4">
-                <span className="dockora-logo-gradient text-lg uppercase tracking-[0.12em]">
-                  {t.appName}
-                </span>
+              <div className="flex items-center justify-between gap-3 border-b border-dockora-railBorder px-3 py-3">
+                <BrandLogo size="md" />
                 <button
                   type="button"
                   className="dockora-field px-2 py-1 font-mono text-xs uppercase"
