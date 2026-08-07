@@ -92,7 +92,9 @@ export function UpdatesPage() {
     </span>,
     u.currentTag,
     u.registry,
-    u.updateAvailable ? (
+    u.error ? (
+      <StatusBadge key={`st-${u.containerId}`} status="danger" label={t.updates.checkFailed} />
+    ) : u.updateAvailable ? (
       <StatusBadge key={`st-${u.containerId}`} status="warning" label={t.updates.available} />
     ) : (
       <StatusBadge key={`st-${u.containerId}`} status="success" label={t.updates.upToDate} />

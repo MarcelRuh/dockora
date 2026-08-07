@@ -368,21 +368,15 @@ async function fetchOciDigest(
   parsed: ReturnType<typeof parseImageRef>,
 ): Promise<string | null> {
   const repoPath = apiRepositoryPath(parsed);
-  let token: string | undefined;
-
-  try {
-    const tokenUrl = `https://${registryHost}/token?service=${registryHost}&scope=repository:${repoPath}:pull`;
-    const tokenRes = await request(tokenUrl);
-    if (tokenRes.statusCode < 400) {
-      const body = (await tokenRes.body.json()) as { token?: string; access_token?: string };
-      token = body.token ?? body.access_token;
-    }
-  } catch {
-    // Anonyme Registries ohne Token-Endpoint
-  }
-
-  return fetchManifestDigest(registryHost, repoPath, parsed.tag, token);
+  return fetchManifestDigest(registryHost, repoPath, parsed.tag);
 }
+
+const MANIFEST_ACCEPT = [
+  'application/vnd.oci.image.index.v1+json',
+  'application/vnd.docker.distribution.manifest.list.v2+json',
+  'application/vnd.oci.image.manifest.v1+json',
+  'application/vnd.docker.distribution.manifest.v2+json',
+].join(', ');
 
 async function fetchManifestDigest(
   registryHost: string,
@@ -392,15 +386,28 @@ async function fetchManifestDigest(
 ): Promise<string | null> {
   const url = `https://${registryHost}/v2/${repoPath}/manifests/${tag}`;
   const headers: Record<string, string> = {
-    Accept:
-      'application/vnd.docker.distribution.manifest.v2+json, application/vnd.oci.image.manifest.v1+json',
+    Accept: MANIFEST_ACCEPT,
   };
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const res = await request(url, { headers });
-  if (res.statusCode === 401 && !token) {
+  let res = await request(url, { headers });
+
+  // OCI registries (ghcr, lscr→ghcr, …) often require a Bearer challenge first
+  if (res.statusCode === 401) {
+    const challenge = parseWwwAuthenticate(res.headers['www-authenticate']);
+    const bearer = await fetchRegistryBearerToken(challenge, repoPath);
+    // Drain previous body before retry
+    await res.body.dump().catch(() => undefined);
+    if (!bearer) {
+      throw new Error(`Registry auth required (${registryHost})`);
+    }
+    headers.Authorization = `Bearer ${bearer}`;
+    res = await request(url, { headers });
+  }
+
+  if (res.statusCode === 401) {
     throw new Error(`Registry auth required (${registryHost})`);
   }
   if (res.statusCode >= 400) {
@@ -409,6 +416,7 @@ async function fetchManifestDigest(
 
   const digestHeader = res.headers['docker-content-digest'];
   if (typeof digestHeader === 'string') {
+    await res.body.dump().catch(() => undefined);
     return digestHeader;
   }
 
@@ -422,6 +430,51 @@ async function fetchManifestDigest(
   }
 
   return null;
+}
+
+interface WwwAuthChallenge {
+  realm?: string;
+  service?: string;
+  scope?: string;
+}
+
+function parseWwwAuthenticate(header: string | string[] | undefined): WwwAuthChallenge | null {
+  const raw = Array.isArray(header) ? header[0] : header;
+  if (!raw || !/^Bearer\s+/i.test(raw)) return null;
+  const params = raw.replace(/^Bearer\s+/i, '');
+  const out: WwwAuthChallenge = {};
+  for (const part of params.split(',')) {
+    const m = part.trim().match(/^(\w+)="([^"]*)"$/);
+    if (!m) continue;
+    const key = m[1]?.toLowerCase();
+    const value = m[2];
+    if (key === 'realm') out.realm = value;
+    if (key === 'service') out.service = value;
+    if (key === 'scope') out.scope = value;
+  }
+  return out.realm ? out : null;
+}
+
+async function fetchRegistryBearerToken(
+  challenge: WwwAuthChallenge | null,
+  repoPath: string,
+): Promise<string | null> {
+  if (!challenge?.realm) return null;
+  const url = new URL(challenge.realm);
+  if (challenge.service) url.searchParams.set('service', challenge.service);
+  url.searchParams.set('scope', challenge.scope ?? `repository:${repoPath}:pull`);
+
+  try {
+    const tokenRes = await request(url.toString());
+    if (tokenRes.statusCode >= 400) {
+      await tokenRes.body.dump().catch(() => undefined);
+      return null;
+    }
+    const body = (await tokenRes.body.json()) as { token?: string; access_token?: string };
+    return body.token ?? body.access_token ?? null;
+  } catch {
+    return null;
+  }
 }
 
 async function recreateStandaloneContainer(
