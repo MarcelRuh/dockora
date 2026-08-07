@@ -9,7 +9,7 @@ import { useAuth } from '@/components/auth/auth-provider';
 import { canAdmin, canOperate } from '@/lib/roles';
 import { containerStatusTone } from '@/lib/status';
 import { formatBytes, formatPercent, formatRelativeTime } from '@/lib/format';
-import { publishedPortHref } from '@/lib/published-ports';
+import { publishedPortHref, uniquePublishedPorts } from '@/lib/published-ports';
 import { Button, Input, Select } from '@/components/ui/form-controls';
 import { ProgressBar } from '@/components/ui/progress-bar';
 import {
@@ -110,7 +110,7 @@ export function ContainersPage() {
     <div key={`ports-${c.id}`} className="flex flex-wrap gap-x-2 gap-y-1 font-mono text-xs">
       {c.ports.length === 0
         ? '—'
-        : c.ports.map((port) => {
+        : uniquePublishedPorts(c.ports).map((port) => {
             const { label, href } = publishedPortHref(port, pageHost);
             if (!href) {
               return (
