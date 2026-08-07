@@ -22,10 +22,42 @@ export class ContainersService {
       filters.includeSelf === true ||
       filters.includeSelf === 'true' ||
       filters.includeSelf === '1';
-    return all
+    const includeStats =
+      filters.includeStats === true ||
+      filters.includeStats === 'true' ||
+      filters.includeStats === '1';
+
+    const summaries = all
       .filter((c) => includeSelf || !isDockoraSelfContainer(c))
       .filter((c) => this.matchesFilter(c, filters))
       .map(toSummary);
+
+    if (!includeStats) {
+      return summaries;
+    }
+
+    await Promise.all(
+      summaries.map(async (summary) => {
+        if (summary.status !== 'running') {
+          summary.cpuPercent = null;
+          summary.memoryPercent = null;
+          summary.memoryUsageBytes = null;
+          return;
+        }
+        try {
+          const stats = await this.deps.docker.getContainerStats(summary.id);
+          summary.cpuPercent = stats.cpuPercent;
+          summary.memoryPercent = stats.memoryPercent;
+          summary.memoryUsageBytes = stats.memoryUsageBytes;
+        } catch {
+          summary.cpuPercent = null;
+          summary.memoryPercent = null;
+          summary.memoryUsageBytes = null;
+        }
+      }),
+    );
+
+    return summaries;
   }
 
   async getDetails(id: string): Promise<ContainerDetails> {

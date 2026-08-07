@@ -8,8 +8,10 @@ import { useLocale } from '@/i18n/locale-provider';
 import { useAuth } from '@/components/auth/auth-provider';
 import { canAdmin, canOperate } from '@/lib/roles';
 import { containerStatusTone } from '@/lib/status';
-import { formatRelativeTime } from '@/lib/format';
+import { formatBytes, formatPercent, formatRelativeTime } from '@/lib/format';
+import { publishedPortHref } from '@/lib/published-ports';
 import { Button, Input, Select } from '@/components/ui/form-controls';
+import { ProgressBar } from '@/components/ui/progress-bar';
 import {
   DataTable,
   EmptyState,
@@ -18,6 +20,8 @@ import {
   PageHeader,
   StatusBadge,
 } from '@/components/ui/page-parts';
+
+const STATS_POLL_MS = 5000;
 
 export function ContainersPage() {
   const { t, locale } = useLocale();
@@ -30,22 +34,38 @@ export function ContainersPage() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<ContainerFilter>({ status: 'all' });
   const [busy, setBusy] = useState<string | null>(null);
+  const [pageHost, setPageHost] = useState('localhost');
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await fetchContainers(filter);
-      setItems(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t.containers.loadError);
-    } finally {
-      setLoading(false);
-    }
-  }, [filter, t.containers.loadError]);
+  useEffect(() => {
+    setPageHost(window.location.hostname);
+  }, []);
+
+  const load = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      if (!opts?.silent) setLoading(true);
+      setError(null);
+      try {
+        const data = await fetchContainers({ ...filter, includeStats: true });
+        setItems(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : t.containers.loadError);
+      } finally {
+        if (!opts?.silent) setLoading(false);
+      }
+    },
+    [filter, t.containers.loadError],
+  );
 
   useEffect(() => {
     void load();
+  }, [load]);
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      void load({ silent: true });
+    }, STATS_POLL_MS);
+    return () => window.clearInterval(id);
   }, [load]);
 
   const runAction = async (id: string, action: 'start' | 'stop' | 'restart' | 'remove') => {
@@ -53,7 +73,7 @@ export function ContainersPage() {
     setBusy(id);
     try {
       await containerAction(id, action, action === 'remove' ? { force: true } : undefined);
-      await load();
+      await load({ silent: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : t.common.failed);
     } finally {
@@ -73,13 +93,56 @@ export function ContainersPage() {
     <span key={`img-${c.id}`} className="font-mono text-xs">
       {c.image}
     </span>,
-    <span key={`ports-${c.id}`} className="font-mono text-xs text-dockora-muted">
-      {c.ports.join(', ') || '—'}
-    </span>,
+    <ResourceCell
+      key={`cpu-${c.id}`}
+      value={c.cpuPercent}
+      label={formatPercent(c.cpuPercent, loc)}
+    />,
+    <ResourceCell
+      key={`mem-${c.id}`}
+      value={c.memoryPercent}
+      label={
+        c.memoryUsageBytes != null
+          ? `${formatPercent(c.memoryPercent, loc)} · ${formatBytes(c.memoryUsageBytes, loc)}`
+          : formatPercent(c.memoryPercent, loc)
+      }
+    />,
+    <div key={`ports-${c.id}`} className="flex flex-wrap gap-x-2 gap-y-1 font-mono text-xs">
+      {c.ports.length === 0
+        ? '—'
+        : c.ports.map((port) => {
+            const { label, href } = publishedPortHref(port, pageHost);
+            if (!href) {
+              return (
+                <span key={port} className="text-dockora-muted">
+                  {port}
+                </span>
+              );
+            }
+            return (
+              <a
+                key={port}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={port}
+                className="text-dockora-accent hover:underline"
+              >
+                {label}
+              </a>
+            );
+          })}
+    </div>,
     <time key={`cr-${c.id}`} className="text-xs text-dockora-muted">
       {formatRelativeTime(c.createdAt, loc)}
     </time>,
     <div key={`act-${c.id}`} className="flex flex-wrap gap-1">
+      <Link
+        href={`/containers/${encodeURIComponent(c.id)}`}
+        className="inline-flex items-center justify-center rounded-lg border border-dockora-border bg-dockora-surface px-3 py-1.5 text-xs font-semibold tracking-wide text-dockora-fg transition-colors hover:border-dockora-accent/50"
+      >
+        {t.containers.detail}
+      </Link>
       {canOps && c.status !== 'running' ? (
         <Button
           variant="primary"
@@ -158,15 +221,38 @@ export function ContainersPage() {
 
       {!loading ? (
         <DataTable
-          headers={[t.common.name, t.common.status, t.common.image, 'Ports', t.common.created, t.common.actions]}
+          headers={[
+            t.common.name,
+            t.common.status,
+            t.common.image,
+            t.containers.stats.cpu,
+            t.containers.stats.memory,
+            t.containers.overview.ports,
+            t.common.created,
+            t.common.actions,
+          ]}
           rows={rows}
           empty={<EmptyState message={t.containers.empty} />}
         />
       ) : null}
 
       {!loading && items.length > 0 ? (
-        <p className="text-xs text-dockora-muted font-mono">{items.length} container(s)</p>
+        <p className="font-mono text-xs text-dockora-muted">
+          {items.length} container(s) · {t.containers.stats.polling}
+        </p>
       ) : null}
+    </div>
+  );
+}
+
+function ResourceCell({ value, label }: { value: number | null | undefined; label: string }) {
+  if (value == null) {
+    return <span className="text-xs text-dockora-muted">—</span>;
+  }
+  return (
+    <div className="min-w-[7rem] space-y-1">
+      <p className="font-mono text-xs tabular-nums">{label}</p>
+      <ProgressBar value={value} className="h-1.5" />
     </div>
   );
 }

@@ -78,6 +78,10 @@ export interface ContainerSummary {
   networks: string[];
   composeProject?: string;
   health?: 'healthy' | 'unhealthy' | 'starting' | 'none';
+  /** Present when list is requested with includeStats (running containers only). */
+  cpuPercent?: number | null;
+  memoryPercent?: number | null;
+  memoryUsageBytes?: number | null;
 }
 
 export interface ContainerDetails extends ContainerSummary {
@@ -111,6 +115,8 @@ export interface ContainerFilter {
   network?: string;
   /** When true, include Dockora's own containers (for monitoring topology). */
   includeSelf?: boolean | string;
+  /** When true, attach cpu/memory stats for running containers. */
+  includeStats?: boolean | string;
 }
 
 export interface ComposeProjectSummary {

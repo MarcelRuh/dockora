@@ -110,6 +110,12 @@ export async function fetchContainers(filter?: ContainerFilter): Promise<Contain
         filter?.includeSelf === '1'
           ? 'true'
           : undefined,
+      includeStats:
+        filter?.includeStats === true ||
+        filter?.includeStats === 'true' ||
+        filter?.includeStats === '1'
+          ? 'true'
+          : undefined,
     })}`,
   );
 }
