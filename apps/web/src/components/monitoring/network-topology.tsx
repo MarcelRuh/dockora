@@ -19,6 +19,7 @@ import {
 } from '@xyflow/react';
 import { parsePortBindings, uniquePublishedPorts } from '@/lib/parse-ports';
 import { cn } from '@/lib/utils';
+import { useTheme } from '@/components/theme-provider';
 
 export interface TopologyLabels {
   title: string;
@@ -186,6 +187,7 @@ export function NetworkTopology({
   labels: TopologyLabels;
 }) {
   const router = useRouter();
+  const { theme } = useTheme();
   const graph = useMemo(() => buildGraph(containers, labels), [containers, labels]);
   const [nodes, setNodes, onNodesChange] = useNodesState(graph.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(graph.edges);
@@ -232,6 +234,7 @@ export function NetworkTopology({
           fitView
           minZoom={0.4}
           maxZoom={1.6}
+          colorMode={theme === 'dark' ? 'dark' : 'light'}
           proOptions={{ hideAttribution: true }}
         >
           <Background gap={18} size={1} color="var(--dockora-border)" />
@@ -239,8 +242,12 @@ export function NetworkTopology({
           <MiniMap
             pannable
             zoomable
-            maskColor="rgba(10, 13, 20, 0.45)"
+            bgColor="var(--dockora-surface)"
+            maskColor={
+              theme === 'dark' ? 'rgba(10, 13, 20, 0.65)' : 'rgba(238, 241, 246, 0.65)'
+            }
             nodeColor={() => 'var(--dockora-accent)'}
+            nodeStrokeColor={() => 'transparent'}
           />
         </ReactFlow>
       </div>

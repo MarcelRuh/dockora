@@ -115,3 +115,54 @@ body {
 .dockora-pulse {
   animation: dockora-pulse-dot 1.8s ease-in-out infinite;
 }
+
+/* React Flow controls / minimap – Dockora theme (default xyflow is light-only) */
+.react-flow__controls {
+  border: 1px solid var(--dockora-border) !important;
+  border-radius: 0.75rem !important;
+  overflow: hidden;
+  box-shadow: none !important;
+}
+
+.react-flow__controls-button {
+  background: var(--dockora-surface) !important;
+  border-bottom: 1px solid var(--dockora-border) !important;
+  fill: var(--dockora-text) !important;
+  width: 28px !important;
+  height: 28px !important;
+}
+
+.react-flow__controls-button:hover {
+  background: var(--dockora-surface-2) !important;
+}
+
+.react-flow__controls-button svg {
+  fill: inherit;
+  max-width: 12px;
+  max-height: 12px;
+}
+
+.react-flow__controls-button:last-child {
+  border-bottom: none !important;
+}
+
+.react-flow__minimap {
+  background: var(--dockora-surface) !important;
+  border: 1px solid var(--dockora-border) !important;
+  border-radius: 0.75rem !important;
+  overflow: hidden;
+}
+
+.react-flow__minimap-mask {
+  fill: color-mix(in srgb, var(--dockora-bg) 55%, transparent) !important;
+}
+
+.react-flow__minimap-node {
+  fill: var(--dockora-accent) !important;
+  stroke: none !important;
+}
+
+.react-flow__attribution {
+  display: none !important;
+}
+
