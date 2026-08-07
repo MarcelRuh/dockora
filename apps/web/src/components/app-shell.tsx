@@ -7,6 +7,7 @@ import { useTheme } from '@/components/theme-provider';
 import { cn } from '@/lib/utils';
 import type { Locale } from '@dockora/shared';
 import { AuthLogoutButton } from '@/components/auth/auth-provider';
+import { NAV_ICONS } from '@/components/ui/nav-icons';
 
 const NAV_ITEMS = [
   { key: 'dashboard', href: '/', ready: true },
@@ -45,8 +46,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <ul className="space-y-1">
             {NAV_ITEMS.map((item) => {
               const active = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
+              const Icon = NAV_ICONS[item.key];
               const className = cn(
-                'block rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                'flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
                 active
                   ? 'dockora-nav-active'
                   : 'text-white/55 hover:bg-white/5 hover:text-white',
@@ -56,10 +58,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <li key={item.key}>
                   {item.ready ? (
                     <Link href={item.href} className={className}>
-                      {t.nav[item.key]}
+                      <Icon className={cn(active ? 'opacity-100' : 'opacity-80')} />
+                      <span>{t.nav[item.key]}</span>
                     </Link>
                   ) : (
-                    <span className={className}>{t.nav[item.key]}</span>
+                    <span className={className}>
+                      <Icon className="opacity-50" />
+                      <span>{t.nav[item.key]}</span>
+                    </span>
                   )}
                 </li>
               );
@@ -122,20 +128,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <nav className="flex gap-1 overflow-x-auto border-b border-dockora-border px-3 py-2 md:hidden">
           {NAV_ITEMS.map((item) => {
             const active = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
+            const Icon = NAV_ICONS[item.key];
             return item.ready ? (
               <Link
                 key={item.key}
                 href={item.href}
                 className={cn(
-                  'shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium',
+                  'inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium',
                   active ? 'dockora-nav-active' : 'text-dockora-muted',
                 )}
               >
-                {t.nav[item.key]}
+                <Icon className="h-3.5 w-3.5" />
+                <span>{t.nav[item.key]}</span>
               </Link>
             ) : (
-              <span key={item.key} className="shrink-0 px-3 py-1.5 text-xs text-dockora-muted">
-                {t.nav[item.key]}
+              <span
+                key={item.key}
+                className="inline-flex shrink-0 items-center gap-1.5 px-3 py-1.5 text-xs text-dockora-muted"
+              >
+                <Icon className="h-3.5 w-3.5 opacity-50" />
+                <span>{t.nav[item.key]}</span>
               </span>
             );
           })}
