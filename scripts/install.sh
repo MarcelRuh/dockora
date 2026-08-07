@@ -173,6 +173,29 @@ if [[ -f .dockora-revision ]]; then
 fi
 chmod +x scripts/*.sh 2>/dev/null || true
 
+# Weekly Docker build-cache cleanup (BuildKit can grow tens of GB)
+install_docker_cleanup_timer() {
+  if [[ ! -d /run/systemd/system ]] || ! command -v systemctl >/dev/null 2>&1; then
+    return 0
+  fi
+  local unit_dir="${INSTALL_DIR}/packaging/systemd"
+  if [[ ! -f "${unit_dir}/dockora-docker-cleanup.service" || ! -f "${unit_dir}/dockora-docker-cleanup.timer" ]]; then
+    return 0
+  fi
+  # Resolve script path inside unit for non-/opt installs
+  local svc_tmp
+  svc_tmp="$(mktemp)"
+  sed "s|/opt/dockora/scripts/docker-cleanup.sh|${INSTALL_DIR}/scripts/docker-cleanup.sh|g" \
+    "${unit_dir}/dockora-docker-cleanup.service" >"$svc_tmp"
+  install -m 0644 "$svc_tmp" /etc/systemd/system/dockora-docker-cleanup.service
+  rm -f "$svc_tmp"
+  install -m 0644 "${unit_dir}/dockora-docker-cleanup.timer" /etc/systemd/system/dockora-docker-cleanup.timer
+  systemctl daemon-reload
+  systemctl enable --now dockora-docker-cleanup.timer >/dev/null
+  info "Enabled weekly Docker cleanup timer (Sun ~03:30)"
+}
+install_docker_cleanup_timer
+
 if [[ "$SKIP_START" == "1" ]]; then
   green "Skip start requested. Configure ${INSTALL_DIR}/.env then run:"
   if [[ "$USE_IMAGES" == "1" ]]; then
