@@ -1,0 +1,13 @@
+---
+description: Never attribute commits/pushes to Cursor agent (cursoragent)
+alwaysApply: true
+---
+
+# No cursoragent on Git
+
+- **Never** commit or push with author/committer `cursoragent`, `Cursor`, or `cursoragent@cursor.com`.
+- **Never** include `Co-authored-by: Cursor <cursoragent@cursor.com>` (or any Cursor co-author trailer) in commit messages.
+- Before every `git commit`, ensure identity is the repo owner (`MarcelRuh` / configured Silence identity), not an agent identity.
+- After `git commit`, immediately check `git log -1 --format='%B'` / `%an %ae`. If a Cursor co-author trailer or agent identity appears, remove it with `git commit --amend` **before** any push (only if that commit is yours and unpushed, or the user explicitly requested a history fix).
+- **Do not push** until the latest commit has no Cursor/cursoragent attribution.
+- Prefer: prepare the commit locally; push only when the user explicitly asks to push.
