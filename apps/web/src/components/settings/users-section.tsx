@@ -94,7 +94,7 @@ export function UsersSection() {
       {error ? <ErrorBanner message={error} /> : null}
       {success ? <SuccessBanner message={success} /> : null}
 
-      <ul className="mb-4 divide-y divide-dockora-border rounded-xl border border-dockora-border">
+      <ul className="mb-4 divide-y divide-dockora-border rounded-md border border-dockora-border">
         {users.map((u) => (
           <li key={u.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm">
             <div>

@@ -118,7 +118,7 @@ export function ContainerTerminal({ containerId }: { containerId: string }) {
   return (
     <div
       ref={hostRef}
-      className="mt-3 h-[420px] overflow-hidden rounded-xl border border-dockora-border bg-dockora-rail p-1"
+      className="mt-3 h-[420px] overflow-hidden rounded-md border border-dockora-border bg-dockora-rail p-1"
     />
   );
 }

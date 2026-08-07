@@ -14,9 +14,9 @@ export function PageHeader({
   leading?: React.ReactNode;
 }) {
   return (
-    <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <header className="flex flex-col gap-4 border-b border-dockora-border pb-5 sm:flex-row sm:items-end sm:justify-between">
       <div className="space-y-2">
-        <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-dockora-accent">
+        <p className="font-mono text-[11px] font-medium uppercase tracking-[0.2em] text-dockora-accent">
           Dockora
         </p>
         <div className="flex items-center gap-3">
@@ -45,7 +45,9 @@ export function Section({
 }) {
   return (
     <section className={cn('space-y-3', className)}>
-      {title ? <h2 className="font-display text-lg font-bold tracking-tight">{title}</h2> : null}
+      {title ? (
+        <h2 className="font-display text-lg font-bold tracking-tight text-dockora-text">{title}</h2>
+      ) : null}
       {children}
     </section>
   );
@@ -61,7 +63,7 @@ export function AccentPanel({
   return (
     <div
       className={cn(
-        'dockora-panel border-l-4 border-l-dockora-accent px-4 py-3',
+        'border border-dockora-border border-l-[3px] border-l-dockora-accent bg-dockora-surface px-4 py-3',
         className,
       )}
     >
@@ -72,7 +74,7 @@ export function AccentPanel({
 
 export function ErrorBanner({ message }: { message: string }) {
   return (
-    <p className="rounded-xl border border-dockora-danger/40 bg-dockora-danger/10 px-4 py-3 text-sm text-dockora-danger">
+    <p className="border border-dockora-danger/35 bg-dockora-danger/8 px-4 py-3 text-sm text-dockora-danger">
       {message}
     </p>
   );
@@ -80,7 +82,7 @@ export function ErrorBanner({ message }: { message: string }) {
 
 export function SuccessBanner({ message }: { message: string }) {
   return (
-    <p className="rounded-xl border border-dockora-success/40 bg-dockora-success/10 px-4 py-3 text-sm text-dockora-success">
+    <p className="border border-dockora-success/35 bg-dockora-success/8 px-4 py-3 text-sm text-dockora-success">
       {message}
     </p>
   );
@@ -88,8 +90,10 @@ export function SuccessBanner({ message }: { message: string }) {
 
 export function EmptyState({ message }: { message: string }) {
   return (
-    <div className="dockora-panel flex flex-col items-start gap-2 px-5 py-10">
-      <span className="font-mono text-xs uppercase tracking-wider text-dockora-accent">Empty</span>
+    <div className="flex flex-col items-start gap-2 border border-dashed border-dockora-border bg-dockora-surface/60 px-5 py-10">
+      <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-dockora-accent">
+        Empty
+      </span>
       <p className="text-sm text-dockora-muted">{message}</p>
     </div>
   );
@@ -97,7 +101,9 @@ export function EmptyState({ message }: { message: string }) {
 
 export function LoadingState({ message }: { message: string }) {
   return (
-    <div className="dockora-panel px-5 py-6 text-sm text-dockora-muted">{message}</div>
+    <div className="border border-dockora-border bg-dockora-surface/70 px-5 py-6 text-sm text-dockora-muted">
+      {message}
+    </div>
   );
 }
 
@@ -109,17 +115,17 @@ export function StatusBadge({
   label: string;
 }) {
   const tones = {
-    success: 'border-dockora-success/50 bg-dockora-success/10 text-dockora-success',
-    warning: 'border-dockora-warning/50 bg-dockora-warning/10 text-dockora-warning',
-    danger: 'border-dockora-danger/50 bg-dockora-danger/10 text-dockora-danger',
+    success: 'border-dockora-success/45 bg-dockora-success/10 text-dockora-success',
+    warning: 'border-dockora-warning/45 bg-dockora-warning/10 text-dockora-warning',
+    danger: 'border-dockora-danger/45 bg-dockora-danger/10 text-dockora-danger',
     muted: 'border-dockora-border bg-dockora-surface2 text-dockora-muted',
-    info: 'border-dockora-accent/50 bg-dockora-accentSoft text-dockora-accent',
+    info: 'border-dockora-accent/45 bg-dockora-accentSoft text-dockora-accent',
   } as const;
 
   return (
     <span
       className={cn(
-        'inline-flex rounded-md border px-2 py-0.5 text-[11px] font-semibold',
+        'inline-flex rounded-sm border px-2 py-0.5 text-[11px] font-semibold tracking-wide',
         tones[status],
       )}
     >
@@ -138,17 +144,17 @@ export function TabBar({
   onChange: (id: string) => void;
 }) {
   return (
-    <div className="flex flex-wrap gap-1 rounded-xl border border-dockora-border bg-dockora-surface/80 p-1">
+    <div className="flex flex-wrap gap-0 border-b border-dockora-border">
       {tabs.map((tab) => (
         <button
           key={tab.id}
           type="button"
           onClick={() => onChange(tab.id)}
           className={cn(
-            'rounded-lg px-4 py-2 text-xs font-semibold transition-colors',
+            '-mb-px border-b-2 px-4 py-2.5 text-xs font-semibold transition-colors',
             active === tab.id
-              ? 'bg-dockora-accent text-dockora-accentFg'
-              : 'text-dockora-muted hover:bg-dockora-surface2 hover:text-dockora-text',
+              ? 'border-dockora-accent text-dockora-accent'
+              : 'border-transparent text-dockora-muted hover:text-dockora-text',
           )}
         >
           {tab.label}
@@ -170,13 +176,13 @@ export function DataTable({
   if (rows.length === 0 && empty) return <>{empty}</>;
 
   return (
-    <div className="dockora-panel overflow-hidden">
+    <div className="overflow-hidden border border-dockora-border bg-dockora-surface">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[640px] text-left text-sm">
           <thead>
-            <tr className="border-b border-dockora-border bg-dockora-surface2 text-xs text-dockora-muted">
+            <tr className="border-b border-dockora-border bg-dockora-surface2/80 text-xs text-dockora-muted">
               {headers.map((h) => (
-                <th key={h} className="px-3 py-2.5 font-semibold">
+                <th key={h} className="px-3 py-2.5 font-semibold tracking-wide">
                   {h}
                 </th>
               ))}
@@ -186,7 +192,7 @@ export function DataTable({
             {rows.map((cells, i) => (
               <tr
                 key={i}
-                className="border-b border-dockora-border/80 hover:bg-dockora-accentSoft last:border-0"
+                className="border-b border-dockora-border/70 transition-colors hover:bg-dockora-accentSoft/50 last:border-0"
               >
                 {cells.map((cell, j) => (
                   <td key={j} className="px-3 py-2.5 align-middle">
@@ -212,9 +218,9 @@ export function KeyValueGrid({
       {items.map((item) => (
         <div
           key={item.label}
-          className="rounded-xl border border-dockora-border bg-dockora-surface/80 px-4 py-3"
+          className="border border-dockora-border bg-dockora-surface px-4 py-3"
         >
-          <dt className="text-xs text-dockora-muted">{item.label}</dt>
+          <dt className="text-xs font-medium text-dockora-muted">{item.label}</dt>
           <dd className={cn('mt-1 text-sm', item.mono && 'break-all font-mono text-xs')}>
             {item.value}
           </dd>
@@ -226,7 +232,7 @@ export function KeyValueGrid({
 
 export function LogViewer({ content }: { content: string }) {
   return (
-    <pre className="max-h-[480px] overflow-auto rounded-xl border border-dockora-border bg-dockora-rail p-4 font-mono text-xs leading-relaxed text-dockora-accent whitespace-pre-wrap">
+    <pre className="max-h-[480px] overflow-auto border border-dockora-border bg-dockora-rail p-4 font-mono text-xs leading-relaxed text-dockora-accent whitespace-pre-wrap">
       {content || '—'}
     </pre>
   );

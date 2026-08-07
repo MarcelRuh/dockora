@@ -71,7 +71,7 @@ export function PortCards({
             <Link
               key={card.key}
               href={`/containers/${encodeURIComponent(card.containerId)}`}
-              className="block space-y-3 rounded-2xl border border-dockora-border bg-dockora-surface/80 p-4 transition hover:border-dockora-accent/50 hover:bg-dockora-surface"
+              className="block space-y-3 rounded-md border border-dockora-border bg-dockora-surface/80 p-4 transition hover:border-dockora-accent/50 hover:bg-dockora-surface"
             >
               <div className="flex items-start justify-between gap-2">
                 <p className="font-mono text-2xl font-bold tabular-nums text-dockora-accent">

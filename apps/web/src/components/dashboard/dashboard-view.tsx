@@ -20,10 +20,10 @@ export function DashboardView({
 
   return (
     <div className="space-y-8 animate-in fade-in">
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <header className="flex flex-col gap-4 border-b border-dockora-border pb-5 sm:flex-row sm:items-end sm:justify-between">
         <div className="space-y-2">
-          <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-dockora-accent">
-            {t.dashboard.live.live}
+          <p className="font-mono text-[11px] font-medium uppercase tracking-[0.2em] text-dockora-accent">
+            Dockora · {t.dashboard.live.live}
           </p>
           <h1 className="font-display text-4xl font-extrabold tracking-tight sm:text-5xl">
             {t.dashboard.title}
@@ -40,7 +40,7 @@ export function DashboardView({
       </header>
 
       {state === 'error' && !data ? (
-        <p className="rounded-xl border border-dockora-danger/40 bg-dockora-danger/10 px-4 py-3 text-sm text-dockora-danger">
+        <p className="border border-dockora-danger/35 bg-dockora-danger/8 px-4 py-3 text-sm text-dockora-danger">
           {t.dashboard.loadError}: {error}
         </p>
       ) : null}
@@ -136,15 +136,15 @@ function LiveResources({
           {labels.resources.realtime}
         </p>
       </div>
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-3">
         {rows.map((row) => (
           <div
             key={row.key}
-            className="space-y-4 rounded-2xl border border-dockora-border bg-dockora-surface/80 p-5"
+            className="space-y-3 border border-dockora-border bg-dockora-surface p-4"
           >
-            <div className="flex items-baseline justify-between">
+            <div className="flex items-baseline justify-between gap-2">
               <p className="text-sm font-medium text-dockora-muted">{row.label}</p>
-              <p className="font-mono text-3xl font-bold tabular-nums text-dockora-accent">
+              <p className="font-mono text-2xl font-bold tabular-nums text-dockora-accent">
                 {row.primary}
               </p>
             </div>
@@ -175,15 +175,15 @@ function LiveBadge({
   const isLive = state === 'ready' || state === 'loading';
 
   return (
-    <div className="flex items-center gap-3 self-start rounded-xl border border-dockora-border bg-dockora-surface/90 px-3 py-2 sm:self-auto">
+    <div className="flex items-center gap-3 self-start border border-dockora-border bg-dockora-surface px-3 py-2 sm:self-auto">
       <div className="flex items-center gap-2 text-xs">
         <span
           className={cn(
-            'h-2 w-2 rounded-full',
+            'h-2 w-2 rounded-sm',
             isLive ? 'dockora-pulse bg-dockora-accent' : 'bg-dockora-danger',
           )}
         />
-        <span className="font-medium">
+        <span className="font-semibold">
           {state === 'loading' && !lastUpdated ? labels.updating : labels.live}
         </span>
         {lastUpdated ? (
@@ -250,9 +250,9 @@ function EngineStrip({
       ].map((item) => (
         <div
           key={item.label}
-          className="rounded-2xl border border-dockora-border bg-dockora-surface/80 px-4 py-4"
+          className="border border-dockora-border bg-dockora-surface px-4 py-4"
         >
-          <p className="text-xs text-dockora-muted">{item.label}</p>
+          <p className="text-xs font-medium text-dockora-muted">{item.label}</p>
           <p className={cn('mt-1 text-lg font-semibold', item.className)}>{item.value}</p>
         </div>
       ))}
@@ -275,8 +275,8 @@ function AsideColumn({
   locale: string;
 }) {
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      <section className="rounded-2xl border border-dockora-border bg-dockora-surface/80 px-4 py-4">
+    <div className="grid gap-3 lg:grid-cols-2">
+      <section className="border border-dockora-border bg-dockora-surface px-4 py-4">
         <h2 className="font-display text-base font-bold">{labels.updates.title}</h2>
         <p
           className={cn(
@@ -290,14 +290,14 @@ function AsideColumn({
         </p>
       </section>
 
-      <section className="rounded-2xl border border-dockora-border bg-dockora-surface/80 px-4 py-4">
+      <section className="border border-dockora-border bg-dockora-surface px-4 py-4">
         <h2 className="font-display text-base font-bold">{labels.notifications.title}</h2>
         {notifications.length === 0 ? (
           <p className="mt-2 text-sm text-dockora-muted">{labels.notifications.empty}</p>
         ) : (
-          <ul className="mt-3 space-y-3">
+          <ul className="mt-3 space-y-2">
             {notifications.map((n) => (
-              <li key={n.id} className="rounded-xl border border-dockora-border px-3 py-2">
+              <li key={n.id} className="border border-dockora-border bg-dockora-surface2/40 px-3 py-2">
                 <p className="text-sm font-medium">{n.title}</p>
                 <p className="text-xs text-dockora-muted">{n.message}</p>
                 <time className="font-mono text-[11px] text-dockora-muted">

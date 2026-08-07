@@ -22,7 +22,7 @@ export function ServiceIcon({
       <span
         aria-hidden
         className={cn(
-          'inline-flex shrink-0 items-center justify-center rounded-md border border-dockora-border bg-dockora-surface2 font-mono text-[10px] uppercase text-dockora-muted',
+          'inline-flex shrink-0 items-center justify-center rounded-sm border border-dockora-border bg-dockora-surface2 font-mono text-[10px] uppercase text-dockora-muted',
           dim,
           className,
         )}
@@ -45,7 +45,7 @@ export function ServiceIcon({
       decoding="async"
       referrerPolicy="no-referrer"
       onError={() => setFailed(true)}
-      className={cn('shrink-0 rounded-md object-contain', dim, className)}
+      className={cn('shrink-0 rounded-sm object-contain', dim, className)}
     />
   );
 }

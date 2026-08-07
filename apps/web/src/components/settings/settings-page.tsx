@@ -209,7 +209,7 @@ export function SettingsPageView() {
 
       <div className="grid gap-6 md:grid-cols-[13rem_minmax(0,1fr)] lg:grid-cols-[15rem_minmax(0,1fr)]">
         <aside className="hidden md:block">
-          <nav className="sticky top-4 space-y-1 rounded-xl border border-dockora-border bg-dockora-surface/60 p-2">
+          <nav className="sticky top-4 space-y-1 rounded-md border border-dockora-border bg-dockora-surface/60 p-2">
             {tabs.map((item) => (
               <button
                 key={item.id}

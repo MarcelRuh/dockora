@@ -29,41 +29,46 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="relative flex min-h-screen">
-      <aside className="sticky top-0 hidden h-screen w-56 shrink-0 flex-col border-r border-dockora-border bg-dockora-rail text-dockora-railText md:flex">
-        <Link href="/" className="flex items-center gap-3 px-5 py-6">
-          <span className="dockora-brand-mark flex h-10 w-10 items-center justify-center font-display text-base font-extrabold tracking-tight">
+      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-dockora-railBorder bg-dockora-rail text-dockora-railText md:flex">
+        <Link
+          href="/"
+          className="group flex flex-col gap-3 border-b border-dockora-railBorder px-5 py-6 transition-opacity hover:opacity-95"
+        >
+          <span className="dockora-brand-mark flex h-11 w-11 items-center justify-center font-display text-lg">
             Dk
           </span>
           <span>
-            <span className="block font-display text-xl font-bold tracking-tight">{t.appName}</span>
-            <span className="mt-0.5 block font-mono text-[10px] uppercase tracking-[0.16em] text-white/45">
+            <span className="block font-display text-2xl font-extrabold tracking-tight">
+              {t.appName}
+            </span>
+            <span className="mt-1 block font-mono text-[10px] uppercase tracking-[0.18em] text-dockora-railMuted">
               {t.tagline}
             </span>
           </span>
         </Link>
 
-        <nav className="flex-1 overflow-y-auto px-3 pb-4">
-          <ul className="space-y-1">
-            {NAV_ITEMS.map((item) => {
+        <nav className="flex-1 overflow-y-auto px-2 py-4">
+          <ul className="space-y-0.5">
+            {NAV_ITEMS.map((item, index) => {
               const active = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
               const Icon = NAV_ICONS[item.key];
               const className = cn(
-                'flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                'flex items-center gap-2.5 rounded-md px-3 py-2.5 text-sm font-medium transition-colors animate-in slide-in',
                 active
                   ? 'dockora-nav-active'
-                  : 'text-white/55 hover:bg-white/5 hover:text-white',
+                  : 'text-dockora-railMuted hover:bg-white/5 hover:text-dockora-railText',
               );
 
               return (
-                <li key={item.key}>
+                <li key={item.key} style={{ animationDelay: `${index * 20}ms` }}>
                   {item.ready ? (
                     <Link href={item.href} className={className}>
-                      <Icon className={cn(active ? 'opacity-100' : 'opacity-80')} />
+                      <Icon className="h-4 w-4 opacity-90" />
                       <span>{t.nav[item.key]}</span>
                     </Link>
                   ) : (
                     <span className={className}>
-                      <Icon className="opacity-50" />
+                      <Icon className="h-4 w-4 opacity-40" />
                       <span>{t.nav[item.key]}</span>
                     </span>
                   )}
@@ -73,11 +78,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </ul>
         </nav>
 
-        <div className="space-y-2 border-t border-white/10 px-3 py-4">
+        <div className="space-y-2 border-t border-dockora-railBorder px-3 py-4">
           <div className="flex gap-2">
             <select
               aria-label={t.locale.label}
-              className="flex-1 rounded-lg border border-white/15 bg-white/5 px-2 py-1.5 font-mono text-xs outline-none focus:border-dockora-accent"
+              className="flex-1 rounded-md border border-dockora-railBorder bg-white/5 px-2 py-1.5 font-mono text-xs text-dockora-railText outline-none focus:border-dockora-accent"
               value={locale}
               onChange={(e) => setLocale(e.target.value as Locale)}
             >
@@ -87,7 +92,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <button
               type="button"
               onClick={toggleTheme}
-              className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 font-mono text-xs uppercase tracking-wider hover:border-dockora-accent"
+              className="rounded-md border border-dockora-railBorder bg-white/5 px-3 py-1.5 font-mono text-xs uppercase tracking-wider text-dockora-railText hover:border-dockora-accent"
               aria-label={t.theme.toggle}
             >
               {theme === 'dark' ? t.theme.light : t.theme.dark}
@@ -99,16 +104,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-40 flex items-center justify-between gap-3 border-b border-dockora-border bg-dockora-bg/90 px-4 py-3 backdrop-blur-md md:hidden">
-          <Link href="/" className="flex items-center gap-2">
-            <span className="dockora-brand-mark flex h-8 w-8 items-center justify-center text-sm font-extrabold">
+          <Link href="/" className="flex items-center gap-2.5">
+            <span className="dockora-brand-mark flex h-9 w-9 items-center justify-center text-sm">
               Dk
             </span>
-            <span className="font-display text-lg font-bold">{t.appName}</span>
+            <span className="font-display text-xl font-extrabold tracking-tight">{t.appName}</span>
           </Link>
           <div className="flex items-center gap-2">
             <select
               aria-label={t.locale.label}
-              className="rounded-lg border border-dockora-border bg-dockora-surface px-2 py-1 font-mono text-xs"
+              className="rounded-md border border-dockora-border bg-dockora-surface px-2 py-1 font-mono text-xs"
               value={locale}
               onChange={(e) => setLocale(e.target.value as Locale)}
             >
@@ -118,14 +123,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <button
               type="button"
               onClick={toggleTheme}
-              className="rounded-lg border border-dockora-border bg-dockora-surface px-2 py-1 font-mono text-xs"
+              className="rounded-md border border-dockora-border bg-dockora-surface px-2 py-1 font-mono text-xs"
             >
               {theme === 'dark' ? t.theme.light : t.theme.dark}
             </button>
           </div>
         </header>
 
-        <nav className="flex gap-1 overflow-x-auto border-b border-dockora-border px-3 py-2 md:hidden">
+        <nav className="flex gap-1 overflow-x-auto border-b border-dockora-border bg-dockora-surface/70 px-2 py-2 md:hidden">
           {NAV_ITEMS.map((item) => {
             const active = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
             const Icon = NAV_ICONS[item.key];
@@ -134,8 +139,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 key={item.key}
                 href={item.href}
                 className={cn(
-                  'inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium',
-                  active ? 'dockora-nav-active' : 'text-dockora-muted',
+                  'inline-flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold',
+                  active
+                    ? 'bg-dockora-accentSoft text-dockora-accent'
+                    : 'text-dockora-muted hover:bg-dockora-surface2 hover:text-dockora-text',
                 )}
               >
                 <Icon className="h-3.5 w-3.5" />
@@ -144,7 +151,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             ) : (
               <span
                 key={item.key}
-                className="inline-flex shrink-0 items-center gap-1.5 px-3 py-1.5 text-xs text-dockora-muted"
+                className="inline-flex shrink-0 items-center gap-1.5 px-2.5 py-1.5 text-xs text-dockora-muted"
               >
                 <Icon className="h-3.5 w-3.5 opacity-50" />
                 <span>{t.nav[item.key]}</span>

@@ -26,7 +26,7 @@ export function Button({
       type={type}
       disabled={disabled}
       className={cn(
-        'inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-xs font-semibold tracking-wide transition-colors disabled:cursor-not-allowed disabled:opacity-40',
+        'inline-flex items-center justify-center rounded-md px-3 py-1.5 text-xs font-semibold tracking-wide transition-[color,background-color,border-color,filter] disabled:cursor-not-allowed disabled:opacity-40',
         variants[variant],
         className,
       )}
@@ -42,7 +42,7 @@ export function Input({
   return (
     <input
       className={cn(
-        'w-full rounded-lg border border-dockora-border bg-dockora-surface px-3 py-2 text-sm outline-none focus:border-dockora-accent',
+        'w-full rounded-md border border-dockora-border bg-dockora-surface px-3 py-2 text-sm outline-none transition-colors focus:border-dockora-accent focus:ring-2 focus:ring-dockora-accentSoft',
         className,
       )}
       {...props}
@@ -58,7 +58,7 @@ export function Select({
   return (
     <select
       className={cn(
-        'rounded-lg border border-dockora-border bg-dockora-surface px-3 py-2 text-sm outline-none focus:border-dockora-accent',
+        'rounded-md border border-dockora-border bg-dockora-surface px-3 py-2 text-sm outline-none transition-colors focus:border-dockora-accent focus:ring-2 focus:ring-dockora-accentSoft',
         className,
       )}
       {...props}
@@ -75,7 +75,7 @@ export function Textarea({
   return (
     <textarea
       className={cn(
-        'w-full rounded-lg border border-dockora-border bg-dockora-surface px-3 py-2 text-sm outline-none focus:border-dockora-accent',
+        'w-full rounded-md border border-dockora-border bg-dockora-surface px-3 py-2 text-sm outline-none transition-colors focus:border-dockora-accent focus:ring-2 focus:ring-dockora-accentSoft',
         className,
       )}
       {...props}

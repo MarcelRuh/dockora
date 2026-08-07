@@ -97,7 +97,7 @@ export function MonitoringPage() {
             ].map((item) => (
               <div
                 key={item.label}
-                className="space-y-3 rounded-2xl border border-dockora-border bg-dockora-surface/80 p-4"
+                className="space-y-3 rounded-md border border-dockora-border bg-dockora-surface/80 p-4"
               >
                 <div className="flex items-baseline justify-between gap-2">
                   <p className="text-sm text-dockora-muted">{item.label}</p>
@@ -121,7 +121,7 @@ export function MonitoringPage() {
                 {data.alerts.map((alert) => (
                   <li
                     key={alert}
-                    className="rounded-xl border border-dockora-warning/40 bg-dockora-warning/10 px-4 py-2 text-sm text-dockora-warning"
+                    className="rounded-md border border-dockora-warning/40 bg-dockora-warning/10 px-4 py-2 text-sm text-dockora-warning"
                   >
                     {alert}
                   </li>

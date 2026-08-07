@@ -79,7 +79,7 @@ export function SchedulerSection({ canEdit }: { canEdit: boolean }) {
         {jobs.map((job) => (
           <div
             key={job.id}
-            className="flex flex-col gap-3 rounded-xl border border-dockora-border bg-dockora-surface/80 p-4 sm:flex-row sm:items-center sm:justify-between"
+            className="flex flex-col gap-3 rounded-md border border-dockora-border bg-dockora-surface/80 p-4 sm:flex-row sm:items-center sm:justify-between"
           >
             <div className="min-w-0 space-y-1">
               <p className="font-medium">{job.type}</p>

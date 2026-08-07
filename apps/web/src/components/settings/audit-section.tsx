@@ -58,7 +58,7 @@ export function AuditSection() {
         <Button onClick={() => void load()}>{t.common.refresh}</Button>
       </div>
       {error ? <ErrorBanner message={error} /> : null}
-      <ul className="divide-y divide-dockora-border rounded-xl border border-dockora-border">
+      <ul className="divide-y divide-dockora-border rounded-md border border-dockora-border">
         {rows.map((row) => (
           <li key={row.id} className="px-4 py-3 text-sm">
             <div className="flex flex-wrap items-baseline justify-between gap-2">

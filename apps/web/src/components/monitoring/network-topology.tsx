@@ -42,7 +42,7 @@ type TopologyNode = Node<HostNodeData | ContainerNodeData | NetworkNodeData>;
 
 function HostNode({ data }: NodeProps<Node<HostNodeData>>) {
   return (
-    <div className="min-w-[140px] rounded-2xl border border-dockora-accent/50 bg-dockora-accent-soft px-4 py-3 shadow-sm">
+    <div className="min-w-[140px] rounded-md border border-dockora-accent/50 bg-dockora-accentSoft px-4 py-3">
       <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-dockora-accent">Host</p>
       <p className="mt-1 font-display text-sm font-bold">{data.label}</p>
       <Handle type="source" position={Position.Right} className="!bg-dockora-accent" />
@@ -55,7 +55,7 @@ function ContainerNode({ data }: NodeProps<Node<ContainerNodeData>>) {
   return (
     <div
       className={cn(
-        'min-w-[170px] cursor-pointer rounded-2xl border bg-dockora-surface px-4 py-3 shadow-sm',
+        'min-w-[170px] cursor-pointer rounded-md border bg-dockora-surface px-4 py-3',
         running ? 'border-dockora-success/40' : 'border-dockora-border',
       )}
     >
@@ -79,7 +79,7 @@ function ContainerNode({ data }: NodeProps<Node<ContainerNodeData>>) {
 
 function NetworkNode({ data }: NodeProps<Node<NetworkNodeData>>) {
   return (
-    <div className="min-w-[140px] rounded-2xl border border-dockora-border bg-dockora-surface-2/80 px-4 py-3 shadow-sm">
+    <div className="min-w-[140px] rounded-md border border-dockora-border bg-dockora-surface2/80 px-4 py-3">
       <Handle type="target" position={Position.Left} className="!bg-dockora-muted" />
       <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-dockora-muted">Network</p>
       <p className="mt-1 truncate font-mono text-sm font-semibold">{data.label}</p>
@@ -223,7 +223,7 @@ export function NetworkTopology({
           {labels.published}
         </p>
       </div>
-      <div className="h-[420px] overflow-hidden rounded-2xl border border-dockora-border bg-dockora-bg/60">
+      <div className="h-[420px] overflow-hidden rounded-md border border-dockora-border bg-dockora-bg/60">
         <ReactFlow
           nodes={nodes}
           edges={edges}

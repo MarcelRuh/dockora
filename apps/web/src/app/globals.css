@@ -5,42 +5,49 @@
 @import 'xterm/css/xterm.css';
 @import '@xyflow/react/dist/style.css';
 
+/* Harbor Console – light-first teal ops UI */
 :root {
-  --dockora-bg: #eef1f6;
+  --dockora-bg: #f3f6f8;
   --dockora-surface: #ffffff;
-  --dockora-surface-2: #e4e9f1;
-  --dockora-border: #c5cedc;
-  --dockora-text: #121826;
-  --dockora-muted: #5c6b82;
-  --dockora-accent: #c45a28;
-  --dockora-accent-soft: rgba(196, 90, 40, 0.12);
-  --dockora-accent-fg: #fff8f3;
-  --dockora-success: #0f7a4a;
-  --dockora-warning: #b45309;
-  --dockora-danger: #b42318;
-  --dockora-glow: rgba(196, 90, 40, 0.18);
-  --dockora-rail: #121826;
-  --dockora-rail-text: #eef1f6;
-  --dockora-hatch: rgba(18, 24, 38, 0.04);
+  --dockora-surface-2: #e7eef1;
+  --dockora-border: #c5d4da;
+  --dockora-text: #0b1f24;
+  --dockora-muted: #5a7178;
+  --dockora-accent: #0f766e;
+  --dockora-accent-soft: rgba(15, 118, 110, 0.12);
+  --dockora-accent-fg: #f0fdfa;
+  --dockora-success: #15803d;
+  --dockora-warning: #c2410c;
+  --dockora-danger: #be123c;
+  --dockora-mesh: rgba(15, 118, 110, 0.09);
+  --dockora-mesh-2: rgba(8, 47, 73, 0.05);
+  --dockora-grid: rgba(11, 31, 36, 0.045);
+  --dockora-rail: #0a1c1f;
+  --dockora-rail-text: #e8f4f3;
+  --dockora-rail-muted: rgba(232, 244, 243, 0.55);
+  --dockora-rail-border: rgba(232, 244, 243, 0.1);
 }
 
 .dark {
-  --dockora-bg: #0a0d14;
-  --dockora-surface: #121722;
-  --dockora-surface-2: #1a2130;
-  --dockora-border: #2a3347;
-  --dockora-text: #eef1f6;
-  --dockora-muted: #8b97ad;
-  --dockora-accent: #e07040;
-  --dockora-accent-soft: rgba(224, 112, 64, 0.14);
-  --dockora-accent-fg: #1a0e08;
-  --dockora-success: #3ecf8e;
-  --dockora-warning: #f0b429;
-  --dockora-danger: #f04438;
-  --dockora-glow: rgba(224, 112, 64, 0.22);
-  --dockora-rail: #06080e;
-  --dockora-rail-text: #eef1f6;
-  --dockora-hatch: rgba(224, 112, 64, 0.035);
+  --dockora-bg: #071416;
+  --dockora-surface: #0f1c1f;
+  --dockora-surface-2: #15262b;
+  --dockora-border: #2a4046;
+  --dockora-text: #e8f4f3;
+  --dockora-muted: #8aa3a9;
+  --dockora-accent: #2dd4bf;
+  --dockora-accent-soft: rgba(45, 212, 191, 0.12);
+  --dockora-accent-fg: #042f2e;
+  --dockora-success: #4ade80;
+  --dockora-warning: #fb923c;
+  --dockora-danger: #fb7185;
+  --dockora-mesh: rgba(45, 212, 191, 0.07);
+  --dockora-mesh-2: rgba(56, 189, 248, 0.04);
+  --dockora-grid: rgba(232, 244, 243, 0.035);
+  --dockora-rail: #040d0f;
+  --dockora-rail-text: #e8f4f3;
+  --dockora-rail-muted: rgba(232, 244, 243, 0.5);
+  --dockora-rail-border: rgba(232, 244, 243, 0.1);
 }
 
 html,
@@ -51,14 +58,15 @@ body {
 body {
   background-color: var(--dockora-bg);
   background-image:
-    radial-gradient(ellipse 80% 50% at 0% 0%, var(--dockora-glow), transparent 55%),
-    repeating-linear-gradient(
-      -32deg,
-      transparent,
-      transparent 11px,
-      var(--dockora-hatch) 11px,
-      var(--dockora-hatch) 12px
-    );
+    radial-gradient(ellipse 70% 45% at 8% -10%, var(--dockora-mesh), transparent 55%),
+    radial-gradient(ellipse 50% 40% at 100% 0%, var(--dockora-mesh-2), transparent 50%),
+    linear-gradient(var(--dockora-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--dockora-grid) 1px, transparent 1px);
+  background-size:
+    auto,
+    auto,
+    28px 28px,
+    28px 28px;
   color: var(--dockora-text);
 }
 
@@ -70,7 +78,18 @@ body {
 @keyframes dockora-fade-in {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes dockora-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
   }
   to {
     opacity: 1;
@@ -85,30 +104,41 @@ body {
     transform: scale(1);
   }
   50% {
-    opacity: 0.45;
+    opacity: 0.4;
     transform: scale(0.85);
   }
 }
 
 .animate-in.fade-in {
-  animation: dockora-fade-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: dockora-fade-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-in.slide-in {
+  animation: dockora-slide-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .dockora-panel {
   border: 1px solid var(--dockora-border);
-  background: color-mix(in srgb, var(--dockora-surface) 92%, transparent);
-  border-radius: 1rem;
-  backdrop-filter: blur(8px);
+  background: color-mix(in srgb, var(--dockora-surface) 94%, transparent);
+  border-radius: 0.5rem;
 }
 
 .dockora-brand-mark {
   background: var(--dockora-accent);
   color: var(--dockora-accent-fg);
-  border-radius: 0.65rem;
+  border-radius: 0.4rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
 }
 
 .dockora-nav-active {
-  background: var(--dockora-accent-soft);
+  background: color-mix(in srgb, var(--dockora-accent) 18%, transparent);
+  color: var(--dockora-accent);
+  box-shadow: inset 3px 0 0 var(--dockora-accent);
+}
+
+.dark .dockora-nav-active {
+  background: color-mix(in srgb, var(--dockora-accent) 14%, transparent);
   color: var(--dockora-accent);
 }
 
@@ -116,10 +146,10 @@ body {
   animation: dockora-pulse-dot 1.8s ease-in-out infinite;
 }
 
-/* React Flow controls / minimap – Dockora theme (default xyflow is light-only) */
+/* React Flow controls / minimap – Dockora theme */
 .react-flow__controls {
   border: 1px solid var(--dockora-border) !important;
-  border-radius: 0.75rem !important;
+  border-radius: 0.5rem !important;
   overflow: hidden;
   box-shadow: none !important;
 }
@@ -149,7 +179,7 @@ body {
 .react-flow__minimap {
   background: var(--dockora-surface) !important;
   border: 1px solid var(--dockora-border) !important;
-  border-radius: 0.75rem !important;
+  border-radius: 0.5rem !important;
   overflow: hidden;
 }
 
@@ -165,4 +195,3 @@ body {
 .react-flow__attribution {
   display: none !important;
 }
-
