@@ -48,12 +48,21 @@ export class UpdatesService {
     );
     const results: UpdateCheckResult[] = [];
 
-    for (const container of containers) {
+    for (let i = 0; i < containers.length; i++) {
+      const container = containers[i]!;
+      // Stagger registry calls – GHCR anonymous/auth quotas are easy to trip in a burst
+      if (i > 0) await sleep(750);
       try {
         const result = await this.checkContainer(container.id, container.name, container.image);
         results.push(result);
+        if (result.error?.toLowerCase().includes('rate limited')) {
+          await sleep(5_000);
+        }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
+        if (message.toLowerCase().includes('rate limited')) {
+          await sleep(5_000);
+        }
         const fallback = await this.persistError(
           container.id,
           container.name,
@@ -218,27 +227,37 @@ export class UpdatesService {
         }
       }
 
-      const targetRef =
-        remoteDigest && !cached.image.includes('@')
-          ? `${stripTag(cached.image)}@${remoteDigest}`
-          : cached.image;
+      // Pull exact digest when known, but recreate with the original tag
+      // (e.g. :latest) so Config.Image stays human-readable and matches compose YAML.
+      const taggedRef = cached.image;
+      const digestRef =
+        remoteDigest && !taggedRef.includes('@')
+          ? `${stripTag(taggedRef)}@${remoteDigest}`
+          : null;
+      const pullRef = digestRef ?? taggedRef;
+      const runRef = taggedRef;
 
-      await this.deps.docker.pullImage(targetRef).catch(async () => {
-        await this.deps.docker.pullImage(cached.image);
+      await this.deps.docker.pullImage(pullRef).catch(async () => {
+        await this.deps.docker.pullImage(taggedRef);
       });
+      if (digestRef) {
+        await this.deps.docker.tagImage(digestRef, runRef).catch(async () => {
+          await this.deps.docker.tagImage(pullRef, runRef);
+        });
+      }
 
       let recreateMsg = '';
       if (composeProjectId && this.deps.compose && composeServiceName) {
         await this.deps.compose.recreatePinned(composeProjectId, {
           serviceName: composeServiceName,
-          imageRef: targetRef,
+          imageRef: runRef,
         });
-        recreateMsg = ` Compose service "${composeServiceName}" recreated (${targetRef}).`;
+        recreateMsg = ` Compose service "${composeServiceName}" recreated (${runRef}).`;
       } else if (composeProjectId && this.deps.compose) {
         await this.deps.compose.runAction(composeProjectId, 'recreate');
         recreateMsg = ' Compose project recreated.';
       } else {
-        await recreateStandaloneContainer(this.deps.docker, containerId, targetRef);
+        await recreateStandaloneContainer(this.deps.docker, containerId, runRef);
         recreateMsg = ' Standalone container recreated.';
       }
 
@@ -475,6 +494,25 @@ type ManifestAuth = {
   registryAuth?: RegistryAuth;
 };
 
+interface WwwAuthChallenge {
+  realm?: string;
+  service?: string;
+  scope?: string;
+}
+
+function isGhcrFamily(registryHost: string): boolean {
+  const host = registryHost.toLowerCase();
+  return host.includes('ghcr.io') || host.includes('lscr.io');
+}
+
+function defaultGhcrChallenge(repoPath: string): WwwAuthChallenge {
+  return {
+    realm: 'https://ghcr.io/token',
+    service: 'ghcr.io',
+    scope: `repository:${repoPath}:pull`,
+  };
+}
+
 async function fetchManifestDigest(
   registryHost: string,
   repoPath: string,
@@ -490,54 +528,69 @@ async function fetchManifestDigest(
     return request(url, { headers });
   };
 
-  // Never send a raw PAT as Bearer on the first request – GHCR/LSCR answer 403
-  // ("invalid token") without WWW-Authenticate, which broke public image checks.
-  let res = await attempt(auth?.bearer);
-  let usedChallenge = false;
+  const resolveBearer = async (
+    challengeHint?: WwwAuthChallenge | null,
+  ): Promise<string | null> => {
+    let challenge = challengeHint ?? null;
+    if (!challenge && isGhcrFamily(registryHost)) {
+      challenge = defaultGhcrChallenge(repoPath);
+    }
+    if (!challenge) return null;
+    return fetchRegistryBearerToken(challenge, repoPath, auth?.registryAuth);
+  };
+
+  // Prefer authenticated GHCR/LSCR access when a PAT is configured.
+  // Anonymous GHCR quota is tiny – public 200s still count against it and cause 429s.
+  let bearer = auth?.bearer;
+  if (!bearer && auth?.registryAuth?.token && isGhcrFamily(registryHost)) {
+    bearer = (await resolveBearer(defaultGhcrChallenge(repoPath))) ?? undefined;
+  }
+
+  let res = await attempt(bearer);
+  let usedChallenge = Boolean(bearer && auth?.registryAuth?.token);
 
   const needsAuth =
     res.statusCode === 401 ||
     res.statusCode === 403 ||
-    (res.statusCode === 404 && !auth?.bearer); // some registries hide existence until authed
+    (res.statusCode === 404 && !bearer);
 
   if (needsAuth) {
     let challenge = parseWwwAuthenticate(res.headers['www-authenticate']);
     await res.body.dump().catch(() => undefined);
 
-    // 403 with bad Bearer (or no challenge): retry anonymous to obtain a real challenge
     if (!challenge) {
       const anon = await attempt(undefined);
       challenge = parseWwwAuthenticate(anon.headers['www-authenticate']);
       if (!challenge && anon.statusCode < 400) {
-        // Public registry that accepted anonymous GET – use this response
         res = anon;
       } else {
         await anon.body.dump().catch(() => undefined);
       }
     }
 
-    if (challenge) {
-      const bearer = await fetchRegistryBearerToken(challenge, repoPath, auth?.registryAuth);
-      if (!bearer) {
-        throw new Error(`Registry auth required (${ref})`);
-      }
-      usedChallenge = true;
-      res = await attempt(bearer);
+    const nextBearer = await resolveBearer(challenge);
+    if (!nextBearer) {
+      throw new Error(`Registry auth required (${ref})`);
     }
+    usedChallenge = true;
+    bearer = nextBearer;
+    res = await attempt(bearer);
   }
 
-  // Rate limit: one short retry
-  if (res.statusCode === 429) {
+  // Rate limit: backoff + authenticated retry (never stay on anonymous)
+  for (let retry = 0; res.statusCode === 429 && retry < 3; retry++) {
     await res.body.dump().catch(() => undefined);
-    await sleep(1500);
-    const bearer = auth?.bearer;
-    res = await attempt(bearer);
-    if (res.statusCode === 401 || res.statusCode === 403) {
-      const challenge = parseWwwAuthenticate(res.headers['www-authenticate']);
-      await res.body.dump().catch(() => undefined);
-      const token = await fetchRegistryBearerToken(challenge, repoPath, auth?.registryAuth);
-      if (token) res = await attempt(token);
+    await sleep(2_000 * (retry + 1));
+    const challenge = parseWwwAuthenticate(res.headers['www-authenticate']);
+    const nextBearer =
+      (await resolveBearer(challenge)) ??
+      (auth?.registryAuth?.token ? await resolveBearer(null) : null) ??
+      bearer;
+    if (nextBearer) {
+      usedChallenge = true;
+      bearer = nextBearer;
     }
+    res = await attempt(bearer);
   }
 
   if (res.statusCode === 401 || res.statusCode === 403) {
@@ -584,12 +637,6 @@ async function fetchManifestDigest(
   }
 
   return null;
-}
-
-interface WwwAuthChallenge {
-  realm?: string;
-  service?: string;
-  scope?: string;
 }
 
 function parseWwwAuthenticate(header: string | string[] | undefined): WwwAuthChallenge | null {

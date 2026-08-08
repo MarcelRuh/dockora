@@ -24,7 +24,7 @@ import {
   StatusBadge,
 } from '@/components/ui/page-parts';
 
-const STATS_POLL_MS = 10_000;
+const STATS_POLL_MS = 15_000;
 
 function mergePreservingStats(
   previous: ContainerSummary[],

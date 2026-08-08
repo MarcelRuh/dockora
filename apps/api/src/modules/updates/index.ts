@@ -5,7 +5,9 @@ import {
   PrismaSettingsRepository,
   SettingsService,
 } from '../settings/settings.service.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 import { UpdatesService } from './updates.service.js';
+import { notifyUpdatesAvailable, notifyUpdatesInstalled } from './notify-updates.js';
 
 export const updatesModule: FastifyPluginAsync = async (app: FastifyInstance) => {
   const compose = new ComposeService({
@@ -14,6 +16,7 @@ export const updatesModule: FastifyPluginAsync = async (app: FastifyInstance) =>
     excludePaths: app.config.composeExcludePaths,
   });
   const settings = new SettingsService(new PrismaSettingsRepository());
+  const notifications = new NotificationsService({ settings });
   const service = new UpdatesService({
     docker: app.docker,
     compose,
@@ -35,14 +38,24 @@ export const updatesModule: FastifyPluginAsync = async (app: FastifyInstance) =>
   });
 
   app.post(`${API_PREFIX}/updates/check`, async (): Promise<UpdateCheckResult[]> => {
-    return service.checkAll(true);
+    const results = await service.checkAll(true);
+    // Same Discord/in-app signal as the scheduled update_check job
+    await notifyUpdatesAvailable(notifications, results);
+    return results;
   });
 
   app.post<{ Params: { containerId: string } }>(
     `${API_PREFIX}/updates/:containerId/pull`,
     { preHandler: [app.requireRole('admin', 'operator')] },
     async (request) => {
-      return service.applyUpdate(request.params.containerId);
+      const before = (await service.listCached()).find(
+        (r) => r.containerId === request.params.containerId,
+      );
+      const result = await service.applyUpdate(request.params.containerId);
+      if (result.ok && before) {
+        await notifyUpdatesInstalled(notifications, [before]);
+      }
+      return result;
     },
   );
 };

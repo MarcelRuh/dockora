@@ -6,10 +6,10 @@ import { nextCronRunIso } from './next-cron-run.js';
 export type JobCallback = () => Promise<void>;
 
 const DEFAULT_JOBS: Array<{ type: JobType; cron: string; preset?: string }> = [
-  { type: 'update_check', cron: '0 * * * *', preset: 'custom' },
+  { type: 'update_check', cron: '0 */2 * * *', preset: 'custom' },
   { type: 'backup', cron: '0 2 * * *', preset: 'daily' },
   { type: 'cleanup', cron: '0 3 * * *', preset: 'daily' },
-  { type: 'healthcheck', cron: '*/5 * * * *', preset: 'custom' },
+  { type: 'healthcheck', cron: '*/15 * * * *', preset: 'custom' },
 ];
 
 export class SchedulerService {
@@ -40,6 +40,21 @@ export class SchedulerService {
         job.cron === '0 3 * * *'
       ) {
         // Migrate legacy weekly cleanup → daily (build-cache fills quickly)
+        await prisma.scheduledJob.update({
+          where: { id: existing.id },
+          data: { cron: job.cron, preset: job.preset },
+        });
+      } else if (
+        job.type === 'healthcheck' &&
+        (existing.cron === '*/5 * * * *' || existing.cron === '*/5 * * *')
+      ) {
+        // Less frequent healthchecks → lower Docker df / CPU load
+        await prisma.scheduledJob.update({
+          where: { id: existing.id },
+          data: { cron: job.cron, preset: job.preset },
+        });
+      } else if (job.type === 'update_check' && existing.cron === '0 * * * *') {
+        // Hourly registry checks are heavy under GHCR rate limits
         await prisma.scheduledJob.update({
           where: { id: existing.id },
           data: { cron: job.cron, preset: job.preset },

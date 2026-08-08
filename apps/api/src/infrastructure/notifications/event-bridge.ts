@@ -6,6 +6,7 @@ export type EventBridgeHandler = (
   title: string,
   message: string,
   severity?: 'info' | 'warning' | 'error' | 'success',
+  options?: { containers?: string[] },
 ) => Promise<void>;
 
 /**
@@ -15,8 +16,8 @@ export type EventBridgeHandler = (
 export function createEventBridge(
   notifications: NotificationsService,
 ): EventBridgeHandler {
-  return async (event, title, message, severity = 'info') => {
-    await notifications.notify(event, title, message, severity);
+  return async (event, title, message, severity = 'info', options) => {
+    await notifications.notify(event, title, message, severity, options);
   };
 }
 

@@ -139,19 +139,28 @@ export class HostMetricsService implements IHostMetrics {
 
     try {
       const zones = await fs.readdir('/sys/class/thermal');
-      const readings: number[] = [];
+      const preferred: number[] = [];
+      const fallback: number[] = [];
 
       for (const zone of zones) {
         if (!zone.startsWith('thermal_zone')) continue;
         try {
+          const type = (
+            await fs.readFile(`/sys/class/thermal/${zone}/type`, 'utf8')
+          ).trim();
           const raw = await fs.readFile(`/sys/class/thermal/${zone}/temp`, 'utf8');
           const milliC = Number.parseInt(raw.trim(), 10);
-          if (!Number.isNaN(milliC)) readings.push(milliC / 1000);
+          if (Number.isNaN(milliC)) continue;
+          const c = milliC / 1000;
+          // Prefer real CPU package sensors; ACPI TZ often reports junk or ambient
+          if (/pkg|x86|cpu|core/i.test(type)) preferred.push(c);
+          else if (!/acpitz|acpi/i.test(type)) fallback.push(c);
         } catch {
           // ignore
         }
       }
 
+      const readings = preferred.length > 0 ? preferred : fallback;
       if (readings.length === 0) return null;
       return round1(Math.max(...readings));
     } catch {
@@ -189,8 +198,8 @@ async function readHostProcSnap(
 ): Promise<{ meminfo: string; stat: string; df: string } | null> {
   try {
     const st = await fs.stat(snapPath);
-    // veraltet (>15s) ignorieren
-    if (Date.now() - st.mtimeMs > 15_000) return null;
+    // veraltet (>30s) ignorieren – host-agent schreibt alle ~10s
+    if (Date.now() - st.mtimeMs > 30_000) return null;
     const raw = await fs.readFile(snapPath, 'utf8');
     const [meminfo, rest] = raw.split('----STAT----');
     if (!meminfo || !rest) return null;

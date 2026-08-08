@@ -37,7 +37,7 @@ export function MonitoringPage() {
 
   useEffect(() => {
     void load();
-    const timer = window.setInterval(() => void load(), 8_000);
+    const timer = window.setInterval(() => void load(), 15_000);
     return () => window.clearInterval(timer);
   }, [load]);
 

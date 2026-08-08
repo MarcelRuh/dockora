@@ -16,7 +16,7 @@ const DEFAULTS: AppSettings = {
   locale: 'de',
   theme: 'dark',
   timezone: 'Europe/Berlin',
-  updateCheckIntervalMinutes: 60,
+  updateCheckIntervalMinutes: 120,
   autoUpdateImages: false,
   ghcrToken: '',
   lscrToken: '',
@@ -27,6 +27,7 @@ const DEFAULTS: AppSettings = {
   monitoringRamThreshold: 90,
   monitoringDiskThreshold: 85,
   monitoringBuildCacheGbThreshold: 5,
+  monitoringTempThreshold: 95,
   authEnabled: false,
 };
 
@@ -96,6 +97,7 @@ export class SettingsService {
         stored.monitoringBuildCacheGbThreshold,
         base.monitoringBuildCacheGbThreshold,
       ),
+      monitoringTempThreshold: num(stored.monitoringTempThreshold, base.monitoringTempThreshold),
       authEnabled: stored.authEnabled ? stored.authEnabled === 'true' : base.authEnabled,
     };
   }

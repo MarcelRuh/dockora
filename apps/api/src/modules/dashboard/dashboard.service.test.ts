@@ -53,6 +53,7 @@ function createMocks(overrides?: {
     pullImage: vi.fn(),
     removeImage: vi.fn(),
     pruneImages: vi.fn(),
+    tagImage: vi.fn(),
     pruneBuildCache: vi.fn(async () => ({ spaceReclaimed: 0 })),
     getBuildCacheBytes: vi.fn(async () => 0),
     getImageInspect: vi.fn(),

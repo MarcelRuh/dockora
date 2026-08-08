@@ -4,7 +4,7 @@ import { ComposeVersionProvider } from '../../infrastructure/docker/compose-vers
 import { prisma } from '../../infrastructure/db/prisma.js';
 import { DashboardService } from './dashboard.service.js';
 
-const SSE_INTERVAL_MS = 5_000;
+const SSE_INTERVAL_MS = 10_000;
 
 export const dashboardModule: FastifyPluginAsync = async (app: FastifyInstance) => {
   const service = new DashboardService({

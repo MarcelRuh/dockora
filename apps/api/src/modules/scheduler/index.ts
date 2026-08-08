@@ -6,6 +6,10 @@ import {
 } from '../settings/settings.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { UpdatesService } from '../updates/updates.service.js';
+import {
+  notifyUpdatesAvailable,
+  notifyUpdatesInstalled,
+} from '../updates/notify-updates.js';
 import { BackupsService } from '../backups/backups.service.js';
 import { MonitoringService } from '../monitoring/monitoring.service.js';
 import { ComposeService } from '../compose/compose.service.js';
@@ -20,7 +24,14 @@ export const schedulerModule: FastifyPluginAsync = async (app: FastifyInstance) 
     searchPaths: app.config.composeSearchPaths,
     excludePaths: app.config.composeExcludePaths,
   });
-  const updates = new UpdatesService({ docker: app.docker, compose });
+  const updates = new UpdatesService({
+    docker: app.docker,
+    compose,
+    getRegistryAuth: async () => {
+      const s = await settings.getSettings();
+      return { ghcrToken: s.ghcrToken, lscrToken: s.lscrToken };
+    },
+  });
   const backups = new BackupsService({
     settings,
     backupDir: app.config.backupDir,
@@ -36,35 +47,23 @@ export const schedulerModule: FastifyPluginAsync = async (app: FastifyInstance) 
 
   scheduler.registerCallback('update_check', async () => {
     const results = await updates.checkAll(true);
-    const available = results.filter((r) => r.updateAvailable);
+    const available = results.filter((r) => r.updateAvailable && !r.error);
     if (available.length === 0) return;
 
     const current = await settings.getSettings();
     const autoUpdate = current.autoUpdateImages || app.config.autoUpdateEnabled;
 
     if (autoUpdate) {
-      let installed = 0;
+      const installed: typeof available = [];
       for (const item of available) {
         const result = await updates.applyUpdate(item.containerId);
-        if (result.ok) installed += 1;
+        if (result.ok) installed.push(item);
       }
-      if (installed > 0) {
-        await notifications.notify(
-          'update.installed',
-          'Auto-Update',
-          `${installed} Container aktualisiert (Pull + Recreate).`,
-          'success',
-        );
-      }
+      await notifyUpdatesInstalled(notifications, installed, { auto: true });
       return;
     }
 
-    await notifications.notify(
-      'update.available',
-      'Updates verfügbar',
-      `${available.length} Container haben Updates.`,
-      'info',
-    );
+    await notifyUpdatesAvailable(notifications, results);
   });
 
   scheduler.registerCallback('backup', async () => {
@@ -142,11 +141,18 @@ export const schedulerModule: FastifyPluginAsync = async (app: FastifyInstance) 
     const freshSnapshot = cacheAlert ? await monitoring.getSnapshot() : snapshot;
     const fresh = filterAlertsWithCooldown(freshSnapshot.alerts);
     if (fresh.length > 0) {
+      const containerHints = fresh
+        .map((a) => {
+          const m = a.match(/^([^:]+):\s*(unhealthy|exited)/i);
+          return m?.[1]?.trim();
+        })
+        .filter((n): n is string => Boolean(n));
       await notifications.notify(
         'error',
-        'Monitoring-Alerts',
-        fresh.join('; '),
+        fresh.length === 1 ? 'Monitoring-Alert' : 'Monitoring-Alerts',
+        fresh.map((a) => `• ${a}`).join('\n'),
         'warning',
+        { containers: containerHints },
       );
     }
   });

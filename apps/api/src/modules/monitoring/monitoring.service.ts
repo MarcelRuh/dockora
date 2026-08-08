@@ -83,7 +83,7 @@ export class MonitoringService {
         `Disk usage ${diskPercent}% exceeds ${settings.monitoringDiskThreshold}% threshold (${freeGb} GB free)`,
       );
     }
-    if (resources.temperatureC !== null && resources.temperatureC >= 85) {
+    if (resources.temperatureC !== null && resources.temperatureC >= settings.monitoringTempThreshold) {
       alerts.push(`High temperature: ${resources.temperatureC}°C`);
     }
 
