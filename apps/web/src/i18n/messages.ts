@@ -454,6 +454,7 @@ export const messages = {
         authEnabled: 'Nach dem Speichern wird die Seite neu geladen.',
         monitoringBuildCacheGbThreshold:
           'Alert, wenn Docker BuildKit-Cache diese Größe überschreitet (0 = deaktiviert).',
+        monitoringTempThreshold: 'Alarm ab dieser CPU-Package-Temperatur (Standard 95 °C).',
       },
       scheduler: {
         empty: 'Keine Jobs konfiguriert.',
@@ -542,6 +543,7 @@ export const messages = {
         monitoringCpuThreshold: 'CPU-Schwellwert (%)',
         monitoringRamThreshold: 'RAM-Schwellwert (%)',
         monitoringDiskThreshold: 'Festplatten-Schwellwert (%)',
+        monitoringTempThreshold: 'Temperatur-Schwellwert (°C)',
         monitoringBuildCacheGbThreshold: 'Build-Cache-Schwellwert (GB)',
         authEnabled: 'Authentifizierung aktiv',
       },
@@ -1049,6 +1051,7 @@ export const messages = {
         authEnabled: 'The page reloads after saving this setting.',
         monitoringBuildCacheGbThreshold:
           'Alert when Docker BuildKit cache exceeds this size (0 = disabled).',
+        monitoringTempThreshold: 'Alert when CPU package temperature reaches this °C (default 95).',
       },
       scheduler: {
         empty: 'No jobs configured.',
@@ -1137,6 +1140,7 @@ export const messages = {
         monitoringCpuThreshold: 'CPU threshold (%)',
         monitoringRamThreshold: 'RAM threshold (%)',
         monitoringDiskThreshold: 'Disk threshold (%)',
+        monitoringTempThreshold: 'Temperature threshold (°C)',
         monitoringBuildCacheGbThreshold: 'Build cache threshold (GB)',
         authEnabled: 'Authentication enabled',
       },

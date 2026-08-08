@@ -493,6 +493,19 @@ export function SettingsPageView() {
                   />
                 </Field>
                 <Field
+                  label={t.settings.fields.monitoringTempThreshold}
+                  hint={t.settings.hints.monitoringTempThreshold}
+                >
+                  <Input
+                    type="number"
+                    min={50}
+                    max={120}
+                    value={settings.monitoringTempThreshold}
+                    onChange={(e) => patch('monitoringTempThreshold', Number(e.target.value))}
+                    disabled={!isAdmin}
+                  />
+                </Field>
+                <Field
                   label={t.settings.fields.monitoringBuildCacheGbThreshold}
                   hint={t.settings.hints.monitoringBuildCacheGbThreshold}
                 >

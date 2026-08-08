@@ -15,7 +15,7 @@ export interface UseDashboardResult {
   refresh: () => Promise<void>;
 }
 
-const POLL_INTERVAL_MS = 5_000;
+const POLL_INTERVAL_MS = 10_000;
 
 /**
  * Live-Dashboard: bevorzugt SSE direkt gegen die API, Fallback Polling.

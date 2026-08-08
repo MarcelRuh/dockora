@@ -218,6 +218,8 @@ export interface AppSettings {
   monitoringDiskThreshold: number;
   /** Alert when Docker build cache exceeds this many GB */
   monitoringBuildCacheGbThreshold: number;
+  /** Alert when host CPU package temperature reaches this °C */
+  monitoringTempThreshold: number;
   authEnabled: boolean;
 }
 

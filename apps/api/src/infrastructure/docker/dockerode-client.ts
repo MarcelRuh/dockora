@@ -43,6 +43,7 @@ export class DockerodeClient implements IDockerClient {
   private readonly events: DockerEventInfo[] = [];
   private stream: NodeJS.ReadableStream | null = null;
   private listening = false;
+  private buildCacheCache: { at: number; bytes: number } | null = null;
 
   constructor(options: DockerodeClientOptions) {
     this.logger = options.logger;
@@ -201,6 +202,11 @@ export class DockerodeClient implements IDockerClient {
     });
   }
 
+  async tagImage(source: string, target: string): Promise<void> {
+    const { repo, tag } = splitRepoTag(target);
+    await this.docker.getImage(source).tag({ repo, tag });
+  }
+
   async removeImage(id: string, force = false): Promise<void> {
     const image = this.docker.getImage(id);
     await image.remove({ force });
@@ -254,14 +260,20 @@ export class DockerodeClient implements IDockerClient {
   }
 
   async getBuildCacheBytes(): Promise<number> {
+    const now = Date.now();
+    if (this.buildCacheCache && now - this.buildCacheCache.at < 60_000) {
+      return this.buildCacheCache.bytes;
+    }
     try {
       const df = (await this.docker.df()) as {
         BuildCache?: Array<{ Size?: number }>;
       };
-      return (df.BuildCache ?? []).reduce((sum, entry) => sum + (entry.Size ?? 0), 0);
+      const bytes = (df.BuildCache ?? []).reduce((sum, entry) => sum + (entry.Size ?? 0), 0);
+      this.buildCacheCache = { at: now, bytes };
+      return bytes;
     } catch (error) {
       this.logger?.debug({ err: error }, 'docker df (build cache) failed');
-      return 0;
+      return this.buildCacheCache?.bytes ?? 0;
     }
   }
 
@@ -406,6 +418,10 @@ export class OfflineDockerClient implements IDockerClient {
   }
 
   async pullImage(_image: string): Promise<void> {
+    OfflineDockerClient.offline();
+  }
+
+  async tagImage(_source: string, _target: string): Promise<void> {
     OfflineDockerClient.offline();
   }
 
@@ -680,6 +696,20 @@ function formatCommand(
 function readOptionalNumber(source: object, key: string): number | undefined {
   const value = (source as Record<string, unknown>)[key];
   return typeof value === 'number' ? value : undefined;
+}
+
+/** Split `repo:tag` or `host/repo:tag` for dockerode Image.tag(). */
+export function splitRepoTag(target: string): { repo: string; tag: string } {
+  const withoutDigest = target.split('@')[0] ?? target;
+  const lastSlash = withoutDigest.lastIndexOf('/');
+  const lastColon = withoutDigest.lastIndexOf(':');
+  if (lastColon > lastSlash) {
+    return {
+      repo: withoutDigest.slice(0, lastColon),
+      tag: withoutDigest.slice(lastColon + 1) || 'latest',
+    };
+  }
+  return { repo: withoutDigest, tag: 'latest' };
 }
 
 async function demuxDockerOutput(

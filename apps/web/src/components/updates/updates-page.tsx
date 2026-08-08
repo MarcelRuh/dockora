@@ -167,7 +167,6 @@ export function UpdatesPage() {
       window.clearInterval(timer);
       setBusy(null);
       setPhase(null);
-      setConfirm(null);
       window.setTimeout(() => {
         setApplyStep(null);
         setApplyProgress(0);
@@ -329,8 +328,10 @@ export function UpdatesPage() {
         onCancel={() => setConfirm(null)}
         onConfirm={() => {
           if (!confirm) return;
-          if (confirm.mode === 'one' && confirm.id) {
-            void runApplySteps([confirm.id]);
+          const pending = confirm;
+          setConfirm(null);
+          if (pending.mode === 'one' && pending.id) {
+            void runApplySteps([pending.id]);
           } else {
             void runApplySteps(
               items.filter((u) => u.updateAvailable && !u.error).map((u) => u.containerId),

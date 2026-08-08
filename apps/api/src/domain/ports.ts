@@ -95,6 +95,8 @@ export interface IDockerClient {
   getContainerStats(id: string): Promise<DockerStatsSnapshot>;
   listImages(): Promise<DockerImageInfo[]>;
   pullImage(image: string): Promise<void>;
+  /** Tag an existing local image as repo:tag (e.g. after digest pull). */
+  tagImage(source: string, target: string): Promise<void>;
   removeImage(id: string, force?: boolean): Promise<void>;
   pruneImages(danglingOnly?: boolean): Promise<{ imagesDeleted: number; spaceReclaimed: number }>;
   /** Prune BuildKit cache (all unused). */

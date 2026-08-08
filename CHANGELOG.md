@@ -5,6 +5,21 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [1.5.3] – 2026-08-09
+
+### Improved
+
+- Discord notifications list affected container names and use clearer embed fields (no more bare “N Container haben Updates”)
+- Manual “Update prüfen” and successful apply also send `update.available` / `update.installed` notifications (same as scheduler)
+- Lower idle load: host-agent 10s (compose version 60s), healthcheck every 15m, update-check every 2h, slower UI polls, cached `docker df`
+
+### Fixed
+
+- Updates confirm dialog closes immediately on confirm so the progress bar is visible
+- Image updates keep the original tag (e.g. `:latest`) on recreate instead of pinning `Config.Image` to `@sha256:…`
+- Temperature alerts use CPU package sensors and a configurable threshold (default **95 °C**)
+- GHCR/LSCR update checks authenticate with the configured PAT first (anonymous 429s no longer skip the token) and stagger requests
+
 ## [1.5.2] – 2026-08-07
 
 ### Fixed

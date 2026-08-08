@@ -2,10 +2,15 @@ import type { DashboardNotification } from '@dockora/shared';
 import type { NotificationEvent } from '@dockora/shared';
 import { prisma } from '../../infrastructure/db/prisma.js';
 import type { SettingsService } from '../settings/settings.service.js';
-import { sendDiscordEmbed } from './discord.js';
+import { sendDiscordEmbed, type DiscordField } from './discord.js';
 
 export interface NotificationsServiceDeps {
   settings: SettingsService;
+}
+
+export interface NotifyOptions {
+  containers?: string[];
+  fields?: DiscordField[];
 }
 
 export class NotificationsService {
@@ -54,6 +59,7 @@ export class NotificationsService {
     title: string,
     message: string,
     severity: DashboardNotification['severity'] = 'info',
+    options: NotifyOptions = {},
   ): Promise<DashboardNotification> {
     const row = await prisma.notification.create({
       data: { severity, title, message, read: false },
@@ -71,6 +77,8 @@ export class NotificationsService {
           message,
           event,
           severity,
+          containers: options.containers,
+          fields: options.fields,
         });
       } catch {
         // Discord-Fehler sollen Benachrichtigung nicht blockieren
@@ -96,9 +104,10 @@ export class NotificationsService {
     try {
       await sendDiscordEmbed(settings.discordWebhookUrl, {
         title: 'Dockora Test',
-        message: 'Discord webhook integration is working.',
+        message: 'Discord-Webhook funktioniert. Beispiel-Container unten.',
         event: 'error',
         severity: 'success',
+        containers: ['beispiel-container'],
       });
       return { ok: true, message: 'Test message sent' };
     } catch (error) {
