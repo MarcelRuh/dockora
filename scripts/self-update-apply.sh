@@ -98,6 +98,22 @@ parse_sha() {
   printf '%s' "$1" | tr -d '\n' | sed -n 's/.*"sha"[[:space:]]*:[[:space:]]*"\([a-f0-9]\{40\}\)".*/\1/p' | head -1
 }
 
+sha_from_upload_pack() {
+  wget -qO- --header='User-Agent: git/2.43.0' \
+    "https://github.com/${REPO}.git/info/refs?service=git-upload-pack" \
+    | tr -d '\000' \
+    | grep -oE "[0-9a-f]{40}[[:space:]]+refs/heads/${BRANCH}" \
+    | awk '{print $1}' \
+    | head -1 || true
+}
+
+sha_from_atom() {
+  wget -qO- --header='User-Agent: dockora-self-update' \
+    "https://github.com/${REPO}/commits/${BRANCH}.atom" \
+    | sed -n 's/.*Grit::Commit\/\([a-f0-9]\{40\}\).*/\1/p' \
+    | head -1 || true
+}
+
 resolve_sha() {
   if command -v git >/dev/null 2>&1; then
     SHA="$(git ls-remote "$CLONE_URL" "refs/heads/${BRANCH}" | awk '{print $1}' | head -1 || true)"
@@ -105,6 +121,16 @@ resolve_sha() {
       echo "$SHA"
       return 0
     fi
+  fi
+  SHA="$(sha_from_upload_pack)"
+  if [ -n "${SHA:-}" ]; then
+    echo "$SHA"
+    return 0
+  fi
+  SHA="$(sha_from_atom)"
+  if [ -n "${SHA:-}" ]; then
+    echo "$SHA"
+    return 0
   fi
   AUTH_HEADER=""
   if [ -n "${GITHUB_TOKEN:-}${GH_TOKEN:-}" ]; then

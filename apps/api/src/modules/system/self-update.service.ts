@@ -8,6 +8,7 @@ import type Docker from 'dockerode';
 import type { IDockerClient } from '../../domain/ports.js';
 import { apiRepositoryPath, parseImageRef, pickDigest } from '../updates/registry.js';
 import { SELF_UPDATE_APPLY_SCRIPT } from './self-update-apply.sh.js';
+import { fetchGithubCommitSha } from './github-revision.js';
 import {
   mergeProgress,
   parseProgressFile,
@@ -579,36 +580,6 @@ export function revisionsMatch(local: string, remote: string): boolean {
 function githubToken(): string | null {
   const token = process.env.GITHUB_TOKEN?.trim() || process.env.GH_TOKEN?.trim() || '';
   return token || null;
-}
-
-let githubShaCache: { key: string; sha: string; at: number } | null = null;
-const GITHUB_SHA_CACHE_MS = 60_000;
-
-export async function fetchGithubCommitSha(repo: string, branch: string): Promise<string> {
-  const key = `${repo}@${branch}`;
-  const now = Date.now();
-  if (githubShaCache && githubShaCache.key === key && now - githubShaCache.at < GITHUB_SHA_CACHE_MS) {
-    return githubShaCache.sha;
-  }
-
-  const url = `https://api.github.com/repos/${repo}/commits/${encodeURIComponent(branch)}`;
-  const headers: Record<string, string> = {
-    Accept: 'application/vnd.github+json',
-    'User-Agent': 'dockora-self-update',
-  };
-  const token = githubToken();
-  if (token) headers.Authorization = `Bearer ${token}`;
-
-  const res = await request(url, { headers });
-  if (res.statusCode >= 400) {
-    throw new Error(`GitHub API ${res.statusCode}`);
-  }
-  const body = (await res.body.json()) as { sha?: string };
-  if (!body.sha || !/^[a-f0-9]{7,40}$/i.test(body.sha)) {
-    throw new Error('Ungültige GitHub-Antwort (kein SHA)');
-  }
-  githubShaCache = { key, sha: body.sha, at: now };
-  return body.sha;
 }
 
 async function pullImageQuiet(docker: Docker, image: string): Promise<void> {
