@@ -38,9 +38,8 @@ pnpm-debug.log*
 
 # IDE / OS
 .idea/
-.vscode/*
-!.vscode/extensions.json
-!.vscode/settings.json.example
+.vscode/
+.cursor/
 *.swp
 *.swo
 .DS_Store
