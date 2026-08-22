@@ -1,0 +1,113 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  # Avoid cancelling a nearly-finished main run when another push lands;
+  # still cancel superseded PR runs to save minutes.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build-test:
+    name: Typecheck · Test · Build · Smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Block Cursor co-author trailers
+        run: |
+          chmod +x scripts/check-no-cursor-coauthor.sh
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            scripts/check-no-cursor-coauthor.sh "origin/${{ github.base_ref }}..HEAD"
+          else
+            scripts/check-no-cursor-coauthor.sh "HEAD~15..HEAD"
+          fi
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared package
+        run: pnpm --filter @dockora/shared build
+
+      - name: Prisma generate
+        run: pnpm --filter @dockora/api exec prisma generate
+        env:
+          DATABASE_URL: file:./ci.db
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Unit tests
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+        env:
+          DATABASE_URL: file:./ci.db
+          JWT_SECRET: ci-test-secret-at-least-16-chars
+          DOCKORA_API_URL: http://127.0.0.1:3001
+          NEXT_TELEMETRY_DISABLED: '1'
+
+      - name: Prisma migrate (smoke DB)
+        working-directory: apps/api
+        env:
+          DATABASE_URL: file:./smoke.db
+        run: pnpm exec prisma migrate deploy
+
+      - name: Start API
+        working-directory: apps/api
+        env:
+          NODE_ENV: development
+          HOST: 127.0.0.1
+          PORT: 3001
+          DATABASE_URL: file:./smoke.db
+          JWT_SECRET: ci-smoke-secret-at-least-32-characters-long
+          BOOTSTRAP_ADMIN_EMAIL: admin@dockora.local
+          BOOTSTRAP_ADMIN_PASSWORD: dockora-admin-change-me
+          CORS_ORIGIN: http://127.0.0.1:3000
+          DOCKER_SOCKET: /var/run/docker.sock
+        run: |
+          pnpm exec tsx src/main.ts > /tmp/dockora-api.log 2>&1 &
+          echo $! > /tmp/dockora-api.pid
+          for i in $(seq 1 45); do
+            if curl -fsS http://127.0.0.1:3001/api/v1/health >/dev/null; then
+              echo "API up"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "API failed to start"; cat /tmp/dockora-api.log; exit 1
+
+      - name: E2E smoke
+        env:
+          DOCKORA_API_URL: http://127.0.0.1:3001
+          SMOKE_EMAIL: admin@dockora.local
+          SMOKE_PASSWORD: dockora-admin-change-me
+        run: bash scripts/e2e-smoke.sh
+
+      - name: Stop API
+        if: always()
+        run: |
+          if [[ -f /tmp/dockora-api.pid ]]; then kill "$(cat /tmp/dockora-api.pid)" || true; fi
