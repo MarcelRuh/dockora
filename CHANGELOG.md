@@ -5,6 +5,16 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [1.7.0] – 2026-08-22
+
+### Added
+
+- Self-update shows changelog notes before applying an update
+- Compose restart, redeploy and logs can target a single service
+- Compose `.env` editor with key/value fields and password masking
+- Unhealthy containers are listed and clickable on the dashboard and compose views
+- Compose service icon field (URL or Homarr/Selfhst picker) writes `icon=`
+
 ## [1.6.2] – 2026-08-22
 
 ### Fixed

@@ -163,8 +163,15 @@ export async function fetchComposeProject(id: string): Promise<ComposeProjectDet
   return request<ComposeProjectDetails>(`/compose/${encodeURIComponent(id)}`);
 }
 
-export async function composeAction(id: string, action: ComposeAction): Promise<ActionResult> {
-  return request<ActionResult>(`/compose/${encodeURIComponent(id)}/${action}`, { method: 'POST' });
+export async function composeAction(
+  id: string,
+  action: ComposeAction,
+  service?: string,
+): Promise<ActionResult> {
+  return request<ActionResult>(
+    `/compose/${encodeURIComponent(id)}/${action}${qs({ service })}`,
+    { method: 'POST' },
+  );
 }
 
 export async function saveComposeYaml(id: string, content: string): Promise<ComposeProjectDetails> {
@@ -204,9 +211,9 @@ export async function previewComposeChanges(id: string): Promise<import('@dockor
   return request(`/compose/${encodeURIComponent(id)}/preview`);
 }
 
-export async function fetchComposeLogs(id: string): Promise<string> {
+export async function fetchComposeLogs(id: string, service?: string): Promise<string> {
   const res = await request<string | { logs: string }>(
-    `/compose/${encodeURIComponent(id)}/logs`,
+    `/compose/${encodeURIComponent(id)}/logs${qs({ service })}`,
   );
   return typeof res === 'string' ? res : res.logs;
 }
@@ -317,6 +324,7 @@ export async function fetchSelfUpdateStatus(): Promise<{
   branch: string | null;
   updating: boolean;
   progress: { percent: number; step: string; detail: string | null } | null;
+  changelog: string | null;
 }> {
   return request('/system/self-update');
 }

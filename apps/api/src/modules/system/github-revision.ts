@@ -123,6 +123,22 @@ export function parseNpmPackageVersion(raw: string): string | null {
   }
 }
 
+/** Newest-first CHANGELOG sections until `currentVersion` (exclusive). */
+export function extractChangelogSince(markdown: string, currentVersion: string): string {
+  const chunks = markdown.split(/^## /m).slice(1);
+  const sections: string[] = [];
+  for (const chunk of chunks) {
+    const header = chunk.split('\n', 1)[0]?.trim() ?? '';
+    const version = /\[([^\]]+)\]/.exec(header)?.[1] ?? header.replace(/[–-].*$/, '').trim();
+    if (!version || version.toLowerCase() === 'unreleased') continue;
+    if (version === currentVersion) break;
+    sections.push(`## ${chunk.trim()}`);
+    if (sections.join('\n\n').length >= 4000) break;
+  }
+  const text = sections.join('\n\n').trim();
+  return text.length > 4500 ? `${text.slice(0, 4490).trim()}…` : text;
+}
+
 /**
  * Resolve the tip SHA of a public GitHub branch without depending on the
  * unauthenticated REST API (60 req/h → 403 on wget/shared-IP installs).
@@ -178,7 +194,33 @@ export async function fetchGithubPackageVersion(repo: string, branch: string): P
   return version;
 }
 
+let changelogCache: { key: string; text: string; at: number } | null = null;
+
+export async function fetchGithubChangelog(
+  repo: string,
+  branch: string,
+  currentVersion: string,
+): Promise<string | null> {
+  const key = `${repo}@${branch}@${currentVersion}`;
+  const now = Date.now();
+  if (changelogCache && changelogCache.key === key && now - changelogCache.at < CACHE_MS) {
+    return changelogCache.text || null;
+  }
+
+  const { status, text } = await readBody(
+    `https://raw.githubusercontent.com/${repo}/${encodeURIComponent(branch)}/CHANGELOG.md`,
+    { Accept: 'text/plain', 'User-Agent': 'dockora-self-update' },
+  );
+  if (status >= 400) {
+    throw new Error(`GitHub changelog ${status}`);
+  }
+  const extracted = extractChangelogSince(text, currentVersion);
+  changelogCache = { key, text: extracted, at: now };
+  return extracted || null;
+}
+
 export function clearGithubShaCache(): void {
   shaCache = null;
   versionCache = null;
+  changelogCache = null;
 }

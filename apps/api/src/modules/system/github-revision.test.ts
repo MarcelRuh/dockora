@@ -3,6 +3,7 @@ import {
   parseGitUploadPackRefs,
   parseGithubAtomHeadSha,
   parseNpmPackageVersion,
+  extractChangelogSince,
   pickBranchSha,
 } from './github-revision.js';
 
@@ -39,5 +40,30 @@ describe('parseGithubAtomHeadSha', () => {
 describe('parseNpmPackageVersion', () => {
   it('reads the version field', () => {
     expect(parseNpmPackageVersion('{"name":"dockora","version":"1.6.2"}')).toBe('1.6.2');
+  });
+});
+
+describe('extractChangelogSince', () => {
+  it('returns newer sections only', () => {
+    const md = `# Changelog
+
+## [Unreleased]
+
+## [1.7.0] – 2026-08-22
+
+### Added
+
+- Foo
+
+## [1.6.2] – 2026-08-22
+
+### Fixed
+
+- Bar
+`;
+    const extracted = extractChangelogSince(md, '1.6.2');
+    expect(extracted).toContain('1.7.0');
+    expect(extracted).toContain('Foo');
+    expect(extracted).not.toContain('1.6.2');
   });
 });

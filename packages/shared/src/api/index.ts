@@ -23,6 +23,12 @@ export interface HealthResponse {
   };
 }
 
+export interface DashboardUnhealthyContainer {
+  id: string;
+  name: string;
+  composeProject?: string;
+}
+
 export interface DashboardOverview {
   containers: {
     total: number;
@@ -30,6 +36,7 @@ export interface DashboardOverview {
     stopped: number;
     unhealthy: number;
   };
+  unhealthyContainers: DashboardUnhealthyContainer[];
   resources: {
     cpuPercent: number | null;
     cpuCores: number | null;

@@ -92,12 +92,12 @@ export const composeModule: FastifyPluginAsync = async (app: FastifyInstance) =>
     }
   });
 
-  app.get<{ Params: { id: string } }>(
+  app.get<{ Params: { id: string }; Querystring: { service?: string } }>(
     `${API_PREFIX}/compose/:id/logs`,
     async (request): Promise<{ logs: string }> => {
       try {
         // Wrap as JSON — bare strings are sent as text by Fastify and break the web client JSON.parse
-        return { logs: await service.logs(request.params.id) };
+        return { logs: await service.logs(request.params.id, request.query.service) };
       } catch (error) {
         return await throwComposeError(app, error);
       }
@@ -213,7 +213,7 @@ export const composeModule: FastifyPluginAsync = async (app: FastifyInstance) =>
     },
   );
 
-  app.post<{ Params: { id: string; action: string } }>(
+  app.post<{ Params: { id: string; action: string }; Querystring: { service?: string } }>(
     `${API_PREFIX}/compose/:id/:action`,
     {
       ...destructiveRateLimit,
@@ -234,7 +234,11 @@ export const composeModule: FastifyPluginAsync = async (app: FastifyInstance) =>
         throw app.httpErrors.badRequest(`Unknown compose action: ${request.params.action}`);
       }
       try {
-        const result = await service.runAction(request.params.id, action);
+        const result = await service.runAction(
+          request.params.id,
+          action,
+          request.query.service,
+        );
         if (DESTRUCTIVE_ACTIONS.has(action)) {
           void auditService.record({
             action: `compose.${action}`,

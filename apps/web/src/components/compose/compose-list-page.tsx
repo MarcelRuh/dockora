@@ -62,6 +62,7 @@ export function ComposeListPage() {
   const [items, setItems] = useState<ComposeProjectSummary[]>([]);
   const [bases, setBases] = useState<Array<{ path: string; writable: boolean }>>([]);
   const [projectIcons, setProjectIcons] = useState<Record<string, string[]>>({});
+  const [projectUnhealthy, setProjectUnhealthy] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -109,14 +110,21 @@ export function ComposeListPage() {
       setItems(projects);
       setBases(baseList);
       const icons: Record<string, string[]> = {};
+      const unhealthy: Record<string, number> = {};
       for (const c of containers) {
         const project = c.composeProject;
+        if (!project) continue;
         const url = resolveContainerIconUrl(c.labels);
-        if (!project || !url) continue;
-        const list = icons[project] ?? (icons[project] = []);
-        if (!list.includes(url)) list.push(url);
+        if (url) {
+          const list = icons[project] ?? (icons[project] = []);
+          if (!list.includes(url)) list.push(url);
+        }
+        if (c.health === 'unhealthy') {
+          unhealthy[project] = (unhealthy[project] ?? 0) + 1;
+        }
       }
       setProjectIcons(icons);
+      setProjectUnhealthy(unhealthy);
       const preferred =
         baseList.find((b) => b.writable && b.path === '/home')?.path ??
         baseList.find((b) => b.writable)?.path ??
@@ -348,6 +356,9 @@ export function ComposeListPage() {
         ))}
       </span>
       <span>{p.name}</span>
+      {(projectUnhealthy[p.name] ?? 0) > 0 ? (
+        <StatusBadge status="danger" label={`${t.compose.unhealthy} ${projectUnhealthy[p.name]}`} />
+      ) : null}
     </Link>,
     <StatusBadge key={`s-${p.id}`} status={composeStatusTone(p.status)} label={p.status} />,
     <span key={`p-${p.id}`} className="font-mono text-xs text-dockora-muted">

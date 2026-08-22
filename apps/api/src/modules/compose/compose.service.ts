@@ -103,30 +103,35 @@ export class ComposeService {
     };
   }
 
-  async runAction(id: string, action: ComposeAction): Promise<ActionResult> {
+  async runAction(id: string, action: ComposeAction, service?: string): Promise<ActionResult> {
     const project = await this.resolveProject(id);
-    const args = await buildComposeArgs(project, action);
+    const yaml = await readComposeYaml(project.absoluteComposePath);
+    const svc = assertComposeService(yaml, service, action);
+    const args = await buildComposeArgs(project, action, svc);
     await execCompose(args, { cwd: project.path });
+    const suffix = svc ? ` (${svc})` : '';
     if (action === 'build') {
       try {
         const pruned = await this.deps.docker.pruneBuildCache();
         const mb = Math.round(pruned.spaceReclaimed / (1024 * 1024));
         return {
           ok: true,
-          message: `Compose build succeeded for ${project.name}. Build cache pruned (${mb} MiB).`,
+          message: `Compose build succeeded for ${project.name}${suffix}. Build cache pruned (${mb} MiB).`,
         };
       } catch {
         return {
           ok: true,
-          message: `Compose build succeeded for ${project.name} (build-cache prune failed)`,
+          message: `Compose build succeeded for ${project.name}${suffix} (build-cache prune failed)`,
         };
       }
     }
-    return { ok: true, message: `Compose ${action} succeeded for ${project.name}` };
+    return { ok: true, message: `Compose ${action} succeeded for ${project.name}${suffix}` };
   }
 
-  async logs(id: string): Promise<string> {
+  async logs(id: string, service?: string): Promise<string> {
     const project = await this.resolveProject(id);
+    const yaml = await readComposeYaml(project.absoluteComposePath);
+    const svc = assertComposeService(yaml, service);
     const args = await withEnvFile(project, [
       '--project-directory',
       project.path,
@@ -136,6 +141,7 @@ export class ComposeService {
       '--no-color',
       '--tail',
       '200',
+      ...(svc ? [svc] : []),
     ]);
     const { stdout } = await execCompose(args, { cwd: project.path });
     return stdout;
@@ -626,6 +632,28 @@ export class ComposeValidationError extends Error {
   readonly statusCode = 400;
 }
 
+const COMPOSE_SERVICE_NAME = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$/;
+
+export function assertComposeService(
+  yaml: string,
+  service: string | undefined,
+  action?: ComposeAction,
+): string | undefined {
+  if (!service?.trim()) return undefined;
+  const name = service.trim();
+  if (!COMPOSE_SERVICE_NAME.test(name)) {
+    throw new ComposeValidationError(`Invalid compose service name: ${service}`);
+  }
+  if (action === 'down') {
+    throw new ComposeValidationError('Compose down cannot target a single service');
+  }
+  const names = extractServiceNames(yaml);
+  if (!names.includes(name)) {
+    throw new ComposeValidationError(`Unknown compose service: ${name}`);
+  }
+  return name;
+}
+
 async function withEnvFile(
   project: { path: string },
   args: string[],
@@ -647,6 +675,7 @@ async function withEnvFile(
 async function buildComposeArgs(
   project: { path: string; absoluteComposePath: string },
   action: ComposeAction,
+  service?: string,
 ): Promise<string[]> {
   const base = await withEnvFile(project, [
     '--project-directory',
@@ -654,22 +683,23 @@ async function buildComposeArgs(
     '-f',
     project.absoluteComposePath,
   ]);
+  const svc = service ? [service] : [];
 
   switch (action) {
     case 'up':
-      return [...base, 'up', '-d', '--remove-orphans'];
+      return [...base, 'up', '-d', '--remove-orphans', ...svc];
     case 'down':
       return [...base, 'down', '--remove-orphans'];
     case 'restart':
-      return [...base, 'restart'];
+      return [...base, 'restart', ...svc];
     case 'pull':
-      return [...base, 'pull'];
+      return [...base, 'pull', ...svc];
     case 'build':
-      return [...base, 'build'];
+      return [...base, 'build', ...svc];
     case 'recreate':
-      return [...base, 'up', '-d', '--force-recreate', '--remove-orphans'];
+      return [...base, 'up', '-d', '--force-recreate', '--remove-orphans', ...svc];
     case 'logs':
-      return [...base, 'logs', '--no-color', '--tail', '200'];
+      return [...base, 'logs', '--no-color', '--tail', '200', ...svc];
     default:
       throw new Error(`Unknown compose action: ${action as string}`);
   }

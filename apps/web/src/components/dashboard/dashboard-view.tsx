@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import type { DashboardOverview } from '@dockora/shared';
 import { useLocale } from '@/i18n/locale-provider';
 import { formatBytes, formatPercent, formatRelativeTime, usageRatio } from '@/lib/format';
@@ -55,6 +56,7 @@ export function DashboardView({
       {data ? (
         <div className="space-y-8">
           <EngineStrip overview={data} labels={t.dashboard} />
+          <ContainerStrip overview={data} labels={t.dashboard} />
           <LiveResources overview={data} labels={t.dashboard} locale={loc} />
           <AsideColumn
             notifications={data.notifications}
@@ -70,6 +72,86 @@ export function DashboardView({
         </div>
       ) : null}
     </div>
+  );
+}
+
+function ContainerStrip({
+  overview,
+  labels,
+}: {
+  overview: DashboardOverview;
+  labels: {
+    containers: {
+      title: string;
+      total: string;
+      running: string;
+      stopped: string;
+      unhealthy: string;
+      unhealthyList: string;
+      unhealthyEmpty: string;
+    };
+  };
+}) {
+  const stats = [
+    { key: 'total', label: labels.containers.total, value: overview.containers.total, danger: false },
+    { key: 'running', label: labels.containers.running, value: overview.containers.running, danger: false },
+    { key: 'stopped', label: labels.containers.stopped, value: overview.containers.stopped, danger: false },
+    {
+      key: 'unhealthy',
+      label: labels.containers.unhealthy,
+      value: overview.containers.unhealthy,
+      danger: overview.containers.unhealthy > 0,
+    },
+  ];
+
+  return (
+    <section className="space-y-3">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="dockora-title-gradient text-lg tracking-tight">{labels.containers.title}</h2>
+        <Link href="/containers" className="dockora-link text-xs uppercase tracking-wide">
+          {labels.containers.title}
+        </Link>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-4">
+        {stats.map((item) => (
+          <div key={item.key} className="dockora-panel px-4 py-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-dockora-muted">
+              {item.label}
+            </p>
+            <p
+              className={cn(
+                'mt-1 font-mono text-2xl tabular-nums',
+                item.danger ? 'text-dockora-danger' : 'dockora-stat-gradient',
+              )}
+            >
+              {item.value}
+            </p>
+          </div>
+        ))}
+      </div>
+      <div className="dockora-panel px-4 py-4">
+        <h3 className="text-sm font-medium">{labels.containers.unhealthyList}</h3>
+        {(overview.unhealthyContainers ?? []).length === 0 ? (
+          <p className="mt-2 text-sm text-dockora-muted">{labels.containers.unhealthyEmpty}</p>
+        ) : (
+          <ul className="mt-2 space-y-1.5">
+            {(overview.unhealthyContainers ?? []).map((c) => (
+              <li key={c.id} className="flex flex-wrap items-baseline gap-2 text-sm">
+                <Link
+                  href={`/containers/${encodeURIComponent(c.id)}`}
+                  className="dockora-link font-mono"
+                >
+                  {c.name}
+                </Link>
+                {c.composeProject ? (
+                  <span className="text-xs text-dockora-muted">{c.composeProject}</span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </section>
   );
 }
 

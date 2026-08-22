@@ -211,13 +211,25 @@ export function SelfUpdateSection() {
         confirmLabel={t.common.confirm}
         cancelLabel={t.common.cancel}
         danger
+        wide
         busy={busy}
         onCancel={() => setConfirmOpen(false)}
         onConfirm={() => {
           setConfirmOpen(false);
           void handleApply();
         }}
-      />
+      >
+        {status?.updateAvailable ? (
+          <div className="space-y-1.5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-dockora-muted">
+              {t.settings.selfUpdate.changelog}
+            </p>
+            <pre className="max-h-64 overflow-auto rounded border border-dockora-border bg-black/30 p-3 font-mono text-xs whitespace-pre-wrap text-dockora-muted">
+              {status.changelog?.trim() || t.settings.selfUpdate.changelogEmpty}
+            </pre>
+          </div>
+        ) : null}
+      </ConfirmDialog>
     </Section>
   );
 }

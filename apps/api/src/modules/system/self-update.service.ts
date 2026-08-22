@@ -8,7 +8,7 @@ import type Docker from 'dockerode';
 import type { IDockerClient } from '../../domain/ports.js';
 import { apiRepositoryPath, parseImageRef, pickDigest } from '../updates/registry.js';
 import { SELF_UPDATE_APPLY_SCRIPT } from './self-update-apply.sh.js';
-import { fetchGithubCommitSha, fetchGithubPackageVersion } from './github-revision.js';
+import { fetchGithubChangelog, fetchGithubCommitSha, fetchGithubPackageVersion } from './github-revision.js';
 import {
   mergeProgress,
   parseProgressFile,
@@ -39,6 +39,7 @@ export interface SelfUpdateStatus {
   branch: string | null;
   updating: boolean;
   progress: SelfUpdateProgress | null;
+  changelog: string | null;
 }
 
 export interface SelfUpdateApplyResult {
@@ -104,6 +105,7 @@ export class SelfUpdateService {
         branch: this.options.branch,
         updating,
         progress: null,
+        changelog: null,
       },
       updating,
     );
@@ -150,6 +152,7 @@ export class SelfUpdateService {
       branch: this.options.branch,
       updating,
       progress: null,
+      changelog: null,
     };
 
     if (!hostDir || !mount) {
@@ -184,6 +187,7 @@ export class SelfUpdateService {
         localRevision,
         remoteRevision: null,
         updateAvailable: versionDrift,
+        changelog: await this.maybeChangelog(versionDrift),
         message: versionDrift
           ? `GitHub-Check fehlgeschlagen (${reason}). Laufende Version ${APP_VERSION} ≠ ${latest} – Rebuild möglich.`
           : `GitHub-Check fehlgeschlagen: ${reason}`,
@@ -206,6 +210,7 @@ export class SelfUpdateService {
       localRevision,
       remoteRevision,
       updateAvailable,
+      changelog: await this.maybeChangelog(updateAvailable),
       message: updating
         ? 'Update läuft…'
         : updateAvailable
@@ -214,6 +219,15 @@ export class SelfUpdateService {
             : 'Update verfügbar – Source von GitHub holen und anwenden'
           : 'Up to date',
     };
+  }
+
+  private async maybeChangelog(updateAvailable: boolean): Promise<string | null> {
+    if (!updateAvailable) return null;
+    try {
+      return await fetchGithubChangelog(this.options.repo, this.options.branch, APP_VERSION);
+    } catch {
+      return null;
+    }
   }
 
   private async imageStatus(updating: boolean): Promise<SelfUpdateStatus> {
@@ -236,6 +250,7 @@ export class SelfUpdateService {
       branch: this.options.branch,
       updating,
       progress: null,
+      changelog: null,
     };
 
     if (!image) return base;

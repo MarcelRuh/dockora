@@ -3,7 +3,7 @@ import type {
   DashboardNotification,
   DashboardOverview,
 } from '@dockora/shared';
-import { summarizeContainers } from '../../domain/container-utils.js';
+import { isUnhealthyContainer, summarizeContainers } from '../../domain/container-utils.js';
 import { isDockoraSelfContainer } from '../../domain/dockora-self.js';
 import type {
   IComposeVersionProvider,
@@ -31,7 +31,8 @@ export class DashboardService {
     ]);
 
     return {
-      containers: containersResult,
+      containers: containersResult.summary,
+      unhealthyContainers: containersResult.unhealthy,
       resources: {
         cpuPercent: resources.cpuPercent,
         cpuCores: resources.cpuCores,
@@ -67,14 +68,29 @@ export class DashboardService {
     }
   }
 
-  private async resolveContainers(): Promise<DashboardOverview['containers']> {
+  private async resolveContainers(): Promise<{
+    summary: DashboardOverview['containers'];
+    unhealthy: DashboardOverview['unhealthyContainers'];
+  }> {
     try {
       const list = (await this.deps.docker.listContainers(true)).filter(
         (c) => !isDockoraSelfContainer(c),
       );
-      return summarizeContainers(list);
+      return {
+        summary: summarizeContainers(list),
+        unhealthy: list
+          .filter((c) => isUnhealthyContainer(c))
+          .map((c) => ({
+            id: c.id,
+            name: c.name,
+            composeProject: c.composeProject,
+          })),
+      };
     } catch {
-      return { total: 0, running: 0, stopped: 0, unhealthy: 0 };
+      return {
+        summary: { total: 0, running: 0, stopped: 0, unhealthy: 0 },
+        unhealthy: [],
+      };
     }
   }
 

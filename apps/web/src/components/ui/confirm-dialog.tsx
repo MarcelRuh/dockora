@@ -13,6 +13,7 @@ export type ConfirmDialogProps = {
   cancelLabel?: string;
   danger?: boolean;
   busy?: boolean;
+  wide?: boolean;
   children?: React.ReactNode;
   onConfirm: () => void;
   onCancel: () => void;
@@ -27,6 +28,7 @@ export function ConfirmDialog({
   cancelLabel = 'Cancel',
   danger = false,
   busy = false,
+  wide = false,
   children,
   onConfirm,
   onCancel,
@@ -60,7 +62,10 @@ export function ConfirmDialog({
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="dockora-panel w-full max-w-md space-y-4 p-5 shadow-neon outline-none"
+        className={cn(
+          'dockora-panel w-full space-y-4 p-5 shadow-neon outline-none',
+          wide ? 'max-w-2xl' : 'max-w-md',
+        )}
       >
         <div className="space-y-2">
           <h2 id={titleId} className="dockora-title-gradient text-xl">

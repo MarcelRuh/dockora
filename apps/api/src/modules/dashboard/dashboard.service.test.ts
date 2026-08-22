@@ -108,6 +108,7 @@ describe('DashboardService', () => {
       stopped: 1,
       unhealthy: 0,
     });
+    expect(overview.unhealthyContainers).toEqual([]);
     expect(overview.resources.cpuPercent).toBe(12.5);
     expect(overview.recentEvents).toHaveLength(1);
     expect(overview.updatesAvailable).toBe(0);
@@ -120,5 +121,32 @@ describe('DashboardService', () => {
 
     expect(overview.docker.engineStatus).toBe('offline');
     expect(overview.docker.engineVersion).toBeNull();
+  });
+
+  it('lists unhealthy containers as clickable targets', async () => {
+    const mocks = createMocks({
+      containers: [
+        {
+          id: 'u1',
+          name: 'sonarr',
+          image: 'sonarr:latest',
+          status: 'running',
+          state: 'Up 2 hours (unhealthy)',
+          createdAt: new Date().toISOString(),
+          health: 'unhealthy',
+          labels: {},
+          ports: [],
+          networks: [],
+          composeProject: 'arr-stack',
+        },
+      ],
+    });
+    const service = new DashboardService(mocks);
+    const overview = await service.getOverview();
+
+    expect(overview.containers.unhealthy).toBe(1);
+    expect(overview.unhealthyContainers).toEqual([
+      { id: 'u1', name: 'sonarr', composeProject: 'arr-stack' },
+    ]);
   });
 });

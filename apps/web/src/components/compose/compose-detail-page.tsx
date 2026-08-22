@@ -23,9 +23,12 @@ import { useAuth } from '@/components/auth/auth-provider';
 import { canAdmin, canOperate } from '@/lib/roles';
 import { composeStatusTone } from '@/lib/status';
 import { resolveContainerIconUrl, extractComposeServiceIcons } from '@/lib/container-icon';
-import { Button, Select, Textarea } from '@/components/ui/form-controls';
+import { cn } from '@/lib/utils';
+import { Button, Input, Select, Textarea } from '@/components/ui/form-controls';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ServiceIcon } from '@/components/ui/service-icon';
+import { EnvEditor } from '@/components/compose/env-editor';
+import { homarrIconUrl, selfhstIconUrl, setComposeServiceIcon } from '@/lib/compose-icon-yaml';
 import {
   ErrorBanner,
   LoadingState,
@@ -41,6 +44,7 @@ type ConfirmState = {
   kind: ConfirmKind;
   consequences: string[];
   removeVolumes?: boolean;
+  service?: string;
 };
 
 export function ComposeDetailPage({ id }: { id: string }) {
@@ -152,10 +156,28 @@ export function ComposeDetailPage({ id }: { id: string }) {
     }
   };
 
-  const handleLogs = async () => {
+  const handleLogs = async (service?: string) => {
     setBusy(true);
     try {
-      setLogs(await fetchComposeLogs(id));
+      setLogs(await fetchComposeLogs(id, service));
+      document.getElementById('compose-logs')?.scrollIntoView({ behavior: 'smooth' });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t.common.failed);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleSaveIcon = async (service: string, url: string) => {
+    setBusy(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const next = setComposeServiceIcon(yaml, service, url);
+      const updated = await saveComposeYaml(id, next);
+      setProject(updated);
+      setYaml(updated.yaml);
+      setSuccess(t.compose.saved);
     } catch (err) {
       setError(err instanceof Error ? err.message : t.common.failed);
     } finally {
@@ -176,13 +198,13 @@ export function ComposeDetailPage({ id }: { id: string }) {
     }
   };
 
-  const openConfirm = async (kind: ConfirmKind) => {
+  const openConfirm = async (kind: ConfirmKind, service?: string) => {
     if (!project) return;
     setConfirmBusy(true);
     setError(null);
     try {
       let consequences: string[] = [];
-      if (kind === 'up' || kind === 'recreate' || kind === 'delete') {
+      if (!service && (kind === 'up' || kind === 'recreate' || kind === 'delete')) {
         try {
           const preview = await previewComposeChanges(id);
           consequences = formatComposePreviewLines(preview, t.compose);
@@ -200,6 +222,7 @@ export function ComposeDetailPage({ id }: { id: string }) {
         kind,
         consequences,
         removeVolumes: kind === 'delete' ? false : undefined,
+        service,
       });
     } finally {
       setConfirmBusy(false);
@@ -208,7 +231,7 @@ export function ComposeDetailPage({ id }: { id: string }) {
 
   const executeConfirm = async () => {
     if (!confirm || !project) return;
-    const { kind, removeVolumes } = confirm;
+    const { kind, removeVolumes, service } = confirm;
     setConfirm(null);
     setBusy(true);
     setError(null);
@@ -218,7 +241,7 @@ export function ComposeDetailPage({ id }: { id: string }) {
         router.push('/compose');
         return;
       }
-      await composeAction(id, kind);
+      await composeAction(id, kind, service);
       await load();
     } catch (err) {
       setError(
@@ -363,14 +386,21 @@ export function ComposeDetailPage({ id }: { id: string }) {
             {envExists ? t.compose.envExists : t.compose.envMissing}
           </span>
         </div>
-        <Textarea
+        <EnvEditor
           value={envContent}
-          onChange={(e) => setEnvContent(e.target.value)}
-          rows={10}
-          spellCheck={false}
+          onChange={setEnvContent}
           disabled={!canOps}
-          className="font-mono text-sm"
           placeholder="PUID=1000&#10;PGID=1000&#10;TZ=Europe/Berlin"
+          labels={{
+            fields: t.compose.envModeFields,
+            raw: t.compose.envModeRaw,
+            add: t.compose.envAdd,
+            key: t.compose.envKey,
+            value: t.compose.envValue,
+            show: t.compose.envShow,
+            hide: t.compose.envHide,
+            remove: t.compose.envRemove,
+          }}
         />
         {canOps ? (
           <div className="mt-3">
@@ -389,11 +419,19 @@ export function ComposeDetailPage({ id }: { id: string }) {
             services={project.services}
             yaml={yaml}
             containers={serviceContainers}
+            canOps={canOps}
+            busy={busy}
+            labels={t.compose}
+            onRestart={(service) => void openConfirm('restart', service)}
+            onRecreate={(service) => void openConfirm('recreate', service)}
+            onLogs={(service) => void handleLogs(service)}
+            onSaveIcon={(service, url) => void handleSaveIcon(service, url)}
           />
         )}
       </Section>
 
       <Section title={t.compose.logs}>
+        <div id="compose-logs" />
         <Button disabled={busy} onClick={() => void handleLogs()}>
           {t.containers.logs.fetch}
         </Button>
@@ -419,9 +457,15 @@ export function ComposeDetailPage({ id }: { id: string }) {
             : confirm?.kind === 'down'
               ? t.compose.downConfirm.replace('{name}', project.name)
               : confirm?.kind === 'restart'
-                ? t.compose.restartConfirm.replace('{name}', project.name)
+                ? (confirm.service
+                    ? t.compose.serviceRestartConfirm
+                    : t.compose.restartConfirm
+                  ).replace('{name}', confirm.service ?? project.name)
                 : confirm?.kind === 'recreate'
-                  ? t.compose.recreateConfirm.replace('{name}', project.name)
+                  ? (confirm.service
+                      ? t.compose.serviceRecreateConfirm
+                      : t.compose.recreateConfirm
+                    ).replace('{name}', confirm.service ?? project.name)
                   : t.compose.upConfirm.replace('{name}', project.name)
         }
         consequences={confirm?.consequences}
@@ -454,39 +498,203 @@ function ServiceIconList({
   services,
   yaml,
   containers,
+  canOps,
+  busy,
+  labels,
+  onRestart,
+  onRecreate,
+  onLogs,
+  onSaveIcon,
 }: {
   services: string[];
   yaml: string;
   containers: ContainerSummary[];
+  canOps: boolean;
+  busy: boolean;
+  labels: {
+    restart: string;
+    recreate: string;
+    logs: string;
+    iconUrl: string;
+    iconSlug: string;
+    iconHomarr: string;
+    iconSelfhst: string;
+    iconApply: string;
+    iconHint: string;
+    unhealthy: string;
+  };
+  onRestart: (service: string) => void;
+  onRecreate: (service: string) => void;
+  onLogs: (service: string) => void;
+  onSaveIcon: (service: string, url: string) => void;
 }) {
   const yamlIcons = extractComposeServiceIcons(yaml);
   return (
-    <ul className="flex flex-wrap gap-3">
+    <ul className="grid gap-3 sm:grid-cols-2">
       {services.map((service) => {
         const fromContainer = containers.find(
           (c) => c.labels['com.docker.compose.service'] === service || c.name === service,
         );
         const icon =
           resolveContainerIconUrl(fromContainer?.labels) ?? yamlIcons[service] ?? null;
+        const unhealthy = fromContainer?.health === 'unhealthy';
         return (
-          <li
+          <ServiceCard
             key={service}
-            className="inline-flex items-center gap-2 rounded-md border border-dockora-border bg-dockora-surface2/50 px-2.5 py-1.5"
-          >
-            <ServiceIcon url={icon} alt={service} size="sm" />
-            {fromContainer ? (
-              <Link
-                href={`/containers/${encodeURIComponent(fromContainer.id)}`}
-                className="font-mono dockora-link text-sm"
-              >
-                {service}
-              </Link>
-            ) : (
-              <span className="font-mono text-sm">{service}</span>
-            )}
-          </li>
+            service={service}
+            icon={icon}
+            containerId={fromContainer?.id}
+            unhealthy={unhealthy}
+            canOps={canOps}
+            busy={busy}
+            labels={labels}
+            onRestart={onRestart}
+            onRecreate={onRecreate}
+            onLogs={onLogs}
+            onSaveIcon={onSaveIcon}
+          />
         );
       })}
     </ul>
   );
 }
+
+function ServiceCard({
+  service,
+  icon,
+  containerId,
+  unhealthy,
+  canOps,
+  busy,
+  labels,
+  onRestart,
+  onRecreate,
+  onLogs,
+  onSaveIcon,
+}: {
+  service: string;
+  icon: string | null;
+  containerId?: string;
+  unhealthy: boolean;
+  canOps: boolean;
+  busy: boolean;
+  labels: {
+    restart: string;
+    recreate: string;
+    logs: string;
+    iconUrl: string;
+    iconSlug: string;
+    iconHomarr: string;
+    iconSelfhst: string;
+    iconApply: string;
+    iconHint: string;
+    unhealthy: string;
+  };
+  onRestart: (service: string) => void;
+  onRecreate: (service: string) => void;
+  onLogs: (service: string) => void;
+  onSaveIcon: (service: string, url: string) => void;
+}) {
+  const [url, setUrl] = useState(icon ?? '');
+  const [slug, setSlug] = useState(service.toLowerCase());
+
+  useEffect(() => {
+    setUrl(icon ?? '');
+  }, [icon]);
+
+  return (
+    <li
+      className={cn(
+        'dockora-panel space-y-3 p-3',
+        unhealthy && 'border-dockora-danger/50',
+      )}
+    >
+      <div className="flex items-center gap-2">
+        <ServiceIcon url={url || icon} alt={service} size="sm" />
+        {containerId ? (
+          <Link
+            href={`/containers/${encodeURIComponent(containerId)}`}
+            className="font-mono dockora-link text-sm"
+          >
+            {service}
+          </Link>
+        ) : (
+          <span className="font-mono text-sm">{service}</span>
+        )}
+        {unhealthy && containerId ? (
+          <Link
+            href={`/containers/${encodeURIComponent(containerId)}`}
+            className="text-[10px] font-semibold uppercase tracking-wide text-dockora-danger"
+          >
+            {labels.unhealthy}
+          </Link>
+        ) : null}
+      </div>
+      {canOps ? (
+        <div className="flex flex-wrap gap-1.5">
+          <Button size="sm" disabled={busy} onClick={() => onRestart(service)}>
+            {labels.restart}
+          </Button>
+          <Button size="sm" disabled={busy} onClick={() => onRecreate(service)}>
+            {labels.recreate}
+          </Button>
+          <Button size="sm" disabled={busy} onClick={() => onLogs(service)}>
+            {labels.logs}
+          </Button>
+        </div>
+      ) : (
+        <Button size="sm" disabled={busy} onClick={() => onLogs(service)}>
+          {labels.logs}
+        </Button>
+      )}
+      <p className="text-xs text-dockora-muted">{labels.iconHint}</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <Input
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          disabled={!canOps || busy}
+          spellCheck={false}
+          className="min-w-[12rem] flex-1 font-mono text-xs"
+          placeholder={labels.iconUrl}
+          aria-label={labels.iconUrl}
+        />
+        <Input
+          value={slug}
+          onChange={(e) => setSlug(e.target.value)}
+          disabled={!canOps || busy}
+          spellCheck={false}
+          className="w-28 font-mono text-xs"
+          placeholder={labels.iconSlug}
+          aria-label={labels.iconSlug}
+        />
+        {canOps ? (
+          <>
+            <Button
+              size="sm"
+              disabled={busy || !slug.trim()}
+              onClick={() => setUrl(homarrIconUrl(slug.trim().toLowerCase()))}
+            >
+              {labels.iconHomarr}
+            </Button>
+            <Button
+              size="sm"
+              disabled={busy || !slug.trim()}
+              onClick={() => setUrl(selfhstIconUrl(slug.trim().toLowerCase()))}
+            >
+              {labels.iconSelfhst}
+            </Button>
+            <Button
+              size="sm"
+              variant="primary"
+              disabled={busy}
+              onClick={() => onSaveIcon(service, url.trim())}
+            >
+              {labels.iconApply}
+            </Button>
+          </>
+        ) : null}
+      </div>
+    </li>
+  );
+}
+
