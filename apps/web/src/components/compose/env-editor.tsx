@@ -9,26 +9,30 @@ export function EnvEditor({
   onChange,
   disabled,
   placeholder,
+  defaultMode = 'raw',
   labels,
 }: {
   value: string;
   onChange: (next: string) => void;
   disabled?: boolean;
   placeholder?: string;
+  /** `raw` = einfügen; `fields` = vorhandene Keys nachbearbeiten */
+  defaultMode?: 'fields' | 'raw';
   labels: {
     fields: string;
     raw: string;
-    add: string;
     key: string;
     value: string;
     show: string;
     hide: string;
     remove: string;
+    empty: string;
   };
 }) {
-  const [mode, setMode] = useState<'fields' | 'raw'>('fields');
+  const [mode, setMode] = useState<'fields' | 'raw'>(defaultMode);
   const [revealed, setRevealed] = useState<Record<number, boolean>>({});
   const entries = useMemo(() => parseEnvFile(value), [value]);
+  const pairCount = entries.filter((entry) => entry.kind === 'pair').length;
 
   const update = (next: EnvEntry[]) => onChange(serializeEnvFile(next));
 
@@ -63,12 +67,14 @@ export function EnvEditor({
         <Textarea
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          rows={10}
+          rows={12}
           spellCheck={false}
           disabled={disabled}
           className="font-mono text-sm"
           placeholder={placeholder}
         />
+      ) : pairCount === 0 ? (
+        <p className="text-sm text-dockora-muted">{labels.empty}</p>
       ) : (
         <div className="space-y-2">
           {entries.map((entry, index) =>
@@ -125,14 +131,6 @@ export function EnvEditor({
                 )}
               </div>
             ),
-          )}
-          {disabled ? null : (
-            <Button
-              size="sm"
-              onClick={() => update([...entries, { kind: 'pair', key: '', value: '' }])}
-            >
-              {labels.add}
-            </Button>
           )}
         </div>
       )}

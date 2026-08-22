@@ -63,6 +63,23 @@ export interface DockerImageInfo {
   digests: string[];
 }
 
+export interface DockerVolumeInfo {
+  name: string;
+  driver: string;
+  mountpoint: string;
+  createdAt: string | null;
+  sizeBytes: number | null;
+  refCount: number;
+  usedBy: string[];
+  labels: Record<string, string>;
+}
+
+export interface DockerVolumeBrowseEntry {
+  name: string;
+  kind: 'file' | 'dir';
+  sizeBytes: number | null;
+}
+
 export interface DockerEventInfo {
   id: string;
   type: string;
@@ -99,6 +116,10 @@ export interface IDockerClient {
   tagImage(source: string, target: string): Promise<void>;
   removeImage(id: string, force?: boolean): Promise<void>;
   pruneImages(danglingOnly?: boolean): Promise<{ imagesDeleted: number; spaceReclaimed: number }>;
+  listVolumes(): Promise<DockerVolumeInfo[]>;
+  removeVolume(name: string, force?: boolean): Promise<void>;
+  pruneVolumes(): Promise<{ volumesDeleted: number; spaceReclaimed: number }>;
+  browseVolume(name: string): Promise<DockerVolumeBrowseEntry[]>;
   /** Prune BuildKit cache (all unused). */
   pruneBuildCache(): Promise<{ spaceReclaimed: number }>;
   /** Total BuildKit/build-cache bytes (0 if unavailable). */

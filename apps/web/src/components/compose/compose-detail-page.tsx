@@ -390,16 +390,17 @@ export function ComposeDetailPage({ id }: { id: string }) {
           value={envContent}
           onChange={setEnvContent}
           disabled={!canOps}
-          placeholder="PUID=1000&#10;PGID=1000&#10;TZ=Europe/Berlin"
+          defaultMode="fields"
+          placeholder={'PUID=1000\nPGID=1000\nTZ=Europe/Berlin'}
           labels={{
             fields: t.compose.envModeFields,
             raw: t.compose.envModeRaw,
-            add: t.compose.envAdd,
             key: t.compose.envKey,
             value: t.compose.envValue,
             show: t.compose.envShow,
             hide: t.compose.envHide,
             remove: t.compose.envRemove,
+            empty: t.compose.envFieldsEmpty,
           }}
         />
         {canOps ? (

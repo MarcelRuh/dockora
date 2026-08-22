@@ -51,6 +51,9 @@ export async function throwDockerError(
   if (message.toLowerCase().includes('no such image')) {
     throw app.httpErrors.notFound(message);
   }
+  if (message.toLowerCase().includes('no such volume')) {
+    throw app.httpErrors.notFound(message);
+  }
   if (isPortConflictMessage(message)) {
     throw app.httpErrors.badRequest(message);
   }

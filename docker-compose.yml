@@ -9,7 +9,7 @@ services:
     group_add:
       - "${DOCKER_GID:-999}"
     ports:
-      - "${DOCKORA_API_PORT:-3001}:3001"
+      - "${DOCKORA_API_BIND:-0.0.0.0}:${DOCKORA_API_PORT:-3001}:3001"
     environment:
       NODE_ENV: production
       HOST: 0.0.0.0
@@ -80,7 +80,7 @@ services:
     container_name: dockora-web
     restart: unless-stopped
     ports:
-      - "${DOCKORA_WEB_PORT:-3000}:3000"
+      - "${DOCKORA_WEB_BIND:-0.0.0.0}:${DOCKORA_WEB_PORT:-3000}:3000"
     environment:
       DOCKORA_API_URL: http://api:3001
     depends_on:
@@ -103,5 +103,32 @@ services:
       web:
         condition: service_started
 
+  # Optional: HTTPS (Caddy). Let’s Encrypt or internal CA – see deploy/Caddyfile*
+  # docker compose --profile tls up
+  #   ACME:     DOCKORA_DOMAIN + DOCKORA_ACME_EMAIL, Caddyfile
+  #   Internal: DOCKORA_CADDYFILE=./deploy/Caddyfile.internal
+  tls:
+    profiles: ["tls"]
+    image: caddy:2.10-alpine
+    container_name: dockora-caddy
+    restart: unless-stopped
+    ports:
+      - "${DOCKORA_HTTP_PORT:-80}:80"
+      - "${DOCKORA_HTTPS_PORT:-443}:443"
+    environment:
+      DOCKORA_SITE: ${DOCKORA_DOMAIN:-localhost}
+      DOCKORA_ACME_EMAIL: ${DOCKORA_ACME_EMAIL:-}
+    volumes:
+      - ${DOCKORA_CADDYFILE:-./deploy/Caddyfile}:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_started
+
 volumes:
   dockora-data:
+  caddy-data:
+  caddy-config:

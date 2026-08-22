@@ -11,8 +11,9 @@
 | dashboard | `GET /dashboard`, `GET /dashboard/stream` |
 | containers | CRUD-Aktionen, logs, stats, SSE logs |
 | terminal | `WS /containers/:id/terminal` |
-| compose | discovery, actions, yaml, backup |
+| compose | discovery, create, actions, yaml, backup |
 | images | list, pull, remove, prune |
+| volumes | list, prune unused, remove, browse |
 | updates | check, pull, count |
 | backups | create, restore, cleanup |
 | notifications | list, read, discord test |
@@ -24,4 +25,4 @@
 
 ## Web-Routen
 
-`/`, `/containers`, `/containers/[id]`, `/compose`, `/compose/[id]`, `/images`, `/updates`, `/backups`, `/logs`, `/settings`
+`/`, `/containers`, `/containers/[id]`, `/compose`, `/compose/new`, `/compose/[id]`, `/images`, `/volumes`, `/updates`, `/backups`, `/logs`, `/settings`

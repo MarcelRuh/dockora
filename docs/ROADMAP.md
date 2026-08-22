@@ -46,4 +46,7 @@
 - ~~User Edit (DisplayName / Passwort)~~
 - CSRF-Token bei Cookie-Sessions (aktuell Bearer JWT)
 - Plugin-Worker-Isolation (derzeit Pfad-Allowlist + Register-Timeout)
+- ~~HTTPS-Profil (Caddy / Let’s Encrypt + interne CA)~~
+- ~~Volume-Liste, Größe, unused prune, Browse~~
+- ~~Compose-Projekt anlegen (eigene Seite)~~
 

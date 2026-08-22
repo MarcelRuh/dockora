@@ -22,6 +22,25 @@ docker compose --profile proxy up -d --build
 
 Set `CORS_ORIGIN` to the public URL (e.g. `https://dockora.example.com`).
 
+### HTTPS (Caddy profile `tls`)
+
+Let’s Encrypt (ports 80 + 443, public DNS):
+
+```bash
+export DOCKORA_DOMAIN=dockora.example.com
+export DOCKORA_ACME_EMAIL=you@example.com
+# install.sh sets CORS_ORIGIN, binds web/api to 127.0.0.1, COMPOSE_PROFILES=tls
+wget -qO- https://raw.githubusercontent.com/MarcelRuh/dockora/main/scripts/install.sh | DOCKORA_TLS=1 bash
+```
+
+LAN / no public DNS – Caddy internal CA (`deploy/Caddyfile.internal`). Browsers warn until you trust:
+
+```bash
+docker exec dockora-caddy cat /data/caddy/pki/authorities/local/root.crt
+```
+
+Do not enable `proxy` and `tls` together. With TLS, keep `DOCKORA_WEB_BIND` / `DOCKORA_API_BIND` at `127.0.0.1` so only Caddy is public.
+
 ## Environment (critical)
 
 | Variable | Production requirement |
@@ -43,7 +62,7 @@ The API **refuses to start** in `NODE_ENV=production` with weak JWT/bootstrap se
 
 ## Reverse proxy (external)
 
-Point your TLS terminator at the `proxy` service (or `web` + `/api` → `api:3001` with WebSocket upgrade and `proxy_buffering off` for SSE). See `deploy/nginx.conf`.
+Point your TLS terminator at the `tls` service (443) or the `proxy` service (HTTP). Alternatively `web` + `/api` → `api:3001` with WebSocket upgrade and `proxy_buffering off` for SSE. See `deploy/Caddyfile` and `deploy/nginx.conf`.
 
 ### Fast path: GHCR images
 

@@ -1,14 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import type { ComposeProjectSummary } from '@dockora/shared';
 import {
   composeAction,
-  createComposeProject,
   deleteComposeProject,
-  fetchComposeBases,
   fetchComposeProjects,
   fetchContainers,
   previewComposeChanges,
@@ -19,9 +16,8 @@ import { useAuth } from '@/components/auth/auth-provider';
 import { canAdmin, canOperate } from '@/lib/roles';
 import { composeStatusTone } from '@/lib/status';
 import { resolveContainerIconUrl } from '@/lib/container-icon';
-import { Button, FilterBar, Input, Select, Textarea, Label } from '@/components/ui/form-controls';
+import { Button, FilterBar, buttonClassName } from '@/components/ui/form-controls';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { ProgressBar } from '@/components/ui/progress-bar';
 import { ServiceIcon } from '@/components/ui/service-icon';
 import {
   DataTable,
@@ -41,26 +37,12 @@ type ConfirmState = {
   consequences: string[];
 };
 
-const DEFAULT_YAML = `services:
-  web:
-    image: nginx:alpine
-    ports:
-      - "18080:80"
-    restart: unless-stopped
-    labels:
-      - icon=https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/nginx.png
-`;
-
-type CreateStep = 'validate' | 'write' | 'start' | 'done';
-
 export function ComposeListPage() {
   const { t } = useLocale();
   const { authEnabled, user } = useAuth();
   const canOps = canOperate(user?.role, authEnabled);
   const isAdmin = canAdmin(user?.role, authEnabled);
-  const router = useRouter();
   const [items, setItems] = useState<ComposeProjectSummary[]>([]);
-  const [bases, setBases] = useState<Array<{ path: string; writable: boolean }>>([]);
   const [projectIcons, setProjectIcons] = useState<Record<string, string[]>>({});
   const [projectUnhealthy, setProjectUnhealthy] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
@@ -71,44 +53,16 @@ export function ComposeListPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
-  const [showCreate, setShowCreate] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [createProgress, setCreateProgress] = useState<{
-    percent: number;
-    step: CreateStep;
-  } | null>(null);
-
-  const [name, setName] = useState('');
-  const [basePath, setBasePath] = useState('');
-  const [composeFileName, setComposeFileName] = useState('compose.yaml');
-  const [yaml, setYaml] = useState(DEFAULT_YAML);
-  const [envContent, setEnvContent] = useState('');
-  const [startAfterCreate, setStartAfterCreate] = useState(true);
-
-  const createStepLabel = (step: CreateStep) => {
-    switch (step) {
-      case 'validate':
-        return t.compose.createProgressValidate;
-      case 'write':
-        return t.compose.createProgressWrite;
-      case 'start':
-        return t.compose.createProgressStart;
-      case 'done':
-        return t.compose.createProgressDone;
-    }
-  };
 
   const load = useCallback(async (opts?: { clearError?: boolean }) => {
     setLoading(true);
     if (opts?.clearError) setError(null);
     try {
-      const [projects, baseList, containers] = await Promise.all([
+      const [projects, containers] = await Promise.all([
         fetchComposeProjects(),
-        fetchComposeBases(),
         fetchContainers().catch(() => []),
       ]);
       setItems(projects);
-      setBases(baseList);
       const icons: Record<string, string[]> = {};
       const unhealthy: Record<string, number> = {};
       for (const c of containers) {
@@ -125,12 +79,6 @@ export function ComposeListPage() {
       }
       setProjectIcons(icons);
       setProjectUnhealthy(unhealthy);
-      const preferred =
-        baseList.find((b) => b.writable && b.path === '/home')?.path ??
-        baseList.find((b) => b.writable)?.path ??
-        baseList[0]?.path ??
-        '/home';
-      setBasePath((prev) => prev || preferred);
     } catch (err) {
       setError(err instanceof Error ? err.message : t.compose.loadError);
     } finally {
@@ -265,77 +213,6 @@ export function ComposeListPage() {
   const selectedIds = Array.from(selected);
   const anyBusy = Boolean(busy) || bulkBusy || confirmBusy;
 
-  const onCreate = async () => {
-    const trimmed = name.trim();
-    if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(trimmed)) {
-      setError(t.compose.invalidName);
-      return;
-    }
-    if (!yaml.trim() || !/^\s*services:\s*(?:#.*)?$/m.test(yaml)) {
-      setError(t.compose.invalidYaml);
-      return;
-    }
-    setCreating(true);
-    setError(null);
-    setCreateProgress({ percent: 8, step: 'validate' });
-    let tick: ReturnType<typeof setInterval> | null = null;
-    try {
-      setCreateProgress({ percent: 22, step: 'write' });
-      const project = await createComposeProject({
-        name: trimmed,
-        basePath,
-        composeFileName,
-        yaml,
-        envContent: envContent.trim() || undefined,
-        start: false,
-      });
-
-      if (startAfterCreate) {
-        let percent = 55;
-        setCreateProgress({ percent, step: 'start' });
-        tick = setInterval(() => {
-          percent = Math.min(percent + 2, 92);
-          setCreateProgress({ percent, step: 'start' });
-        }, 700);
-        try {
-          await composeAction(project.id, 'up');
-        } catch (err) {
-          if (tick) clearInterval(tick);
-          tick = null;
-          const msg = err instanceof Error ? err.message : t.common.failed;
-          setCreateProgress(null);
-          await load();
-          // Stay on create form with YAML intact so the user can fix ports/volumes
-          setError(
-            `${t.compose.createStartFailed}: ${msg} (${t.compose.targetPath}: ${basePath}/${trimmed})`,
-          );
-          return;
-        } finally {
-          if (tick) clearInterval(tick);
-          tick = null;
-        }
-      }
-
-      setCreateProgress({ percent: 100, step: 'done' });
-      await new Promise((r) => setTimeout(r, 280));
-      setShowCreate(false);
-      setName('');
-      setYaml(DEFAULT_YAML);
-      setEnvContent('');
-      await load({ clearError: true });
-      router.push(`/compose/${encodeURIComponent(project.id)}`);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : t.compose.createError;
-      await load();
-      setError(msg);
-      // Created on disk but later step failed – keep form open with error (no silent navigate)
-    } finally {
-      if (tick) clearInterval(tick);
-      setCreating(false);
-      setCreateProgress(null);
-    }
-  };
-
   const rows = items.map((p) => [
     <input
       key={`cb-${p.id}`}
@@ -430,125 +307,16 @@ export function ComposeListPage() {
         actions={
           <div className="flex gap-2">
             {canOps ? (
-              <Button
-                variant="primary"
-                disabled={creating}
-                onClick={() => setShowCreate((v) => !v)}
-              >
-                {showCreate ? t.common.cancel : t.compose.create}
-              </Button>
+              <Link href="/compose/new" className={buttonClassName({ variant: 'primary' })}>
+                {t.compose.create}
+              </Link>
             ) : null}
             <Button onClick={() => void load({ clearError: true })}>{t.common.refresh}</Button>
           </div>
         }
       />
 
-      {showCreate && canOps ? (
-        <section className="dockora-panel space-y-4 border-l-[3px] border-l-dockora-pink p-4">
-          <h2 className="dockora-title-gradient text-lg">{t.compose.createTitle}</h2>
-          <div className="sticky top-16 z-30 -mx-1 space-y-3 bg-dockora-surface/95 px-1 py-2 backdrop-blur-md md:top-4">
-            {error ? <ErrorBanner message={error} /> : null}
-            {createProgress ? (
-              <div className="space-y-2 rounded-md border border-dockora-border bg-dockora-surface2/80 p-3">
-                <div className="flex items-center justify-between gap-3 text-sm">
-                  <span className="text-dockora-muted">{createStepLabel(createProgress.step)}</span>
-                  <span className="tabular-nums text-dockora-muted">
-                    {Math.round(createProgress.percent)}%
-                  </span>
-                </div>
-                <ProgressBar
-                  value={createProgress.percent}
-                  tone={createProgress.step === 'done' ? 'success' : 'accent'}
-                  autoTone={false}
-                />
-              </div>
-            ) : null}
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="space-y-1.5 text-sm">
-              <Label>{t.common.name}</Label>
-              <Input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="my-app"
-                autoComplete="off"
-                disabled={creating}
-              />
-            </label>
-            <label className="space-y-1.5 text-sm">
-              <Label>{t.compose.basePath}</Label>
-              <Select
-                value={basePath}
-                onChange={(e) => setBasePath(e.target.value)}
-                disabled={creating}
-                className="w-full"
-              >
-                {bases.map((b) => (
-                  <option key={b.path} value={b.path} disabled={!b.writable}>
-                    {b.path}
-                    {b.writable ? '' : ` (${t.compose.readOnlyPath})`}
-                  </option>
-                ))}
-              </Select>
-            </label>
-            <label className="space-y-1.5 text-sm">
-              <Label>{t.compose.filename}</Label>
-              <Select
-                value={composeFileName}
-                onChange={(e) => setComposeFileName(e.target.value)}
-                disabled={creating}
-                className="w-full"
-              >
-                <option value="compose.yaml">compose.yaml</option>
-                <option value="compose.yml">compose.yml</option>
-                <option value="docker-compose.yml">docker-compose.yml</option>
-                <option value="docker-compose.yaml">docker-compose.yaml</option>
-              </Select>
-            </label>
-            <label className="flex items-end gap-2 pb-2 text-sm">
-              <input
-                type="checkbox"
-                checked={startAfterCreate}
-                onChange={(e) => setStartAfterCreate(e.target.checked)}
-                className="h-4 w-4 accent-dockora-pink"
-                disabled={creating}
-              />
-              <span>{t.compose.startAfterCreate}</span>
-            </label>
-          </div>
-          <label className="block space-y-1.5 text-sm">
-            <Label>{t.compose.yaml}</Label>
-            <Textarea
-              rows={12}
-              value={yaml}
-              onChange={(e) => setYaml(e.target.value)}
-              disabled={creating}
-            />
-          </label>
-          <label className="block space-y-1.5 text-sm">
-            <Label>{t.compose.envOptional}</Label>
-            <Textarea
-              rows={4}
-              value={envContent}
-              onChange={(e) => setEnvContent(e.target.value)}
-              placeholder="KEY=value"
-              disabled={creating}
-            />
-          </label>
-          <p className="font-mono text-xs text-dockora-muted">
-            {t.compose.targetPath}: {basePath}/{name || '…'}/{composeFileName}
-          </p>
-          <Button
-            variant="primary"
-            disabled={creating || !name.trim() || !yaml.trim()}
-            onClick={() => void onCreate()}
-          >
-            {creating ? t.common.loading : t.compose.createSubmit}
-          </Button>
-        </section>
-      ) : null}
-
-      {error && !showCreate ? <ErrorBanner message={error} /> : null}
+      {error ? <ErrorBanner message={error} /> : null}
       {bulkProgress ? (
         <p className="font-mono text-xs text-dockora-muted">
           {t.common.bulkProgress

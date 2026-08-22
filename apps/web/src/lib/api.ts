@@ -19,6 +19,8 @@ import type {
   DashboardOverview,
   HealthResponse,
   ImageSummary,
+  VolumeBrowseEntry,
+  VolumeSummary,
   LogEntry,
   LogLevel,
   MonitoringSnapshot,
@@ -288,6 +290,27 @@ export async function removeImage(id: string, force = false): Promise<ActionResu
     `/images/${encodeURIComponent(id)}${qs({ force: force ? 'true' : undefined })}`,
     { method: 'DELETE' },
   );
+}
+
+export async function fetchVolumes(): Promise<VolumeSummary[]> {
+  return request<VolumeSummary[]>('/volumes');
+}
+
+export async function pruneVolumes(): Promise<
+  ActionResult & { volumesDeleted: number; spaceReclaimed: number }
+> {
+  return request<ActionResult & { volumesDeleted: number; spaceReclaimed: number }>(
+    '/volumes/prune',
+    { method: 'POST' },
+  );
+}
+
+export async function removeVolume(name: string): Promise<ActionResult> {
+  return request<ActionResult>(`/volumes/${encodeURIComponent(name)}`, { method: 'DELETE' });
+}
+
+export async function browseVolume(name: string): Promise<VolumeBrowseEntry[]> {
+  return request<VolumeBrowseEntry[]>(`/volumes/${encodeURIComponent(name)}/browse`);
 }
 
 // Updates

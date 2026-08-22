@@ -1,0 +1,35 @@
+# HTTPS with Caddy’s local CA (LAN / no public DNS).
+# Browsers warn until you trust the CA:
+#   docker exec dockora-caddy cat /data/caddy/pki/authorities/local/root.crt
+#
+# docker compose --profile tls up
+# DOCKORA_CADDYFILE=./deploy/Caddyfile.internal
+# DOCKORA_DOMAIN=<hostname-or-ip>
+
+{$DOCKORA_SITE} {
+	tls internal
+	encode gzip
+
+	handle /api/* {
+		reverse_proxy api:3001 {
+			flush_interval -1
+			header_up Host {host}
+			header_up X-Forwarded-Proto {scheme}
+			header_up X-Forwarded-For {remote_host}
+			transport http {
+				read_timeout 3600s
+			}
+		}
+	}
+
+	handle {
+		reverse_proxy web:3000 {
+			header_up Host {host}
+			header_up X-Forwarded-Proto {scheme}
+			header_up X-Forwarded-For {remote_host}
+			transport http {
+				read_timeout 3600s
+			}
+		}
+	}
+}

@@ -226,7 +226,9 @@ echo "==> Rebuilding stack (docker compose up -d --build)"
 write_progress 28 build "Stack-Rebuild startet"
 cd "$INSTALL_DIR"
 PROFILES=""
-if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx 'dockora-proxy'; then
+if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx 'dockora-caddy'; then
+  PROFILES="--profile tls"
+elif docker ps --format '{{.Names}}' 2>/dev/null | grep -qx 'dockora-proxy'; then
   PROFILES="--profile proxy"
 fi
 # shellcheck disable=SC2086
@@ -246,8 +248,13 @@ if [ "$COMPOSE_RC" -ne 0 ]; then
   exit "$COMPOSE_RC"
 fi
 
-# Nginx resolves upstream IPs at start; force-recreate so a stale web/api IP cannot 502
-if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -qx 'dockora-proxy'; then
+# Nginx/Caddy resolve upstream IPs at start; force-recreate so a stale web/api IP cannot 502
+if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -qx 'dockora-caddy'; then
+  echo "==> Refreshing Caddy (pick up new api/web IPs + Caddyfile)"
+  write_progress 93 proxy "TLS-Proxy wird aktualisiert"
+  # shellcheck disable=SC2086
+  docker compose $PROFILES up -d --force-recreate --no-deps tls
+elif docker ps -a --format '{{.Names}}' 2>/dev/null | grep -qx 'dockora-proxy'; then
   echo "==> Refreshing proxy (pick up new api/web IPs + nginx.conf)"
   write_progress 93 proxy "Proxy wird aktualisiert"
   # shellcheck disable=SC2086

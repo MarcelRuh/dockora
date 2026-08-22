@@ -5,7 +5,7 @@
 [![CI](https://github.com/MarcelRuh/dockora/actions/workflows/ci.yml/badge.svg)](https://github.com/MarcelRuh/dockora/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
-> Status: **v1.7.7** – self-hosted Docker management with in-app updates and GHCR images.
+> Status: **v1.8.0** – self-hosted Docker management with in-app updates and GHCR images.
 
 ## One-line install (wget)
 
@@ -15,10 +15,24 @@ Requires Docker + Compose V2. Installs to `/opt/dockora` by default and generate
 wget -qO- https://raw.githubusercontent.com/MarcelRuh/dockora/main/scripts/install.sh | bash
 ```
 
-With same-origin proxy (SSE/WebSocket on port 8080):
+With same-origin HTTP proxy (SSE/WebSocket on port 8080):
 
 ```bash
 wget -qO- https://raw.githubusercontent.com/MarcelRuh/dockora/main/scripts/install.sh | DOCKORA_PROXY=1 bash
+```
+
+HTTPS (Let’s Encrypt, public DNS + ports 80/443):
+
+```bash
+wget -qO- https://raw.githubusercontent.com/MarcelRuh/dockora/main/scripts/install.sh | \
+  DOCKORA_TLS=1 DOCKORA_DOMAIN=dockora.example.com DOCKORA_ACME_EMAIL=you@example.com bash
+```
+
+HTTPS on LAN (Caddy internal CA, browser warning until the CA is trusted):
+
+```bash
+wget -qO- https://raw.githubusercontent.com/MarcelRuh/dockora/main/scripts/install.sh | \
+  DOCKORA_TLS=1 DOCKORA_DOMAIN=192.168.1.50 bash
 ```
 
 Custom directory:
@@ -65,7 +79,8 @@ Images: `ghcr.io/marcelruh/dockora-api` / `dockora-web` (make packages **public*
 
 - Live dashboard (CPU/RAM/disk, container counts, events)
 - Container management (lifecycle, logs, stats, web terminal)
-- Compose discovery & actions (up/down/pull/build, YAML + `.env` editor, backups)
+- Compose discovery & create (YAML + `.env`, then up)
+- Named volume list, size, unused prune, read-only browse
 - Image management & multi-registry update checker (Docker Hub, GHCR, Quay, …)
 - Backups (compose/env/settings/volumes, retention, scheduler) with secret redaction
 - Discord webhooks, monitoring thresholds, central logs
@@ -123,6 +138,15 @@ Recommended same-origin proxy (SSE + WebSocket):
 ```bash
 docker compose --profile proxy up -d --build
 # http://localhost:8080
+```
+
+HTTPS with Caddy (Let’s Encrypt or `deploy/Caddyfile.internal`):
+
+```bash
+# public DNS
+DOCKORA_DOMAIN=dockora.example.com DOCKORA_ACME_EMAIL=you@example.com \
+  docker compose --profile tls up -d --build
+# https://dockora.example.com
 ```
 
 Full operator guide: [docs/DEPLOY.md](./docs/DEPLOY.md)

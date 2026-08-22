@@ -17,6 +17,7 @@ const NAV_ITEMS = [
   { key: 'containers', href: '/containers', ready: true },
   { key: 'compose', href: '/compose', ready: true },
   { key: 'images', href: '/images', ready: true },
+  { key: 'volumes', href: '/volumes', ready: true },
   { key: 'updates', href: '/updates', ready: true },
   { key: 'monitoring', href: '/monitoring', ready: true },
   { key: 'network', href: '/network', ready: true },

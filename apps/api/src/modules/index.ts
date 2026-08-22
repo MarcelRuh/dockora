@@ -7,6 +7,7 @@ import { dashboardModule } from './dashboard/index.js';
 import { containersModule } from './containers/index.js';
 import { composeModule } from './compose/index.js';
 import { imagesModule } from './images/index.js';
+import { volumesModule } from './volumes/index.js';
 import { settingsModule } from './settings/index.js';
 import { updatesModule } from './updates/index.js';
 import { backupsModule } from './backups/index.js';
@@ -28,6 +29,7 @@ export async function registerModules(app: FastifyInstance): Promise<void> {
   await app.register(containersModule);
   await app.register(composeModule);
   await app.register(imagesModule);
+  await app.register(volumesModule);
   await app.register(settingsModule);
   await app.register(updatesModule);
   await app.register(backupsModule);

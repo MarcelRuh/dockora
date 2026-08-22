@@ -10,6 +10,8 @@ import type {
   DockerImageInfo,
   DockerStatsSnapshot,
   DockerVersionInfo,
+  DockerVolumeBrowseEntry,
+  DockerVolumeInfo,
   IDockerClient,
 } from '../../domain/ports.js';
 import { formatPorts, mapContainerStatus } from '../../domain/container-utils.js';
@@ -17,6 +19,8 @@ import { formatPorts, mapContainerStatus } from '../../domain/container-utils.js
 const MAX_EVENTS = 100;
 const COMPOSE_PROJECT_LABEL = 'com.docker.compose.project';
 const COMPOSE_SERVICE_LABEL = 'com.docker.compose.service';
+const VOLUME_HELPER_IMAGE = 'alpine:3.20';
+const VOLUME_NAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,254}$/;
 
 export interface DockerodeClientOptions {
   socketPath: string;
@@ -227,6 +231,131 @@ export class DockerodeClient implements IDockerClient {
     };
   }
 
+  async listVolumes(): Promise<DockerVolumeInfo[]> {
+    const [volRes, containers] = await Promise.all([
+      this.docker.listVolumes(),
+      this.docker.listContainers({ all: true }),
+    ]);
+
+    const usage = new Map<string, { size: number; refCount: number }>();
+    try {
+      const df = (await this.docker.df()) as {
+        Volumes?: Array<{ Name?: string; UsageData?: { Size?: number; RefCount?: number } }>;
+      };
+      for (const entry of df.Volumes ?? []) {
+        if (!entry.Name) continue;
+        usage.set(entry.Name, {
+          size: entry.UsageData?.Size ?? 0,
+          refCount: entry.UsageData?.RefCount ?? 0,
+        });
+      }
+    } catch (error) {
+      this.logger?.debug({ err: error }, 'docker df (volumes) failed');
+    }
+
+    const usedBy = new Map<string, string[]>();
+    for (const row of containers) {
+      const cname = (row.Names?.[0] ?? row.Id.slice(0, 12)).replace(/^\//, '');
+      for (const mount of row.Mounts ?? []) {
+        if (mount.Type !== 'volume' || !mount.Name) continue;
+        const list = usedBy.get(mount.Name) ?? [];
+        if (!list.includes(cname)) list.push(cname);
+        usedBy.set(mount.Name, list);
+      }
+    }
+
+    return (volRes.Volumes ?? []).map((vol) => {
+      const name = vol.Name;
+      const stats = usage.get(name);
+      const users = usedBy.get(name) ?? [];
+      return {
+        name,
+        driver: vol.Driver ?? 'local',
+        mountpoint: vol.Mountpoint ?? '',
+        createdAt: (vol as { CreatedAt?: string }).CreatedAt ?? null,
+        sizeBytes: stats ? stats.size : null,
+        refCount: stats?.refCount ?? users.length,
+        usedBy: users,
+        labels: (vol.Labels ?? {}) as Record<string, string>,
+      };
+    });
+  }
+
+  async removeVolume(name: string, force = false): Promise<void> {
+    assertSafeVolumeName(name);
+    await this.docker.getVolume(name).remove({ force });
+  }
+
+  async pruneVolumes(): Promise<{ volumesDeleted: number; spaceReclaimed: number }> {
+    const result = await this.docker.pruneVolumes();
+    return {
+      volumesDeleted: result.VolumesDeleted?.length ?? 0,
+      spaceReclaimed: result.SpaceReclaimed ?? 0,
+    };
+  }
+
+  async browseVolume(name: string): Promise<DockerVolumeBrowseEntry[]> {
+    assertSafeVolumeName(name);
+    await this.ensureHelperImage(VOLUME_HELPER_IMAGE);
+
+    const container = await this.docker.createContainer({
+      Image: VOLUME_HELPER_IMAGE,
+      Tty: true,
+      Cmd: [
+        'sh',
+        '-c',
+        [
+          'cd /data 2>/dev/null || exit 0',
+          'ls -1A 2>/dev/null | head -n 100 | while IFS= read -r n; do',
+          '  [ -n "$n" ] || continue',
+          '  if [ -d "$n" ]; then t=d; else t=f; fi',
+          '  s=$(du -sb "$n" 2>/dev/null | cut -f1)',
+          '  printf "%s\\t%s\\t%s\\n" "$t" "${s:-0}" "$n"',
+          'done',
+        ].join('\n'),
+      ],
+      HostConfig: {
+        AutoRemove: false,
+        Binds: [`${name}:/data:ro`],
+        NetworkMode: 'none',
+      },
+    });
+
+    const timeout = setTimeout(() => {
+      void container.kill().catch(() => undefined);
+    }, 20_000);
+
+    try {
+      await container.start();
+      await container.wait();
+      const raw = await container.logs({ stdout: true, stderr: true });
+      const text = Buffer.isBuffer(raw) ? raw.toString('utf8') : String(raw);
+      return parseVolumeBrowseOutput(text);
+    } finally {
+      clearTimeout(timeout);
+      await container.remove({ force: true }).catch(() => undefined);
+    }
+  }
+
+  private async ensureHelperImage(image: string): Promise<void> {
+    try {
+      await this.docker.getImage(image).inspect();
+    } catch {
+      await new Promise<void>((resolve, reject) => {
+        this.docker.pull(image, (err: Error | null, stream: NodeJS.ReadableStream) => {
+          if (err) {
+            reject(err);
+            return;
+          }
+          this.docker.modem.followProgress(stream, (followErr: Error | null) => {
+            if (followErr) reject(followErr);
+            else resolve();
+          });
+        });
+      });
+    }
+  }
+
   async pruneBuildCache(): Promise<{ spaceReclaimed: number }> {
     // dockerode.pruneBuilder() ignores `all` and only clears unused cache.
     // Engine API: POST /build/prune?all=true ≈ `docker builder prune -af`
@@ -430,6 +559,22 @@ export class OfflineDockerClient implements IDockerClient {
   }
 
   async pruneImages(): Promise<{ imagesDeleted: number; spaceReclaimed: number }> {
+    OfflineDockerClient.offline();
+  }
+
+  async listVolumes(): Promise<DockerVolumeInfo[]> {
+    return [];
+  }
+
+  async removeVolume(_name: string): Promise<void> {
+    OfflineDockerClient.offline();
+  }
+
+  async pruneVolumes(): Promise<{ volumesDeleted: number; spaceReclaimed: number }> {
+    OfflineDockerClient.offline();
+  }
+
+  async browseVolume(_name: string): Promise<DockerVolumeBrowseEntry[]> {
     OfflineDockerClient.offline();
   }
 
@@ -741,4 +886,30 @@ async function demuxDockerOutput(
 
 function round2(value: number): number {
   return Math.round(value * 100) / 100;
+}
+
+export function assertSafeVolumeName(name: string): void {
+  if (!VOLUME_NAME_RE.test(name)) {
+    throw new Error('Invalid volume name');
+  }
+}
+
+export function parseVolumeBrowseOutput(text: string): DockerVolumeBrowseEntry[] {
+  const entries: DockerVolumeBrowseEntry[] = [];
+  for (const line of text.split('\n')) {
+    const trimmed = line.replace(/^\u0001|\u0002/g, '').trimEnd();
+    if (!trimmed.trim()) continue;
+    const [kindRaw, sizeRaw, ...nameParts] = trimmed.split('\t');
+    const name = nameParts.join('\t').trim();
+    if (!name || name === '.' || name === '..') continue;
+    if (name.includes('/') || name.includes('\\')) continue;
+    const kind = kindRaw === 'd' ? 'dir' : 'file';
+    const size = Number.parseInt(sizeRaw ?? '', 10);
+    entries.push({
+      name,
+      kind,
+      sizeBytes: Number.isFinite(size) ? size : null,
+    });
+  }
+  return entries;
 }

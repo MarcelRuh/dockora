@@ -1,0 +1,34 @@
+# HTTPS + Let’s Encrypt (HTTP-01).
+# docker compose --profile tls up
+# Requires DOCKORA_DOMAIN (public DNS) and DOCKORA_ACME_EMAIL.
+
+{
+	email {$DOCKORA_ACME_EMAIL}
+}
+
+{$DOCKORA_SITE} {
+	encode gzip
+
+	handle /api/* {
+		reverse_proxy api:3001 {
+			flush_interval -1
+			header_up Host {host}
+			header_up X-Forwarded-Proto {scheme}
+			header_up X-Forwarded-For {remote_host}
+			transport http {
+				read_timeout 3600s
+			}
+		}
+	}
+
+	handle {
+		reverse_proxy web:3000 {
+			header_up Host {host}
+			header_up X-Forwarded-Proto {scheme}
+			header_up X-Forwarded-For {remote_host}
+			transport http {
+				read_timeout 3600s
+			}
+		}
+	}
+}

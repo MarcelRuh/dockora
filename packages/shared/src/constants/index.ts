@@ -1,5 +1,5 @@
 export const APP_NAME = 'Dockora';
-export const APP_VERSION = '1.7.7';
+export const APP_VERSION = '1.8.0';
 
 /** Unterstützte UI-Sprachen */
 export const LOCALES = ['de', 'en'] as const;

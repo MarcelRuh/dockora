@@ -5,6 +5,15 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [1.8.0] – 2026-08-22
+
+### Added
+
+- HTTPS install profile (`DOCKORA_TLS=1`) with Caddy: Let’s Encrypt or internal CA
+- Volumes page: list, size, unused prune, read-only browse
+- Dedicated Compose create page (`/compose/new`) with YAML, directory, `.env` editor, and up
+- Compose `.env`: paste in Raw first; Fields is edit-only (no add-row)
+
 ## [1.7.7] – 2026-08-22
 
 ### Added

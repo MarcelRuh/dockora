@@ -79,3 +79,14 @@ describe('isImageUsedOnlyByDockoraSelf', () => {
     expect(isImageUsedOnlyByDockoraSelf([], self)).toBe(false);
   });
 });
+
+describe('isProtectedDockerVolume', () => {
+  it('protects dockora stack volumes only', async () => {
+    const { isProtectedDockerVolume } = await import('./dockora-self.js');
+    expect(isProtectedDockerVolume('dockora-data')).toBe(true);
+    expect(isProtectedDockerVolume('dockora_dockora-data')).toBe(true);
+    expect(isProtectedDockerVolume('dockora_caddy-data')).toBe(true);
+    expect(isProtectedDockerVolume('plex_config')).toBe(false);
+    expect(isProtectedDockerVolume('immich_postgres')).toBe(false);
+  });
+});

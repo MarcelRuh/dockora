@@ -156,6 +156,24 @@ export interface ImageSummary {
   usedBy: string[];
 }
 
+export interface VolumeSummary {
+  name: string;
+  driver: string;
+  mountpoint: string;
+  createdAt: string | null;
+  sizeBytes: number | null;
+  refCount: number;
+  usedBy: string[];
+  unused: boolean;
+  protected: boolean;
+}
+
+export interface VolumeBrowseEntry {
+  name: string;
+  kind: 'file' | 'dir';
+  sizeBytes: number | null;
+}
+
 export interface UpdateCheckResult {
   containerId: string;
   containerName: string;

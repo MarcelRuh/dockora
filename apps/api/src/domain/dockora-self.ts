@@ -7,6 +7,8 @@ const SELF_CONTAINER_NAMES = new Set([
   'dockora-api',
   'dockora-web',
   'dockora-proxy',
+  'dockora-caddy',
+  'dockora-host-agent',
   'dockora-self-updater',
 ]);
 
@@ -65,6 +67,13 @@ export function isDockoraSelfUpdater(input: {
   if (name === 'dockora-self-updater' || name.endsWith('-dockora-self-updater')) return true;
   if (input.labels?.['dockora.update'] === 'self') return true;
   return false;
+}
+
+/** Named volumes that belong to the Dockora stack and must not be pruned. */
+export function isProtectedDockerVolume(name: string): boolean {
+  const n = name.trim().toLowerCase();
+  if (!n) return false;
+  return n === 'dockora-data' || n.startsWith('dockora-') || n.startsWith('dockora_');
 }
 
 /** Compose-Projekt der Dockora-Suite (Name oder Install-Pfad). */

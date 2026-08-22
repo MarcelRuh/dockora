@@ -59,6 +59,16 @@ export function IconImages(props: IconProps) {
   );
 }
 
+export function IconVolumes(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <ellipse cx="12" cy="6" rx="7" ry="3" />
+      <path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6" />
+      <path d="M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3" />
+    </svg>
+  );
+}
+
 export function IconUpdates(props: IconProps) {
   return (
     <svg {...base(props)}>
@@ -135,6 +145,7 @@ export const NAV_ICONS = {
   containers: IconContainers,
   compose: IconCompose,
   images: IconImages,
+  volumes: IconVolumes,
   updates: IconUpdates,
   monitoring: IconMonitoring,
   network: IconNetwork,

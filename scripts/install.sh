@@ -10,6 +10,10 @@
 #   DOCKORA_BRANCH=main              Git-Branch
 #   DOCKORA_SKIP_START=1             Nur klonen/konfigurieren, nicht starten
 #   DOCKORA_PROXY=1                  nginx Same-Origin-Proxy-Profil mitstarten
+#   DOCKORA_TLS=1                    Caddy HTTPS (Let’s Encrypt oder interne CA)
+#   DOCKORA_DOMAIN=dockora.example.com  Hostname/IP für TLS (Browser-URL)
+#   DOCKORA_ACME_EMAIL=you@domain    Let’s Encrypt; ohne E-Mail → interne CA
+#   DOCKORA_TLS_MODE=acme|internal   optional, sonst automatisch
 #   DOCKORA_USE_IMAGES=1             GHCR-Images statt lokalem Build
 #   DOCKORA_IMAGE_TAG=1.1.0          Tag für GHCR-Images (default: latest)
 #   JWT_SECRET=...                   sonst wird generiert
@@ -22,6 +26,7 @@ REPO_HTTPS="https://github.com/MarcelRuh/dockora.git"
 BRANCH="${DOCKORA_BRANCH:-main}"
 INSTALL_DIR="${DOCKORA_DIR:-/opt/dockora}"
 PROXY="${DOCKORA_PROXY:-0}"
+TLS="${DOCKORA_TLS:-0}"
 SKIP_START="${DOCKORA_SKIP_START:-0}"
 USE_IMAGES="${DOCKORA_USE_IMAGES:-0}"
 IMAGE_TAG="${DOCKORA_IMAGE_TAG:-latest}"
@@ -149,6 +154,44 @@ if command -v getent >/dev/null 2>&1; then
 fi
 replace_env DOCKER_GID "${DOCKER_GID:-${DOCKER_GID_DETECTED:-999}}"
 
+is_ipv4() {
+  [[ "${1:-}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]
+}
+
+if [[ "$TLS" == "1" ]]; then
+  DOMAIN="${DOCKORA_DOMAIN:-$(hostname -f 2>/dev/null || hostname || echo localhost)}"
+  ACME_EMAIL="${DOCKORA_ACME_EMAIL:-}"
+  TLS_MODE="${DOCKORA_TLS_MODE:-}"
+  if [[ -z "$TLS_MODE" ]]; then
+    if [[ -n "$ACME_EMAIL" && "$DOMAIN" != "localhost" && "$DOMAIN" != "localhost.localdomain" ]] && ! is_ipv4 "$DOMAIN"; then
+      TLS_MODE=acme
+    else
+      TLS_MODE=internal
+    fi
+  fi
+  if [[ "$TLS_MODE" == "acme" ]]; then
+    if [[ -z "$ACME_EMAIL" ]]; then
+      red "DOCKORA_TLS_MODE=acme requires DOCKORA_ACME_EMAIL"
+      exit 1
+    fi
+    CADDYFILE="./deploy/Caddyfile"
+  else
+    TLS_MODE=internal
+    CADDYFILE="./deploy/Caddyfile.internal"
+  fi
+  replace_env DOCKORA_DOMAIN "$DOMAIN"
+  replace_env DOCKORA_ACME_EMAIL "$ACME_EMAIL"
+  replace_env DOCKORA_CADDYFILE "$CADDYFILE"
+  replace_env DOCKORA_WEB_BIND "127.0.0.1"
+  replace_env DOCKORA_API_BIND "127.0.0.1"
+  replace_env CORS_ORIGIN "https://${DOMAIN}"
+  replace_env COMPOSE_PROFILES "tls"
+  PROXY=0
+  info "TLS enabled (${TLS_MODE}) → https://${DOMAIN}"
+elif [[ "$PROXY" == "1" ]]; then
+  replace_env COMPOSE_PROFILES "proxy"
+fi
+
 # Always keep install-dir / repo wiring for in-app self-update
 replace_env DOCKORA_INSTALL_DIR "$INSTALL_DIR"
 replace_env DOCKORA_REPO "${DOCKORA_REPO:-MarcelRuh/dockora}"
@@ -216,31 +259,40 @@ install_docker_cleanup_timer
 
 if [[ "$SKIP_START" == "1" ]]; then
   green "Skip start requested. Configure ${INSTALL_DIR}/.env then run:"
+  local_cmd="cd ${INSTALL_DIR} && docker compose"
   if [[ "$USE_IMAGES" == "1" ]]; then
-    echo "  cd ${INSTALL_DIR} && docker compose -f docker-compose.yml -f docker-compose.images.yml up -d"
-  else
-    echo "  cd ${INSTALL_DIR} && docker compose up -d --build"
+    local_cmd="${local_cmd} -f docker-compose.yml -f docker-compose.images.yml"
   fi
+  if [[ "$TLS" == "1" ]]; then
+    local_cmd="${local_cmd} --profile tls up -d"
+  elif [[ "$PROXY" == "1" ]]; then
+    local_cmd="${local_cmd} --profile proxy up -d"
+  else
+    local_cmd="${local_cmd} up -d"
+  fi
+  if [[ "$USE_IMAGES" != "1" ]]; then
+    local_cmd="${local_cmd} --build"
+  fi
+  echo "  ${local_cmd}"
   exit 0
 fi
 
 COMPOSE=(docker compose -f docker-compose.yml)
+COMPOSE_PROFILES_ARGS=()
+if [[ "$TLS" == "1" ]]; then
+  COMPOSE_PROFILES_ARGS+=(--profile tls)
+elif [[ "$PROXY" == "1" ]]; then
+  COMPOSE_PROFILES_ARGS+=(--profile proxy)
+fi
+
 if [[ "$USE_IMAGES" == "1" ]]; then
   COMPOSE+=(-f docker-compose.images.yml)
   info "Using GHCR images (tag ${IMAGE_TAG})"
   "${COMPOSE[@]}" pull
-  if [[ "$PROXY" == "1" ]]; then
-    "${COMPOSE[@]}" --profile proxy up -d
-  else
-    "${COMPOSE[@]}" up -d
-  fi
+  "${COMPOSE[@]}" "${COMPOSE_PROFILES_ARGS[@]}" up -d
 else
   info "Building and starting containers"
-  if [[ "$PROXY" == "1" ]]; then
-    docker compose --profile proxy up -d --build
-  else
-    docker compose up -d --build
-  fi
+  docker compose "${COMPOSE_PROFILES_ARGS[@]}" up -d --build
   # BuildKit layers accumulate fast (~GBs per Dockora rebuild)
   if [[ -x "${INSTALL_DIR}/scripts/prune-build-cache.sh" ]]; then
     "${INSTALL_DIR}/scripts/prune-build-cache.sh" || true
@@ -250,7 +302,9 @@ else
   docker image prune -f || true
 fi
 
-if [[ "$PROXY" == "1" ]]; then
+if [[ "$TLS" == "1" ]]; then
+  WEB_HINT="https://${DOCKORA_DOMAIN:-${DOMAIN:-localhost}}"
+elif [[ "$PROXY" == "1" ]]; then
   WEB_HINT="http://$(hostname -f 2>/dev/null || echo localhost):${DOCKORA_PROXY_PORT:-8080}"
 else
   WEB_HINT="http://$(hostname -f 2>/dev/null || echo localhost):${DOCKORA_WEB_PORT:-3000}"
@@ -273,6 +327,10 @@ echo "└───────────────────────�
 echo
 if [[ "$NEW_INSTALL" == "1" ]]; then
   yellow "Passwort jetzt speichern – es wird nicht erneut angezeigt."
+fi
+if [[ "$TLS" == "1" && "${TLS_MODE:-}" == "internal" ]]; then
+  yellow "Internes TLS: Browser warnt, bis die Caddy-CA installiert ist:"
+  echo "  docker exec dockora-caddy cat /data/caddy/pki/authorities/local/root.crt"
 fi
 echo "  API:    http://localhost:${DOCKORA_API_PORT:-3001}/api/v1/health"
 echo "  Logs:   docker compose -f ${INSTALL_DIR}/docker-compose.yml logs -f"
