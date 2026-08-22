@@ -15,18 +15,17 @@ COPY apps/api/package.json ./apps/api/
 RUN pnpm install --filter @dockora/api... --frozen-lockfile || pnpm install --filter @dockora/api...
 
 FROM base AS build
-# Full workspace from deps (pnpm symlinks + @dockora/tsconfig). Overlay sources
-# with cp -a so package node_modules are not wiped (COPY dir/ replaces them).
+# Overlay sources as files so package node_modules from deps stay intact, then
+# re-link the pnpm workspace (GitHub Actions buildx drops pnpm symlinks).
 COPY --from=deps /app ./
 COPY packages/tsconfig ./packages/tsconfig
-COPY packages/shared /tmp/src-shared
-COPY apps/api /tmp/src-api
-RUN cp -a /tmp/src-shared/. /app/packages/shared/ \
- && cp -a /tmp/src-api/. /app/apps/api/ \
- && rm -rf /tmp/src-shared /tmp/src-api \
- && mkdir -p /app/packages/shared/node_modules/@dockora /app/apps/api/node_modules/@dockora \
- && ln -sfn /app/packages/tsconfig /app/packages/shared/node_modules/@dockora/tsconfig \
- && ln -sfn /app/packages/tsconfig /app/apps/api/node_modules/@dockora/tsconfig \
+COPY packages/shared/src ./packages/shared/src
+COPY packages/shared/package.json packages/shared/tsconfig.json ./packages/shared/
+COPY apps/api/src ./apps/api/src
+COPY apps/api/prisma ./apps/api/prisma
+COPY apps/api/package.json apps/api/tsconfig.json ./apps/api/
+RUN pnpm install --filter @dockora/api... --offline --frozen-lockfile \
+ || pnpm install --filter @dockora/api... --frozen-lockfile \
  && pnpm --filter @dockora/shared build \
  && pnpm --filter @dockora/api exec prisma generate \
  && pnpm --filter @dockora/api build

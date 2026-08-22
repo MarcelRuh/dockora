@@ -16,14 +16,15 @@ ARG DOCKORA_API_URL=http://api:3001
 ENV DOCKORA_API_URL=$DOCKORA_API_URL
 COPY --from=deps /app ./
 COPY packages/tsconfig ./packages/tsconfig
-COPY packages/shared /tmp/src-shared
-COPY apps/web /tmp/src-web
-RUN cp -a /tmp/src-shared/. /app/packages/shared/ \
- && cp -a /tmp/src-web/. /app/apps/web/ \
- && rm -rf /tmp/src-shared /tmp/src-web \
- && mkdir -p /app/packages/shared/node_modules/@dockora /app/apps/web/node_modules/@dockora \
- && ln -sfn /app/packages/tsconfig /app/packages/shared/node_modules/@dockora/tsconfig \
- && ln -sfn /app/packages/tsconfig /app/apps/web/node_modules/@dockora/tsconfig \
+COPY packages/shared/src ./packages/shared/src
+COPY packages/shared/package.json packages/shared/tsconfig.json ./packages/shared/
+COPY apps/web/src ./apps/web/src
+COPY apps/web/public ./apps/web/public
+COPY apps/web/package.json apps/web/tsconfig.json apps/web/next.config.ts \
+     apps/web/tailwind.config.js apps/web/postcss.config.js apps/web/next-env.d.ts \
+     apps/web/vitest.config.ts ./apps/web/
+RUN pnpm install --filter @dockora/web... --offline --frozen-lockfile \
+ || pnpm install --filter @dockora/web... --frozen-lockfile \
  && pnpm --filter @dockora/shared build \
  && pnpm --filter @dockora/web build
 
