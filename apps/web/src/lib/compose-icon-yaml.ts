@@ -45,10 +45,6 @@ export function setComposeServiceIcon(yaml: string, service: string, url: string
   return [...lines.slice(0, start), ...filtered, ...lines.slice(end)].join('\n');
 }
 
-export function homarrIconUrl(slug: string): string {
-  return `https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/${slug}.png`;
-}
-
 export function selfhstIconUrl(slug: string): string {
   return `https://cdn.jsdelivr.net/gh/selfhst/icons/png/${slug}.png`;
 }

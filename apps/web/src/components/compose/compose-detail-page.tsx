@@ -28,7 +28,7 @@ import { Button, Input, Select, Textarea } from '@/components/ui/form-controls';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ServiceIcon } from '@/components/ui/service-icon';
 import { EnvEditor } from '@/components/compose/env-editor';
-import { homarrIconUrl, selfhstIconUrl, setComposeServiceIcon } from '@/lib/compose-icon-yaml';
+import { selfhstIconUrl, setComposeServiceIcon } from '@/lib/compose-icon-yaml';
 import {
   ErrorBanner,
   LoadingState,
@@ -517,7 +517,6 @@ function ServiceIconList({
     logs: string;
     iconUrl: string;
     iconSlug: string;
-    iconHomarr: string;
     iconSelfhst: string;
     iconApply: string;
     iconHint: string;
@@ -584,7 +583,6 @@ function ServiceCard({
     logs: string;
     iconUrl: string;
     iconSlug: string;
-    iconHomarr: string;
     iconSelfhst: string;
     iconApply: string;
     iconHint: string;
@@ -669,13 +667,6 @@ function ServiceCard({
         />
         {canOps ? (
           <>
-            <Button
-              size="sm"
-              disabled={busy || !slug.trim()}
-              onClick={() => setUrl(homarrIconUrl(slug.trim().toLowerCase()))}
-            >
-              {labels.iconHomarr}
-            </Button>
             <Button
               size="sm"
               disabled={busy || !slug.trim()}

@@ -125,13 +125,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [drawerOpen]);
 
   return (
-    <div className="relative flex min-h-screen overflow-hidden">
+    <div className="relative flex h-dvh overflow-hidden">
       <div className="pointer-events-none fixed inset-0 z-0">
         <NeonParticles />
         <NeonAtmosphere />
       </div>
 
-      <aside className="relative z-10 sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-dockora-railBorder bg-dockora-rail/90 text-dockora-railText backdrop-blur-xl md:flex">
+      <aside className="relative z-10 hidden h-full w-60 shrink-0 flex-col border-r border-dockora-railBorder bg-dockora-rail/90 text-dockora-railText backdrop-blur-xl md:flex">
         <Link
           href="/"
           className="group block border-b border-dockora-railBorder px-4 py-4 transition-opacity hover:opacity-95"
@@ -150,8 +150,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      <div className="relative z-10 flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-40 flex items-center justify-between gap-3 border-b border-dockora-border bg-dockora-bg/80 px-4 py-3 backdrop-blur-xl md:hidden">
+      <div className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <header className="z-40 flex items-center justify-between gap-3 border-b border-dockora-border bg-dockora-bg/80 px-4 py-3 backdrop-blur-xl md:hidden">
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -231,7 +231,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         ) : null}
 
-        <main className="mx-auto w-full max-w-shell flex-1 px-4 py-8 sm:px-6 sm:py-10 xl:px-8">
+        <main className="mx-auto w-full max-w-shell min-h-0 flex-1 overflow-y-auto px-4 py-8 sm:px-6 sm:py-10 xl:px-8">
           {children}
         </main>
       </div>

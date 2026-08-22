@@ -5,6 +5,16 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [1.7.2] – 2026-08-22
+
+### Changed
+
+- Compose icon picker only offers Selfhst (Homarr button removed)
+
+### Fixed
+
+- Sidebar stays visible while scrolling long Compose pages
+
 ## [1.7.1] – 2026-08-22
 
 ### Fixed

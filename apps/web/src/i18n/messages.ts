@@ -287,10 +287,9 @@ export const messages = {
       envRemove: 'Entfernen',
       iconUrl: 'Icon-URL',
       iconSlug: 'Icon-Name',
-      iconHomarr: 'Homarr',
       iconSelfhst: 'Selfhst',
       iconApply: 'Icon speichern',
-      iconHint: 'URL oder Picker – schreibt das Label icon= in die YAML.',
+      iconHint: 'URL oder Selfhst-Picker – schreibt das Label icon= in die YAML.',
       unhealthy: 'Unhealthy',
     },
     images: {
@@ -930,10 +929,9 @@ export const messages = {
       envRemove: 'Remove',
       iconUrl: 'Icon URL',
       iconSlug: 'Icon name',
-      iconHomarr: 'Homarr',
       iconSelfhst: 'Selfhst',
       iconApply: 'Save icon',
-      iconHint: 'URL or picker – writes the icon= label into the YAML.',
+      iconHint: 'URL or Selfhst picker – writes the icon= label into the YAML.',
       unhealthy: 'Unhealthy',
     },
     images: {
