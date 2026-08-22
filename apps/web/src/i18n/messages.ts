@@ -82,6 +82,21 @@ export const messages = {
       offline: 'Offline',
       unknown: 'Unbekannt',
       versionUnknown: 'n/v',
+      dockerUpdate: {
+        apply: 'Aktualisieren',
+        applying: 'Aktualisiere…',
+        waitingHealth: 'Warte auf Docker nach dem Engine-Update…',
+        confirmEngine: 'Docker Engine auf {version} aktualisieren?',
+        confirmCompose: 'Docker Compose auf {version} aktualisieren?',
+        consequencesEngine: [
+          'Die Engine wird über den Host-Paketmanager aktualisiert.',
+          'Dockerd kann neu starten – laufende Container und Dockora selbst können kurz weg sein.',
+        ],
+        consequencesCompose: [
+          'Das Compose-Plugin auf dem Host wird aktualisiert.',
+          'Laufende Stacks bleiben in der Regel unberührt.',
+        ],
+      },
       containers: {
         title: 'Container',
         total: 'Gesamt',
@@ -724,6 +739,21 @@ export const messages = {
       offline: 'Offline',
       unknown: 'Unknown',
       versionUnknown: 'n/a',
+      dockerUpdate: {
+        apply: 'Update',
+        applying: 'Updating…',
+        waitingHealth: 'Waiting for Docker after the engine update…',
+        confirmEngine: 'Update Docker Engine to {version}?',
+        confirmCompose: 'Update Docker Compose to {version}?',
+        consequencesEngine: [
+          'The engine is upgraded via the host package manager.',
+          'dockerd may restart — running containers and Dockora itself can drop out briefly.',
+        ],
+        consequencesCompose: [
+          'The Compose plugin on the host is upgraded.',
+          'Running stacks are typically left untouched.',
+        ],
+      },
       containers: {
         title: 'Containers',
         total: 'Total',

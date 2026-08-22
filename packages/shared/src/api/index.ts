@@ -49,6 +49,10 @@ export interface DashboardOverview {
     engineVersion: string | null;
     composeVersion: string | null;
     engineStatus: 'online' | 'offline' | 'unknown';
+    engineLatest: string | null;
+    composeLatest: string | null;
+    engineUpdateAvailable: boolean;
+    composeUpdateAvailable: boolean;
   };
   recentEvents: DashboardEvent[];
   notifications: DashboardNotification[];

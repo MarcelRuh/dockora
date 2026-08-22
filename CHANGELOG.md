@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [1.7.4] – 2026-08-22
+
+### Added
+
+- Dashboard Engine/Compose cards check for newer stable releases and let admins apply the host update in-place
+
 ## [1.7.3] – 2026-08-22
 
 ### Fixed

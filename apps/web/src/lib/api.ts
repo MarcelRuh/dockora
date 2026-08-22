@@ -338,6 +338,15 @@ export async function applySelfUpdate(): Promise<{
   return request('/system/self-update', { method: 'POST' });
 }
 
+export async function applyDockerHostUpdate(
+  target: 'engine' | 'compose',
+): Promise<ActionResult> {
+  return request('/system/docker-update', {
+    method: 'POST',
+    body: JSON.stringify({ target }),
+  });
+}
+
 export type PluginInfo = {
   name: string;
   version: string | null;

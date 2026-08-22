@@ -5,7 +5,7 @@
 [![CI](https://github.com/MarcelRuh/dockora/actions/workflows/ci.yml/badge.svg)](https://github.com/MarcelRuh/dockora/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
-> Status: **v1.7.3** – self-hosted Docker management with in-app updates and GHCR images.
+> Status: **v1.7.4** – self-hosted Docker management with in-app updates and GHCR images.
 
 ## One-line install (wget)
 
@@ -36,6 +36,8 @@ curl -fsSL https://raw.githubusercontent.com/MarcelRuh/dockora/main/scripts/inst
 ## Update
 
 **In the UI (recommended):** Settings → Updates → **Dockora Self-Update** → *Jetzt aktualisieren* (admin).
+
+**Docker Engine / Compose:** Dashboard cards show `current → latest` and an update button when a newer stable release exists (admin).
 
 **CLI one-liner:**
 

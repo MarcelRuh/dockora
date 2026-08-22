@@ -2,15 +2,18 @@ import type { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { API_PREFIX, type DashboardOverview } from '@dockora/shared';
 import { ComposeVersionProvider } from '../../infrastructure/docker/compose-version.js';
 import { prisma } from '../../infrastructure/db/prisma.js';
+import { DockerHostUpdateService } from '../system/docker-host-update.service.js';
 import { DashboardService } from './dashboard.service.js';
 
 const SSE_INTERVAL_MS = 10_000;
 
 export const dashboardModule: FastifyPluginAsync = async (app: FastifyInstance) => {
+  const dockerHostUpdates = new DockerHostUpdateService();
   const service = new DashboardService({
     docker: app.docker,
     hostMetrics: app.hostMetrics,
     composeVersion: new ComposeVersionProvider(),
+    dockerLatest: () => dockerHostUpdates.latest(),
     listNotifications: async () => {
       const rows = await prisma.notification.findMany({
         orderBy: { createdAt: 'desc' },

@@ -1,12 +1,18 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import type { DashboardOverview } from '@dockora/shared';
+import { useAuth } from '@/components/auth/auth-provider';
 import { useLocale } from '@/i18n/locale-provider';
+import { ApiError, applyDockerHostUpdate } from '@/lib/api';
 import { formatBytes, formatPercent, formatRelativeTime, usageRatio } from '@/lib/format';
+import { canAdmin } from '@/lib/roles';
 import { cn } from '@/lib/utils';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ProgressBar } from '@/components/ui/progress-bar';
 import { Button } from '@/components/ui/form-controls';
+import { ErrorBanner, SuccessBanner } from '@/components/ui/page-parts';
 import type { UseDashboardResult } from '@/hooks/use-dashboard';
 
 export function DashboardView({
@@ -55,7 +61,7 @@ export function DashboardView({
 
       {data ? (
         <div className="space-y-8">
-          <EngineStrip overview={data} labels={t.dashboard} />
+          <EngineStrip overview={data} onUpdated={() => void refresh()} />
           <ContainerStrip overview={data} labels={t.dashboard} />
           <LiveResources overview={data} labels={t.dashboard} locale={loc} />
           <AsideColumn
@@ -280,21 +286,38 @@ function LiveBadge({
   );
 }
 
+type DockerUpdateTarget = 'engine' | 'compose';
+
+async function waitForApiHealth(timeoutMs = 180_000): Promise<boolean> {
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    try {
+      const res = await fetch('/api/v1/health', { cache: 'no-store' });
+      if (res.ok) return true;
+    } catch {
+      // API/engine restart
+    }
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  return false;
+}
+
 function EngineStrip({
   overview,
-  labels,
+  onUpdated,
 }: {
   overview: DashboardOverview;
-  labels: {
-    engine: string;
-    compose: string;
-    status: string;
-    online: string;
-    offline: string;
-    unknown: string;
-    versionUnknown: string;
-  };
+  onUpdated: () => void;
 }) {
+  const { t } = useLocale();
+  const labels = t.dashboard;
+  const { authEnabled, user } = useAuth();
+  const isAdmin = canAdmin(user?.role, authEnabled);
+  const [busyTarget, setBusyTarget] = useState<DockerUpdateTarget | null>(null);
+  const [confirmTarget, setConfirmTarget] = useState<DockerUpdateTarget | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
   const statusLabel =
     overview.docker.engineStatus === 'online'
       ? labels.online
@@ -302,38 +325,169 @@ function EngineStrip({
         ? labels.offline
         : labels.unknown;
 
+  const applyUpdate = async (target: DockerUpdateTarget) => {
+    setBusyTarget(target);
+    setError(null);
+    setSuccess(null);
+    try {
+      const result = await applyDockerHostUpdate(target);
+      setSuccess(result.message);
+      onUpdated();
+    } catch (err) {
+      const likelyRestart =
+        target === 'engine' && (!(err instanceof ApiError) || err.status >= 500);
+      if (likelyRestart) {
+        setSuccess(labels.dockerUpdate.waitingHealth);
+        const ok = await waitForApiHealth();
+        if (ok) {
+          setSuccess(null);
+          onUpdated();
+        } else {
+          setError(err instanceof Error ? err.message : t.common.failed);
+        }
+      } else {
+        setError(err instanceof Error ? err.message : t.common.failed);
+      }
+    } finally {
+      setBusyTarget(null);
+    }
+  };
+
+  const confirmCopy =
+    confirmTarget === 'engine'
+      ? {
+          title: labels.dockerUpdate.confirmEngine.replace(
+            '{version}',
+            overview.docker.engineLatest ?? '',
+          ),
+          consequences: labels.dockerUpdate.consequencesEngine,
+          danger: true,
+        }
+      : confirmTarget === 'compose'
+        ? {
+            title: labels.dockerUpdate.confirmCompose.replace(
+              '{version}',
+              overview.docker.composeLatest ?? '',
+            ),
+            consequences: labels.dockerUpdate.consequencesCompose,
+            danger: false,
+          }
+        : null;
+
   return (
-    <section className="grid gap-3 sm:grid-cols-3">
-      {[
-        {
-          label: labels.status,
-          value: statusLabel,
-          className:
-            overview.docker.engineStatus === 'online'
-              ? 'text-dockora-success'
-              : overview.docker.engineStatus === 'offline'
-                ? 'text-dockora-danger'
-                : 'text-dockora-muted',
-        },
-        {
-          label: labels.engine,
-          value: overview.docker.engineVersion ?? labels.versionUnknown,
-          className: 'font-mono',
-        },
-        {
-          label: labels.compose,
-          value: overview.docker.composeVersion ?? labels.versionUnknown,
-          className: 'font-mono',
-        },
-      ].map((item) => (
-        <div key={item.label} className="dockora-panel px-4 py-4">
+    <div className="space-y-3">
+      {error ? <ErrorBanner message={error} /> : null}
+      {success ? <SuccessBanner message={success} /> : null}
+      <section className="grid gap-3 sm:grid-cols-3">
+        <div className="dockora-panel px-4 py-4">
           <p className="text-xs font-medium uppercase tracking-wide text-dockora-muted">
-            {item.label}
+            {labels.status}
           </p>
-          <p className={cn('mt-1 text-lg font-semibold', item.className)}>{item.value}</p>
+          <p
+            className={cn(
+              'mt-1 text-lg font-semibold',
+              overview.docker.engineStatus === 'online'
+                ? 'text-dockora-success'
+                : overview.docker.engineStatus === 'offline'
+                  ? 'text-dockora-danger'
+                  : 'text-dockora-muted',
+            )}
+          >
+            {statusLabel}
+          </p>
         </div>
-      ))}
-    </section>
+        <VersionUpdateCard
+          label={labels.engine}
+          current={overview.docker.engineVersion}
+          latest={overview.docker.engineLatest}
+          updateAvailable={overview.docker.engineUpdateAvailable}
+          unknownLabel={labels.versionUnknown}
+          applyLabel={labels.dockerUpdate.apply}
+          applyingLabel={labels.dockerUpdate.applying}
+          showButton={isAdmin}
+          busy={busyTarget !== null}
+          applying={busyTarget === 'engine'}
+          onApply={() => setConfirmTarget('engine')}
+        />
+        <VersionUpdateCard
+          label={labels.compose}
+          current={overview.docker.composeVersion}
+          latest={overview.docker.composeLatest}
+          updateAvailable={overview.docker.composeUpdateAvailable}
+          unknownLabel={labels.versionUnknown}
+          applyLabel={labels.dockerUpdate.apply}
+          applyingLabel={labels.dockerUpdate.applying}
+          showButton={isAdmin}
+          busy={busyTarget !== null}
+          applying={busyTarget === 'compose'}
+          onApply={() => setConfirmTarget('compose')}
+        />
+      </section>
+      <ConfirmDialog
+        open={confirmTarget !== null}
+        title={confirmCopy?.title ?? labels.dockerUpdate.apply}
+        consequences={confirmCopy ? [...confirmCopy.consequences] : undefined}
+        confirmLabel={t.common.confirm}
+        cancelLabel={t.common.cancel}
+        danger={confirmCopy?.danger ?? false}
+        busy={busyTarget !== null}
+        onCancel={() => setConfirmTarget(null)}
+        onConfirm={() => {
+          const target = confirmTarget;
+          setConfirmTarget(null);
+          if (target) void applyUpdate(target);
+        }}
+      />
+    </div>
+  );
+}
+
+function VersionUpdateCard({
+  label,
+  current,
+  latest,
+  updateAvailable,
+  unknownLabel,
+  applyLabel,
+  applyingLabel,
+  showButton,
+  busy,
+  applying,
+  onApply,
+}: {
+  label: string;
+  current: string | null;
+  latest: string | null;
+  updateAvailable: boolean;
+  unknownLabel: string;
+  applyLabel: string;
+  applyingLabel: string;
+  showButton: boolean;
+  busy: boolean;
+  applying: boolean;
+  onApply: () => void;
+}) {
+  return (
+    <div className="dockora-panel flex flex-col px-4 py-4">
+      <p className="text-xs font-medium uppercase tracking-wide text-dockora-muted">{label}</p>
+      <p className="mt-1 text-lg font-semibold font-mono">
+        {current ?? unknownLabel}
+        {updateAvailable && latest ? (
+          <span className="text-dockora-warning"> → {latest}</span>
+        ) : null}
+      </p>
+      {showButton && updateAvailable ? (
+        <Button
+          size="sm"
+          variant="primary"
+          className="mt-3 self-start"
+          disabled={busy}
+          onClick={onApply}
+        >
+          {applying ? applyingLabel : applyLabel}
+        </Button>
+      ) : null}
+    </div>
   );
 }
 

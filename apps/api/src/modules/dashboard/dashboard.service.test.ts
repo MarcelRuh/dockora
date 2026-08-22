@@ -102,6 +102,10 @@ describe('DashboardService', () => {
     expect(overview.docker.engineStatus).toBe('online');
     expect(overview.docker.engineVersion).toBe('27.0.0');
     expect(overview.docker.composeVersion).toBe('2.29.0');
+    expect(overview.docker.engineLatest).toBeNull();
+    expect(overview.docker.composeLatest).toBeNull();
+    expect(overview.docker.engineUpdateAvailable).toBe(false);
+    expect(overview.docker.composeUpdateAvailable).toBe(false);
     expect(overview.containers).toEqual({
       total: 2,
       running: 1,
@@ -148,5 +152,19 @@ describe('DashboardService', () => {
     expect(overview.unhealthyContainers).toEqual([
       { id: 'u1', name: 'sonarr', composeProject: 'arr-stack' },
     ]);
+  });
+
+  it('flags engine and compose updates from latest hints', async () => {
+    const mocks = createMocks();
+    const service = new DashboardService({
+      ...mocks,
+      dockerLatest: async () => ({ engine: '28.3.3', compose: '2.29.0' }),
+    });
+    const overview = await service.getOverview();
+
+    expect(overview.docker.engineLatest).toBe('28.3.3');
+    expect(overview.docker.engineUpdateAvailable).toBe(true);
+    expect(overview.docker.composeLatest).toBe('2.29.0');
+    expect(overview.docker.composeUpdateAvailable).toBe(false);
   });
 });

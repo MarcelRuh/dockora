@@ -1,6 +1,6 @@
 {
   "name": "dockora",
-  "version": "1.7.3",
+  "version": "1.7.4",
   "private": true,
   "description": "Dockora \u2013 moderne Docker Management Suite mit Fokus auf Compose, Updates, Backups und Discord",
   "license": "MIT",
