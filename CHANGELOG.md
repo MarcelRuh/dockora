@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [1.5.3.5] – 2026-08-22
+
+### Fixed
+
+- GHCR image build: shared package no longer requires `@types/node`; Docker `RUN` groups `pnpm install` so the TypeScript build actually runs
+
 ## [1.5.3.4] – 2026-08-22
 
 ### Fixed

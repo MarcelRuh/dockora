@@ -24,8 +24,8 @@ COPY packages/shared/package.json packages/shared/tsconfig.json ./packages/share
 COPY apps/api/src ./apps/api/src
 COPY apps/api/prisma ./apps/api/prisma
 COPY apps/api/package.json apps/api/tsconfig.json ./apps/api/
-RUN pnpm install --filter @dockora/api... --offline --frozen-lockfile \
- || pnpm install --filter @dockora/api... --frozen-lockfile \
+RUN (pnpm install --filter @dockora/api... --offline --frozen-lockfile \
+  || pnpm install --filter @dockora/api... --frozen-lockfile) \
  && pnpm --filter @dockora/shared build \
  && pnpm --filter @dockora/api exec prisma generate \
  && pnpm --filter @dockora/api build
