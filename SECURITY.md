@@ -24,6 +24,7 @@ We aim to acknowledge reports within **7 days**.
 
 - Set a strong `JWT_SECRET` (≥ 32 random characters) in production
 - Set a strong `BOOTSTRAP_ADMIN_PASSWORD` (≥ 12 characters, no defaults)
+- Authentication is **on by default**; keep it enabled on any network-exposed instance
 - Restrict Docker socket access; prefer rootless Docker where possible
 - Expose the UI only behind TLS (reverse proxy)
 - Prefer `docker compose --profile proxy` for same-origin SSE/WebSocket

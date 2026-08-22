@@ -5,6 +5,17 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [1.5.3.1] – 2026-08-22
+
+### Improved
+
+- Compose `up` / `down` / `recreate` use `--remove-orphans`; standalone recreate retries briefly on port races
+
+### Fixed
+
+- Login screen was missing on GitHub/Compose installs because `authEnabled` defaulted to off
+- Port-conflict errors name the container that holds the host port (e.g. `dockora-web` on `:3000`)
+
 ## [1.5.3] – 2026-08-09
 
 ### Improved

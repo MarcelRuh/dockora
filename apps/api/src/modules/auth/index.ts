@@ -11,7 +11,8 @@ import {
   type UserRole,
 } from '@dockora/shared';
 import { prisma } from '../../infrastructure/db/prisma.js';
-import { isAuthEnabled, isPublicAuthRoute, liftBearerToken } from './auth-gate.js';
+import { invalidateAuthEnabledCache, isAuthEnabled, isPublicAuthRoute, liftBearerToken } from './auth-gate.js';
+import { ensureAuthEnabledStored } from '../settings/settings.service.js';
 import {
   assertLoginAllowed,
   clearLoginFailures,
@@ -81,6 +82,8 @@ const authPlugin: FastifyPluginAsync = async (app: FastifyInstance) => {
   });
 
   await ensureBootstrapAdmin(app);
+  await ensureAuthEnabledStored();
+  invalidateAuthEnabledCache();
 
   app.get(`${API_PREFIX}/auth/status`, async () => {
     return { authEnabled: await isAuthEnabled() };

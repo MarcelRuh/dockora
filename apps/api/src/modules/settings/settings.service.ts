@@ -28,7 +28,8 @@ const DEFAULTS: AppSettings = {
   monitoringDiskThreshold: 85,
   monitoringBuildCacheGbThreshold: 5,
   monitoringTempThreshold: 95,
-  authEnabled: false,
+  /** Fresh GitHub/Compose installs must show the login screen. */
+  authEnabled: true,
 };
 
 export class PrismaSettingsRepository implements ISettingsRepository {
@@ -136,6 +137,15 @@ function num(raw: string | undefined, fallback: number): number {
   if (!raw) return fallback;
   const n = Number(raw);
   return Number.isFinite(n) ? n : fallback;
+}
+
+/** Persist default login-on if the operator never saved the toggle. */
+export async function ensureAuthEnabledStored(): Promise<void> {
+  const repo = new PrismaSettingsRepository();
+  const stored = await repo.get('authEnabled');
+  if (stored == null || stored === '') {
+    await repo.set('authEnabled', 'true');
+  }
 }
 
 export { DEFAULTS as DEFAULT_SETTINGS };
