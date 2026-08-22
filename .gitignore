@@ -1,0 +1,65 @@
+# Dependencies & package managers
+node_modules/
+.pnpm-store/
+**/.pnpm-store/
+
+# Build outputs
+dist/
+.next/
+out/
+build/
+*.tsbuildinfo
+apps/*/dist/
+packages/*/dist/
+
+# Env & secrets
+.env
+.env.*
+!.env.example
+!**/.env.example
+*.pem
+*.key
+credentials.json
+
+# Runtime data
+data/
+*.db
+*.db-journal
+**/prisma/*.db
+# Nur Laufzeit-Ordner im Repo-Root – nicht apps/api/src/modules/{backups,logs}
+/backups/
+apps/api/data/
+
+# Logs (nur Root-/generische Logdateien, nicht Source-Module)
+/logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# IDE / OS
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json.example
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Test / coverage
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+
+# Turbo / cache
+.turbo/
+.cache/
+
+# Misc
+tmp/
+temp/
+*.local
+.cursor/
+.dockora-revision
+.dockora-update-progress
