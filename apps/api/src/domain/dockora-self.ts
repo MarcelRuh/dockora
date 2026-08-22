@@ -1,6 +1,6 @@
 /**
  * Erkennt Dockora-eigene Container/Images, damit die Suite sich in
- * Listen (Container, Images, Updates) ausblendet – Monitoring bleibt ungefiltert.
+ * Listen (Container, Images, Updates, Monitoring) ausblendet.
  */
 
 const SELF_CONTAINER_NAMES = new Set([
@@ -52,6 +52,18 @@ export function isDockoraSelfContainer(input: {
   if (project && SELF_COMPOSE_PROJECTS.has(project)) return true;
 
   if (input.image && isDockoraSelfImageRef(input.image)) return true;
+  return false;
+}
+
+/** One-shot Self-Update-Container – nicht in Monitoring/Alerts. */
+export function isDockoraSelfUpdater(input: {
+  name: string;
+  image?: string;
+  labels?: Record<string, string>;
+}): boolean {
+  const name = stripLeadingSlash(input.name).toLowerCase();
+  if (name === 'dockora-self-updater' || name.endsWith('-dockora-self-updater')) return true;
+  if (input.labels?.['dockora.update'] === 'self') return true;
   return false;
 }
 

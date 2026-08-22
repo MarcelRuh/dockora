@@ -46,6 +46,9 @@ services:
       - /opt:/opt
       - /srv:/srv
       - /home:/home
+      # CPU-Temperatur (wget/LXC: Host-Sysfs, falls im Container sonst leer)
+      - /sys/class/thermal:/sys/class/thermal:ro
+      - /sys/class/hwmon:/sys/class/hwmon:ro
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3001/api/v1/health"]
       interval: 30s

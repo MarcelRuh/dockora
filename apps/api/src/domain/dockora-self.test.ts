@@ -4,6 +4,7 @@ import {
   isDockoraSelfContainer,
   isDockoraSelfImageRef,
   isDockoraSelfImageTags,
+  isDockoraSelfUpdater,
   isImageUsedOnlyByDockoraSelf,
 } from './dockora-self.js';
 
@@ -48,6 +49,17 @@ describe('isDockoraSelfContainer', () => {
     expect(isDockoraSelfContainer({ name: 'plex', image: 'plexinc/pms-docker' })).toBe(
       false,
     );
+  });
+});
+
+describe('isDockoraSelfUpdater', () => {
+  it('matches updater name and label', () => {
+    expect(isDockoraSelfUpdater({ name: 'dockora-self-updater' })).toBe(true);
+    expect(isDockoraSelfUpdater({ name: '/dockora-self-updater' })).toBe(true);
+    expect(
+      isDockoraSelfUpdater({ name: 'tmp', labels: { 'dockora.update': 'self' } }),
+    ).toBe(true);
+    expect(isDockoraSelfUpdater({ name: 'plex' })).toBe(false);
   });
 });
 

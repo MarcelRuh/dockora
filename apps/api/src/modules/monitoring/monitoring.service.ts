@@ -1,4 +1,5 @@
 import type { MonitoringSnapshot, ContainerStatus } from '@dockora/shared';
+import { isDockoraSelfUpdater } from '../../domain/dockora-self.js';
 import type { IDockerClient, IHostMetrics } from '../../domain/ports.js';
 import type { SettingsService } from '../settings/settings.service.js';
 
@@ -22,7 +23,9 @@ export class MonitoringService {
     try {
       dockerOnline = await this.deps.docker.ping();
       if (dockerOnline) {
-        const list = await this.deps.docker.listContainers(true);
+        const list = (await this.deps.docker.listContainers(true)).filter(
+          (c) => !isDockoraSelfUpdater(c),
+        );
         containers = list.map((c) => {
           const entry: MonitoringSnapshot['containers'][number] = {
             id: c.id,

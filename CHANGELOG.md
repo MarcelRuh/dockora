@@ -5,6 +5,13 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [1.7.3] – 2026-08-22
+
+### Fixed
+
+- Monitoring no longer lists `dockora-self-updater` or raises exited/unhealthy alerts for it
+- Host CPU temperature is auto-detected (host-agent thermal/hwmon, plus sysfs mounts) so wget installs no longer show “—”
+
 ## [1.7.2] – 2026-08-22
 
 ### Changed
