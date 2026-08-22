@@ -24,6 +24,9 @@ COPY apps/api /tmp/src-api
 RUN cp -a /tmp/src-shared/. /app/packages/shared/ \
  && cp -a /tmp/src-api/. /app/apps/api/ \
  && rm -rf /tmp/src-shared /tmp/src-api \
+ && mkdir -p /app/packages/shared/node_modules/@dockora /app/apps/api/node_modules/@dockora \
+ && ln -sfn /app/packages/tsconfig /app/packages/shared/node_modules/@dockora/tsconfig \
+ && ln -sfn /app/packages/tsconfig /app/apps/api/node_modules/@dockora/tsconfig \
  && pnpm --filter @dockora/shared build \
  && pnpm --filter @dockora/api exec prisma generate \
  && pnpm --filter @dockora/api build

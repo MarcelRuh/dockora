@@ -21,6 +21,9 @@ COPY apps/web /tmp/src-web
 RUN cp -a /tmp/src-shared/. /app/packages/shared/ \
  && cp -a /tmp/src-web/. /app/apps/web/ \
  && rm -rf /tmp/src-shared /tmp/src-web \
+ && mkdir -p /app/packages/shared/node_modules/@dockora /app/apps/web/node_modules/@dockora \
+ && ln -sfn /app/packages/tsconfig /app/packages/shared/node_modules/@dockora/tsconfig \
+ && ln -sfn /app/packages/tsconfig /app/apps/web/node_modules/@dockora/tsconfig \
  && pnpm --filter @dockora/shared build \
  && pnpm --filter @dockora/web build
 
