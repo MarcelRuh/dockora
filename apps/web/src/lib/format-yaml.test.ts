@@ -63,6 +63,65 @@ describe('formatComposeYaml', () => {
     expect(formatComposeYaml('')).toEqual({ ok: true, text: '' });
     expect(formatComposeYaml('   \n')).toEqual({ ok: true, text: '   \n' });
   });
+
+  it('expands flow collections into the block compose structure', () => {
+    const result = formatComposeYaml(`services:
+  web:
+    image: nginx
+    ports: ["8080:80", "443:443"]
+    environment: {FOO: bar, BAZ: qux}
+`);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.text).toBe(`services:
+  web:
+    image: nginx
+    ports:
+      - "8080:80"
+      - "443:443"
+    environment:
+      FOO: bar
+      BAZ: qux
+`);
+  });
+
+  it('re-indents the whole document and spaces compose sections', () => {
+    const result = formatComposeYaml(`name: proxy-stack
+
+
+
+services:
+    web:
+        image: nginx
+        ports: ["8080:80"]
+    db:
+        image: postgres
+        volumes:
+        - data:/var/lib/postgresql/data
+networks:
+    default:
+        name: foo
+`);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.text).toBe(`name: proxy-stack
+
+services:
+  web:
+    image: nginx
+    ports:
+      - "8080:80"
+
+  db:
+    image: postgres
+    volumes:
+      - data:/var/lib/postgresql/data
+
+networks:
+  default:
+    name: foo
+`);
+  });
 });
 
 describe('formatEnvFile', () => {

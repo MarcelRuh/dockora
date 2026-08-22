@@ -1,17 +1,47 @@
-import { parseDocument } from 'yaml';
+import { isCollection, isMap, isNode, parseDocument, visit, type Document } from 'yaml';
 
 export type FormatResult = { ok: true; text: string } | { ok: false; error: string };
+
+const COMPOSE_SECTIONS = ['services', 'networks', 'volumes', 'secrets', 'configs'] as const;
 
 const STRINGIFY = {
   indent: 2,
   lineWidth: 0,
   minContentWidth: 0,
   indentSeq: true,
+  collectionStyle: 'block',
+  defaultStringType: 'PLAIN',
+  defaultKeyType: 'PLAIN',
 } as const;
 
+function forceBlockCollections(doc: Document) {
+  visit(doc, {
+    Collection(node) {
+      if (isCollection(node)) node.flow = false;
+    },
+  });
+}
+
+function spaceSiblingMapEntries(map: unknown) {
+  if (!isMap(map)) return;
+  map.items.forEach((pair, index) => {
+    if (index === 0) return;
+    if (isNode(pair.key)) pair.key.spaceBefore = true;
+  });
+}
+
+/** Blank lines between top-level keys and between named compose entries. */
+function applyComposeLayout(doc: Document) {
+  spaceSiblingMapEntries(doc.contents);
+  if (!isMap(doc.contents)) return;
+  for (const section of COMPOSE_SECTIONS) {
+    spaceSiblingMapEntries(doc.contents.get(section));
+  }
+}
+
 /**
- * Pretty-print Compose YAML with 2-space indent.
- * Comments and quoted scalars (e.g. `"8080:80"`) are kept.
+ * Pretty-print Compose YAML as one consistent block tree (2-space indent).
+ * Flow maps/seqs become block style. Comments and quoted scalars (e.g. `"8080:80"`) are kept.
  */
 export function formatComposeYaml(source: string): FormatResult {
   const newline = source.includes('\r\n') ? '\r\n' : '\n';
@@ -29,6 +59,9 @@ export function formatComposeYaml(source: string): FormatResult {
     if (firstError) {
       return { ok: false, error: firstError.message };
     }
+
+    forceBlockCollections(doc);
+    applyComposeLayout(doc);
 
     let text = doc.toString(STRINGIFY);
     if (!text.endsWith('\n')) text += '\n';
