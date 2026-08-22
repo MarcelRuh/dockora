@@ -453,3 +453,37 @@ body {
 .react-flow__attribution {
   display: none !important;
 }
+
+.dockora-code-editor {
+  border: 1px solid rgba(131, 56, 236, 0.45);
+  background-color: rgba(255, 255, 255, 0.03);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.light .dockora-code-editor {
+  background-color: #ffffff;
+}
+
+.dockora-code-editor:hover {
+  border-color: rgba(131, 56, 236, 0.5);
+}
+
+.dockora-code-editor:focus-within {
+  border-color: var(--dockora-pink);
+  box-shadow: 0 0 24px rgba(255, 0, 110, 0.22);
+}
+
+.dockora-code-editor .cm-editor {
+  background: transparent;
+}
+
+.dockora-code-editor .cm-editor.cm-focused {
+  outline: none;
+}
+
+.dockora-code-editor .cm-scroller {
+  font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  line-height: 1.55;
+}

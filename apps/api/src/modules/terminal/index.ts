@@ -3,7 +3,7 @@ import websocket from '@fastify/websocket';
 import { API_PREFIX } from '@dockora/shared';
 import type Docker from 'dockerode';
 import { actorIdFromRequest, auditService } from '../audit/audit.service.js';
-import { attachDockerExecSession, resolveShell } from './attach-exec.js';
+import { attachDockerExecSession, interactiveShellCommand } from './attach-exec.js';
 
 /**
  * Web-Terminal via Docker Exec + WebSocket.
@@ -37,8 +37,8 @@ export const terminalModule: FastifyPluginAsync = async (app: FastifyInstance) =
       };
       const cols = Number(query.cols ?? 80) || 80;
       const rows = Number(query.rows ?? 24) || 24;
-      const shell = resolveShell(query.shell ?? '/bin/sh');
-      if (!shell) {
+      const cmd = interactiveShellCommand(query.shell);
+      if (!cmd) {
         socket.send('\r\nShell not allowed\r\n');
         socket.close();
         return;
@@ -55,7 +55,7 @@ export const terminalModule: FastifyPluginAsync = async (app: FastifyInstance) =
         await attachDockerExecSession({
           docker,
           containerIdOrName: id,
-          cmd: [shell],
+          cmd,
           cols,
           rows,
           socket: socket as never,
@@ -89,8 +89,8 @@ export const terminalModule: FastifyPluginAsync = async (app: FastifyInstance) =
       const cols = Number(query.cols ?? 80) || 80;
       const rows = Number(query.rows ?? 24) || 24;
       // Host-Shell: /bin/sh ist nach nsenter -m das Host-/bin/sh
-      const shell = resolveShell(query.shell ?? '/bin/sh');
-      if (!shell) {
+      const shellCmd = interactiveShellCommand(query.shell);
+      if (!shellCmd) {
         socket.send('\r\nShell not allowed\r\n');
         socket.close();
         return;
@@ -118,7 +118,7 @@ export const terminalModule: FastifyPluginAsync = async (app: FastifyInstance) =
         actorId: actorIdFromRequest(request),
         resource: 'host',
         resourceId: hostAgentName,
-        metadata: { shell },
+        metadata: { shell: query.shell || 'auto' },
       });
 
       try {
@@ -126,7 +126,7 @@ export const terminalModule: FastifyPluginAsync = async (app: FastifyInstance) =
         await attachDockerExecSession({
           docker,
           containerIdOrName: hostAgentName,
-          cmd: ['nsenter', '-t', '1', '-m', '-u', '-i', '-n', '-p', '--', shell],
+          cmd: ['nsenter', '-t', '1', '-m', '-u', '-i', '-n', '-p', '--', ...shellCmd],
           cols,
           rows,
           socket: socket as never,

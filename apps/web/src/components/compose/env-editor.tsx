@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from 'react';
 import { isSecretEnvKey, parseEnvFile, serializeEnvFile, type EnvEntry } from '@/lib/env-file';
-import { Button, Input, Textarea } from '@/components/ui/form-controls';
+import { Button, Input } from '@/components/ui/form-controls';
+import { CodeEditor } from '@/components/compose/code-editor';
 
 export function EnvEditor({
   value,
@@ -27,6 +28,8 @@ export function EnvEditor({
     hide: string;
     remove: string;
     empty: string;
+    format: string;
+    formatFailed: string;
   };
 }) {
   const [mode, setMode] = useState<'fields' | 'raw'>(defaultMode);
@@ -44,95 +47,104 @@ export function EnvEditor({
     update(next);
   };
 
+  const modeButtons = (
+    <>
+      <Button
+        size="sm"
+        variant={mode === 'fields' ? 'primary' : 'default'}
+        onClick={() => setMode('fields')}
+      >
+        {labels.fields}
+      </Button>
+      <Button
+        size="sm"
+        variant={mode === 'raw' ? 'primary' : 'default'}
+        onClick={() => setMode('raw')}
+      >
+        {labels.raw}
+      </Button>
+    </>
+  );
+
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap gap-2">
-        <Button
-          size="sm"
-          variant={mode === 'fields' ? 'primary' : 'default'}
-          onClick={() => setMode('fields')}
-        >
-          {labels.fields}
-        </Button>
-        <Button
-          size="sm"
-          variant={mode === 'raw' ? 'primary' : 'default'}
-          onClick={() => setMode('raw')}
-        >
-          {labels.raw}
-        </Button>
-      </div>
-
       {mode === 'raw' ? (
-        <Textarea
+        <CodeEditor
+          language="env"
           value={value}
-          onChange={(e) => onChange(e.target.value)}
-          rows={12}
-          spellCheck={false}
+          onChange={onChange}
           disabled={disabled}
-          className="font-mono text-sm"
           placeholder={placeholder}
+          minHeight={280}
+          formatLabel={labels.format}
+          formatFailed={labels.formatFailed}
+          leading={modeButtons}
         />
-      ) : pairCount === 0 ? (
-        <p className="text-sm text-dockora-muted">{labels.empty}</p>
       ) : (
-        <div className="space-y-2">
-          {entries.map((entry, index) =>
-            entry.kind === 'other' ? (
-              <p
-                key={`other-${index}`}
-                className="font-mono text-xs text-dockora-muted whitespace-pre-wrap"
-              >
-                {entry.raw || ' '}
-              </p>
-            ) : (
-              <div key={`pair-${index}`} className="flex flex-wrap items-center gap-2">
-                <Input
-                  value={entry.key}
-                  onChange={(e) => setPair(index, { key: e.target.value })}
-                  disabled={disabled}
-                  spellCheck={false}
-                  className="w-40 font-mono text-sm sm:w-52"
-                  aria-label={labels.key}
-                  placeholder={labels.key}
-                />
-                <Input
-                  type={
-                    isSecretEnvKey(entry.key) && !revealed[index] ? 'password' : 'text'
-                  }
-                  value={entry.value}
-                  onChange={(e) => setPair(index, { value: e.target.value })}
-                  disabled={disabled}
-                  spellCheck={false}
-                  autoComplete="off"
-                  className="min-w-[12rem] flex-1 font-mono text-sm"
-                  aria-label={labels.value}
-                  placeholder={labels.value}
-                />
-                {isSecretEnvKey(entry.key) ? (
-                  <Button
-                    size="sm"
-                    disabled={disabled}
-                    onClick={() =>
-                      setRevealed((prev) => ({ ...prev, [index]: !prev[index] }))
-                    }
+        <>
+          <div className="flex flex-wrap gap-2">{modeButtons}</div>
+          {pairCount === 0 ? (
+            <p className="text-sm text-dockora-muted">{labels.empty}</p>
+          ) : (
+            <div className="space-y-2">
+              {entries.map((entry, index) =>
+                entry.kind === 'other' ? (
+                  <p
+                    key={`other-${index}`}
+                    className="font-mono text-xs text-dockora-muted whitespace-pre-wrap"
                   >
-                    {revealed[index] ? labels.hide : labels.show}
-                  </Button>
-                ) : null}
-                {disabled ? null : (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => update(entries.filter((_, i) => i !== index))}
-                  >
-                    {labels.remove}
-                  </Button>
-                )}
-              </div>
-            ),
+                    {entry.raw || ' '}
+                  </p>
+                ) : (
+                  <div key={`pair-${index}`} className="flex flex-wrap items-center gap-2">
+                    <Input
+                      value={entry.key}
+                      onChange={(e) => setPair(index, { key: e.target.value })}
+                      disabled={disabled}
+                      spellCheck={false}
+                      className="w-40 font-mono text-sm sm:w-52"
+                      aria-label={labels.key}
+                      placeholder={labels.key}
+                    />
+                    <Input
+                      type={
+                        isSecretEnvKey(entry.key) && !revealed[index] ? 'password' : 'text'
+                      }
+                      value={entry.value}
+                      onChange={(e) => setPair(index, { value: e.target.value })}
+                      disabled={disabled}
+                      spellCheck={false}
+                      autoComplete="off"
+                      className="min-w-[12rem] flex-1 font-mono text-sm"
+                      aria-label={labels.value}
+                      placeholder={labels.value}
+                    />
+                    {isSecretEnvKey(entry.key) ? (
+                      <Button
+                        size="sm"
+                        disabled={disabled}
+                        onClick={() =>
+                          setRevealed((prev) => ({ ...prev, [index]: !prev[index] }))
+                        }
+                      >
+                        {revealed[index] ? labels.hide : labels.show}
+                      </Button>
+                    ) : null}
+                    {disabled ? null : (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => update(entries.filter((_, i) => i !== index))}
+                      >
+                        {labels.remove}
+                      </Button>
+                    )}
+                  </div>
+                ),
+              )}
+            </div>
           )}
-        </div>
+        </>
       )}
     </div>
   );

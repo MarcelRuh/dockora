@@ -8,15 +8,40 @@ export const ALLOWED_SHELLS = new Map<string, string>([
   ['/bin/sh', '/bin/sh'],
   ['sh', '/bin/sh'],
   ['/bin/bash', '/bin/bash'],
+  ['/usr/bin/bash', '/usr/bin/bash'],
   ['bash', '/bin/bash'],
   ['/bin/ash', '/bin/ash'],
   ['ash', '/bin/ash'],
   ['/bin/zsh', '/bin/zsh'],
+  ['/usr/bin/zsh', '/usr/bin/zsh'],
   ['zsh', '/bin/zsh'],
 ]);
 
 export function resolveShell(input: string): string | null {
   return ALLOWED_SHELLS.get(input.trim()) ?? null;
+}
+
+/**
+ * Prefer bash/zsh (readline + Tab completion). Fallback is interactive sh.
+ * TERM is set here so we do not replace the container env via Docker Exec Env.
+ */
+export const INTERACTIVE_SHELL_BOOTSTRAP = [
+  '/bin/sh',
+  '-c',
+  'TERM=${TERM:-xterm-256color}; export TERM; ' +
+    'if command -v bash >/dev/null 2>&1; then exec bash -i; ' +
+    'elif command -v zsh >/dev/null 2>&1; then exec zsh -i; ' +
+    'else exec /bin/sh -i; fi',
+] as const;
+
+/** Docker exec argv: explicit allowlisted shell, or auto-detect. */
+export function interactiveShellCommand(requested?: string): string[] | null {
+  if (requested == null || requested.trim() === '') {
+    return [...INTERACTIVE_SHELL_BOOTSTRAP];
+  }
+  const shell = resolveShell(requested);
+  if (!shell) return null;
+  return [shell, '-i'];
 }
 
 export type TerminalSocket = {

@@ -24,7 +24,8 @@ import { canAdmin, canOperate } from '@/lib/roles';
 import { composeStatusTone } from '@/lib/status';
 import { resolveContainerIconUrl, extractComposeServiceIcons } from '@/lib/container-icon';
 import { cn } from '@/lib/utils';
-import { Button, Input, Select, Textarea } from '@/components/ui/form-controls';
+import { Button, Input, Select } from '@/components/ui/form-controls';
+import { CodeEditor } from '@/components/compose/code-editor';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ServiceIcon } from '@/components/ui/service-icon';
 import { EnvEditor } from '@/components/compose/env-editor';
@@ -332,12 +333,14 @@ export function ComposeDetailPage({ id }: { id: string }) {
       {success ? <SuccessBanner message={success} /> : null}
 
       <Section title={t.compose.yaml}>
-        <Textarea
+        <CodeEditor
+          language="yaml"
           value={yaml}
-          onChange={(e) => setYaml(e.target.value)}
-          rows={18}
-          spellCheck={false}
+          onChange={setYaml}
           disabled={!canOps}
+          minHeight={440}
+          formatLabel={t.compose.format}
+          formatFailed={t.compose.formatFailed}
         />
         <div className="mt-3 flex flex-wrap gap-2">
           {canOps ? (
@@ -401,6 +404,8 @@ export function ComposeDetailPage({ id }: { id: string }) {
             hide: t.compose.envHide,
             remove: t.compose.envRemove,
             empty: t.compose.envFieldsEmpty,
+            format: t.compose.format,
+            formatFailed: t.compose.formatFailed,
           }}
         />
         {canOps ? (

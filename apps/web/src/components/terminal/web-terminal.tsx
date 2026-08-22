@@ -64,6 +64,15 @@ export function WebTerminal({
       term.loadAddon(fitAddon);
       term.open(host);
       fitAddon.fit();
+      term.focus();
+
+      const keepTabInTerminal = (ev: KeyboardEvent) => {
+        if (ev.key !== 'Tab' || !host.contains(ev.target as Node)) return;
+        ev.preventDefault();
+      };
+      const focusTerm = () => term?.focus();
+      host.addEventListener('keydown', keepTabInTerminal, true);
+      host.addEventListener('mousedown', focusTerm);
 
       const qs = new URLSearchParams({
         cols: String(term.cols),
@@ -79,8 +88,19 @@ export function WebTerminal({
         term?.writeln('');
       };
 
+      const decoder = new TextDecoder();
       ws.onmessage = (ev) => {
-        term?.write(typeof ev.data === 'string' ? ev.data : '');
+        if (typeof ev.data === 'string') {
+          term?.write(ev.data);
+          return;
+        }
+        if (ev.data instanceof ArrayBuffer) {
+          term?.write(decoder.decode(ev.data));
+          return;
+        }
+        if (ev.data instanceof Blob) {
+          void ev.data.arrayBuffer().then((buf) => term?.write(decoder.decode(buf)));
+        }
       };
 
       ws.onerror = () => {
@@ -112,6 +132,8 @@ export function WebTerminal({
 
       return () => {
         window.removeEventListener('resize', onResize);
+        host.removeEventListener('keydown', keepTabInTerminal, true);
+        host.removeEventListener('mousedown', focusTerm);
         ro.disconnect();
       };
     };
@@ -133,6 +155,7 @@ export function WebTerminal({
   return (
     <div
       ref={hostRef}
+      tabIndex={0}
       className={
         className ??
         `mt-3 overflow-hidden rounded-md border border-dockora-border bg-dockora-rail p-1 ${heightClassName}`

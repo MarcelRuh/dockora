@@ -10,10 +10,11 @@ import {
 import { useLocale } from '@/i18n/locale-provider';
 import { useAuth } from '@/components/auth/auth-provider';
 import { canOperate } from '@/lib/roles';
-import { Button, Input, Select, Textarea, Label } from '@/components/ui/form-controls';
+import { Button, Input, Select, Label } from '@/components/ui/form-controls';
 import { ProgressBar } from '@/components/ui/progress-bar';
 import { ErrorBanner, PageHeader } from '@/components/ui/page-parts';
 import { EnvEditor } from '@/components/compose/env-editor';
+import { CodeEditor } from '@/components/compose/code-editor';
 
 export const DEFAULT_COMPOSE_YAML = `services:
   web:
@@ -232,17 +233,18 @@ export function ComposeCreatePage() {
           </label>
         </div>
 
-        <label className="block space-y-1.5 text-sm">
+        <div className="space-y-1.5 text-sm">
           <Label>{t.compose.yaml}</Label>
-          <Textarea
-            rows={14}
+          <CodeEditor
+            language="yaml"
             value={yaml}
-            onChange={(e) => setYaml(e.target.value)}
+            onChange={setYaml}
             disabled={creating}
-            className="font-mono text-sm"
-            spellCheck={false}
+            minHeight={360}
+            formatLabel={t.compose.format}
+            formatFailed={t.compose.formatFailed}
           />
-        </label>
+        </div>
 
         <div className="space-y-1.5 text-sm">
           <Label>{t.compose.envOptional}</Label>
@@ -262,6 +264,8 @@ export function ComposeCreatePage() {
               hide: t.compose.envHide,
               remove: t.compose.envRemove,
               empty: t.compose.envFieldsEmpty,
+              format: t.compose.format,
+              formatFailed: t.compose.formatFailed,
             }}
           />
         </div>
