@@ -5,6 +5,13 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [1.6.2] – 2026-08-22
+
+### Fixed
+
+- Self-update progress bar no longer stays at 100% from the previous run
+- wget/compose installs show `current → GitHub version` when an update is available
+
 ## [1.6.1] – 2026-08-22
 
 ### Changed

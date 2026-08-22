@@ -8,6 +8,7 @@ const SHA_RE = /^[a-f0-9]{40}$/i;
 const CACHE_MS = 5 * 60 * 1000;
 
 let shaCache: { key: string; sha: string; at: number } | null = null;
+let versionCache: { key: string; version: string; at: number } | null = null;
 
 export function parseGitUploadPackRefs(raw: string): Record<string, string> {
   const refs: Record<string, string> = {};
@@ -113,6 +114,15 @@ function githubToken(): string | null {
   return token || null;
 }
 
+export function parseNpmPackageVersion(raw: string): string | null {
+  try {
+    const pkg = JSON.parse(raw) as { version?: unknown };
+    return typeof pkg.version === 'string' && pkg.version.trim() ? pkg.version.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Resolve the tip SHA of a public GitHub branch without depending on the
  * unauthenticated REST API (60 req/h → 403 on wget/shared-IP installs).
@@ -147,6 +157,28 @@ export async function fetchGithubCommitSha(repo: string, branch: string): Promis
   throw new Error(errors[0] ? `Remote-Revision unbekannt (${errors.join('; ')})` : 'Remote-Revision unbekannt');
 }
 
+/** package.json version on a public GitHub branch (raw.githubusercontent, not REST API). */
+export async function fetchGithubPackageVersion(repo: string, branch: string): Promise<string | null> {
+  const key = `${repo}@${branch}`;
+  const now = Date.now();
+  if (versionCache && versionCache.key === key && now - versionCache.at < CACHE_MS) {
+    return versionCache.version;
+  }
+
+  const { status, text } = await readBody(
+    `https://raw.githubusercontent.com/${repo}/${encodeURIComponent(branch)}/package.json`,
+    { Accept: 'application/json', 'User-Agent': 'dockora-self-update' },
+  );
+  if (status >= 400) {
+    throw new Error(`GitHub package.json ${status}`);
+  }
+  const version = parseNpmPackageVersion(text);
+  if (!version) return null;
+  versionCache = { key, version, at: now };
+  return version;
+}
+
 export function clearGithubShaCache(): void {
   shaCache = null;
+  versionCache = null;
 }

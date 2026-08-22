@@ -82,6 +82,10 @@ export function mergeProgress(
   file: SelfUpdateProgress | null,
   logs: SelfUpdateProgress | null,
 ): SelfUpdateProgress | null {
+  // Leftover 100%/done from the previous run must not pin a new update at 100%.
+  if (file?.step === 'done' && file.percent >= 100 && logs && logs.percent < 100) {
+    return logs;
+  }
   if (!file) return logs;
   if (!logs) return file;
   return logs.percent >= file.percent ? logs : file;

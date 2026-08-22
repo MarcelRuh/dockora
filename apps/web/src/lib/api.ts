@@ -304,6 +304,7 @@ export async function fetchSelfUpdateStatus(): Promise<{
   mode: 'compose' | 'image' | 'none';
   currentVersion: string;
   sourceVersion: string | null;
+  remoteVersion: string | null;
   localRevision: string | null;
   remoteRevision: string | null;
   image: string | null;

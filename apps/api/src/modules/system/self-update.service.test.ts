@@ -79,6 +79,18 @@ describe('isSelfUpdateAvailable', () => {
     ).toBe(true);
   });
 
+  it('is true when GitHub package version is newer than running', () => {
+    expect(
+      isSelfUpdateAvailable({
+        deployedRevision: 'aaaaaaaaaaaaaaaa',
+        remoteRevision: 'aaaaaaaaaaaaaaaa',
+        runningVersion: '1.6.1',
+        sourceVersion: '1.6.1',
+        remoteVersion: '1.6.2',
+      }),
+    ).toBe(true);
+  });
+
   it('is false when deployed SHA and running version match remote/source', () => {
     expect(
       isSelfUpdateAvailable({

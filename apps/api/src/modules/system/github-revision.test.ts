@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   parseGitUploadPackRefs,
   parseGithubAtomHeadSha,
+  parseNpmPackageVersion,
   pickBranchSha,
 } from './github-revision.js';
 
@@ -32,5 +33,11 @@ describe('parseGithubAtomHeadSha', () => {
   </entry>
 </feed>`;
     expect(parseGithubAtomHeadSha(xml)).toBe('8eb85a1817ec01d1b772b85e1f8281280c40ec93');
+  });
+});
+
+describe('parseNpmPackageVersion', () => {
+  it('reads the version field', () => {
+    expect(parseNpmPackageVersion('{"name":"dockora","version":"1.6.2"}')).toBe('1.6.2');
   });
 });

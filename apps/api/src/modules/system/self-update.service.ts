@@ -8,7 +8,7 @@ import type Docker from 'dockerode';
 import type { IDockerClient } from '../../domain/ports.js';
 import { apiRepositoryPath, parseImageRef, pickDigest } from '../updates/registry.js';
 import { SELF_UPDATE_APPLY_SCRIPT } from './self-update-apply.sh.js';
-import { fetchGithubCommitSha } from './github-revision.js';
+import { fetchGithubCommitSha, fetchGithubPackageVersion } from './github-revision.js';
 import {
   mergeProgress,
   parseProgressFile,
@@ -26,6 +26,7 @@ export interface SelfUpdateStatus {
   mode: SelfUpdateMode;
   currentVersion: string;
   sourceVersion: string | null;
+  remoteVersion: string | null;
   localRevision: string | null;
   remoteRevision: string | null;
   image: string | null;
@@ -89,6 +90,7 @@ export class SelfUpdateService {
         mode: 'none',
         currentVersion: APP_VERSION,
         sourceVersion: null,
+        remoteVersion: null,
         localRevision: null,
         remoteRevision: null,
         image: null,
@@ -135,6 +137,7 @@ export class SelfUpdateService {
       mode: 'compose',
       currentVersion: APP_VERSION,
       sourceVersion,
+      remoteVersion: null,
       localRevision: null,
       remoteRevision: null,
       image: null,
@@ -162,21 +165,28 @@ export class SelfUpdateService {
     }
 
     const localRevision = readLocalRevision(mount, this.options.gitSha);
-    let remoteRevision: string | null = null;
+    const [shaResult, versionResult] = await Promise.allSettled([
+      fetchGithubCommitSha(this.options.repo, this.options.branch),
+      fetchGithubPackageVersion(this.options.repo, this.options.branch),
+    ]);
+    const remoteRevision = shaResult.status === 'fulfilled' ? shaResult.value : null;
+    const remoteVersion = versionResult.status === 'fulfilled' ? versionResult.value : null;
+    const shaError = shaResult.status === 'rejected' ? shaResult.reason : null;
 
-    try {
-      remoteRevision = await fetchGithubCommitSha(this.options.repo, this.options.branch);
-    } catch (error) {
-      const versionDrift = Boolean(sourceVersion && sourceVersion !== APP_VERSION);
+    if (!remoteRevision && shaError) {
+      const latest = remoteVersion ?? sourceVersion;
+      const versionDrift = Boolean(latest && latest !== APP_VERSION);
+      const reason = shaError instanceof Error ? shaError.message : String(shaError);
       return {
         ...base,
         enabled: true,
+        remoteVersion,
         localRevision,
         remoteRevision: null,
         updateAvailable: versionDrift,
         message: versionDrift
-          ? `GitHub-Check fehlgeschlagen (${error instanceof Error ? error.message : String(error)}). Laufende Version ${APP_VERSION} ≠ Source ${sourceVersion} – Rebuild möglich.`
-          : `GitHub-Check fehlgeschlagen: ${error instanceof Error ? error.message : String(error)}`,
+          ? `GitHub-Check fehlgeschlagen (${reason}). Laufende Version ${APP_VERSION} ≠ ${latest} – Rebuild möglich.`
+          : `GitHub-Check fehlgeschlagen: ${reason}`,
       };
     }
 
@@ -185,19 +195,22 @@ export class SelfUpdateService {
       remoteRevision,
       runningVersion: APP_VERSION,
       sourceVersion,
+      remoteVersion,
     });
+    const latest = remoteVersion ?? sourceVersion;
 
     return {
       ...base,
       enabled: true,
+      remoteVersion,
       localRevision,
       remoteRevision,
       updateAvailable,
       message: updating
         ? 'Update läuft…'
         : updateAvailable
-          ? sourceVersion && sourceVersion !== APP_VERSION
-            ? `Update verfügbar – Rebuild ${APP_VERSION} → ${sourceVersion}`
+          ? latest && latest !== APP_VERSION
+            ? `Update verfügbar – ${APP_VERSION} → ${latest}`
             : 'Update verfügbar – Source von GitHub holen und anwenden'
           : 'Up to date',
     };
@@ -210,6 +223,7 @@ export class SelfUpdateService {
       mode: 'image',
       currentVersion: APP_VERSION,
       sourceVersion: null,
+      remoteVersion: null,
       localRevision: null,
       remoteRevision: null,
       image,
@@ -556,6 +570,7 @@ export function isSelfUpdateAvailable(opts: {
   remoteRevision: string | null;
   runningVersion: string;
   sourceVersion: string | null;
+  remoteVersion?: string | null;
 }): boolean {
   if (
     opts.remoteRevision &&
@@ -564,6 +579,9 @@ export function isSelfUpdateAvailable(opts: {
     return true;
   }
   if (opts.sourceVersion && opts.sourceVersion !== opts.runningVersion) {
+    return true;
+  }
+  if (opts.remoteVersion && opts.remoteVersion !== opts.runningVersion) {
     return true;
   }
   return false;

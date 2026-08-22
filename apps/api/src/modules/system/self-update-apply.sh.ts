@@ -17,6 +17,7 @@ TARBALL_URL="https://github.com/\${REPO}/archive/refs/heads/\${BRANCH}.tar.gz"
 CLONE_URL="https://github.com/\${REPO}.git"
 
 PROGRESS_FILE="\${INSTALL_DIR}/.dockora-update-progress"
+rm -f "$PROGRESS_FILE"
 
 write_progress() {
   percent="$1"

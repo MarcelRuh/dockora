@@ -63,4 +63,13 @@ describe('mergeProgress', () => {
     );
     expect(merged?.step).toBe('buildWeb');
   });
+
+  it('ignores a leftover 100% done file during a new run', () => {
+    const merged = mergeProgress(
+      { percent: 100, step: 'done', detail: 'Update abgeschlossen' },
+      { percent: 28, step: 'build', detail: 'Stack-Rebuild startet' },
+    );
+    expect(merged?.percent).toBe(28);
+    expect(merged?.step).toBe('build');
+  });
 });
