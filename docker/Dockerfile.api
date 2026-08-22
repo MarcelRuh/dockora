@@ -15,13 +15,16 @@ COPY apps/api/package.json ./apps/api/
 RUN pnpm install --filter @dockora/api... --frozen-lockfile || pnpm install --filter @dockora/api...
 
 FROM base AS build
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/packages ./packages
-COPY --from=deps /app/apps/api ./apps/api
-COPY --from=deps /app/package.json /app/pnpm-workspace.yaml /app/turbo.json ./
-COPY packages/shared ./packages/shared
-COPY apps/api ./apps/api
-RUN pnpm --filter @dockora/shared build \
+# Full workspace from deps (pnpm symlinks + @dockora/tsconfig). Overlay sources
+# with cp -a so package node_modules are not wiped (COPY dir/ replaces them).
+COPY --from=deps /app ./
+COPY packages/tsconfig ./packages/tsconfig
+COPY packages/shared /tmp/src-shared
+COPY apps/api /tmp/src-api
+RUN cp -a /tmp/src-shared/. /app/packages/shared/ \
+ && cp -a /tmp/src-api/. /app/apps/api/ \
+ && rm -rf /tmp/src-shared /tmp/src-api \
+ && pnpm --filter @dockora/shared build \
  && pnpm --filter @dockora/api exec prisma generate \
  && pnpm --filter @dockora/api build
 

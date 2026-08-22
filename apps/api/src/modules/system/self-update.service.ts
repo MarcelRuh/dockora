@@ -17,6 +17,7 @@ export interface SelfUpdateStatus {
   enabled: boolean;
   mode: SelfUpdateMode;
   currentVersion: string;
+  sourceVersion: string | null;
   localRevision: string | null;
   remoteRevision: string | null;
   image: string | null;
@@ -77,6 +78,7 @@ export class SelfUpdateService {
       enabled: false,
       mode: 'none',
       currentVersion: APP_VERSION,
+      sourceVersion: null,
       localRevision: null,
       remoteRevision: null,
       image: null,
@@ -114,10 +116,12 @@ export class SelfUpdateService {
   private async composeStatus(updating: boolean): Promise<SelfUpdateStatus> {
     const hostDir = this.options.installDirHost;
     const mount = this.options.installDirMount ?? hostDir;
+    const sourceVersion = mount ? readSourceVersion(mount) : null;
     const base: SelfUpdateStatus = {
       enabled: false,
       mode: 'compose',
       currentVersion: APP_VERSION,
+      sourceVersion,
       localRevision: null,
       remoteRevision: null,
       image: null,
@@ -149,18 +153,25 @@ export class SelfUpdateService {
     try {
       remoteRevision = await fetchGithubCommitSha(this.options.repo, this.options.branch);
     } catch (error) {
+      const versionDrift = Boolean(sourceVersion && sourceVersion !== APP_VERSION);
       return {
         ...base,
         enabled: true,
         localRevision,
         remoteRevision: null,
-        message: `GitHub-Check fehlgeschlagen: ${error instanceof Error ? error.message : String(error)}`,
+        updateAvailable: versionDrift,
+        message: versionDrift
+          ? `GitHub-Check fehlgeschlagen (${error instanceof Error ? error.message : String(error)}). Laufende Version ${APP_VERSION} ≠ Source ${sourceVersion} – Rebuild möglich.`
+          : `GitHub-Check fehlgeschlagen: ${error instanceof Error ? error.message : String(error)}`,
       };
     }
 
-    const updateAvailable = Boolean(
-      remoteRevision && (!localRevision || !revisionsMatch(localRevision, remoteRevision)),
-    );
+    const updateAvailable = isSelfUpdateAvailable({
+      deployedRevision: localRevision,
+      remoteRevision,
+      runningVersion: APP_VERSION,
+      sourceVersion,
+    });
 
     return {
       ...base,
@@ -171,7 +182,9 @@ export class SelfUpdateService {
       message: updating
         ? 'Update läuft…'
         : updateAvailable
-          ? 'Update verfügbar – Source von GitHub holen und anwenden'
+          ? sourceVersion && sourceVersion !== APP_VERSION
+            ? `Update verfügbar – Rebuild ${APP_VERSION} → ${sourceVersion}`
+            : 'Update verfügbar – Source von GitHub holen und anwenden'
           : 'Up to date',
     };
   }
@@ -182,6 +195,7 @@ export class SelfUpdateService {
       enabled: false,
       mode: 'image',
       currentVersion: APP_VERSION,
+      sourceVersion: null,
       localRevision: null,
       remoteRevision: null,
       image,
@@ -267,6 +281,7 @@ export class SelfUpdateService {
             DOCKORA_REPO: this.options.repo,
             DOCKORA_UPDATE_BRANCH: this.options.branch,
             DOCKORA_SKIP_COMPOSE: '1',
+            ...(githubToken() ? { GITHUB_TOKEN: githubToken() as string } : {}),
           },
           timeout: APPLY_TIMEOUT_MS,
           maxBuffer: 4 * 1024 * 1024,
@@ -287,6 +302,7 @@ export class SelfUpdateService {
           DOCKORA_REPO: this.options.repo,
           DOCKORA_UPDATE_BRANCH: this.options.branch,
           DOCKORA_SKIP_COMPOSE: '1',
+          ...(githubToken() ? { GITHUB_TOKEN: githubToken() as string } : {}),
         },
         timeout: APPLY_TIMEOUT_MS,
         maxBuffer: 4 * 1024 * 1024,
@@ -323,15 +339,24 @@ export class SelfUpdateService {
       // Bind host path → same path inside updater. Compose bind-mounts are
       // resolved by the Docker daemon on the host; a remount as /install breaks
       // relative volumes (nginx.conf) and leaks DOCKORA_INSTALL_DIR=/install.
+      const rawApplyUrl = `https://raw.githubusercontent.com/${this.options.repo}/${this.options.branch}/scripts/self-update-apply.sh`;
+      const token = githubToken();
       const container = await raw.createContainer({
         name: UPDATER_NAME,
         Image: updaterImage,
-        Cmd: ['sh', '-c', SELF_UPDATE_APPLY_SCRIPT],
+        Cmd: [
+          'sh',
+          '-c',
+          `if wget -qO /tmp/dockora-apply.sh ${JSON.stringify(rawApplyUrl)}; then exec sh /tmp/dockora-apply.sh; fi\n` +
+            `echo "WARN: could not download apply script, using embedded fallback" >&2\n` +
+            SELF_UPDATE_APPLY_SCRIPT,
+        ],
         Env: [
           `DOCKORA_INSTALL_DIR=${hostDir}`,
           `DOCKORA_REPO=${this.options.repo}`,
           `DOCKORA_UPDATE_BRANCH=${this.options.branch}`,
           'DOCKORA_SKIP_COMPOSE=0',
+          ...(token ? [`GITHUB_TOKEN=${token}`] : []),
         ],
         WorkingDir: hostDir,
         HostConfig: {
@@ -427,33 +452,69 @@ export class SelfUpdateService {
 export function readLocalRevision(mountDir: string, envSha: string | null): string | null {
   if (envSha?.trim()) return envSha.trim();
 
-  // Prefer live git HEAD when install dir is a clone (agent/deploy pushes).
-  const gitHead = path.join(mountDir, '.git', 'HEAD');
-  if (existsSync(gitHead)) {
+  // Deployed revision written after a successful compose rebuild / install.
+  // Do not use git HEAD: the working tree can already match GitHub while
+  // running containers are still the previous build.
+  const file = path.join(mountDir, '.dockora-revision');
+  if (existsSync(file)) {
     try {
-      const head = readFileSync(gitHead, 'utf8').trim();
-      if (/^[a-f0-9]{7,40}$/i.test(head)) return head;
-      const refMatch = /^ref:\s*(.+)$/.exec(head);
-      if (refMatch?.[1]) {
-        const refPath = path.join(mountDir, '.git', refMatch[1]);
-        if (existsSync(refPath)) {
-          const sha = readFileSync(refPath, 'utf8').trim();
-          if (/^[a-f0-9]{7,40}$/i.test(sha)) return sha;
-        }
-      }
+      const value = readFileSync(file, 'utf8').trim();
+      if (value) return value;
     } catch {
-      // fall through to revision file
+      // fall through to git HEAD
     }
   }
 
-  const file = path.join(mountDir, '.dockora-revision');
-  if (!existsSync(file)) return null;
+  return readGitHead(mountDir);
+}
+
+export function readGitHead(mountDir: string): string | null {
+  const gitHead = path.join(mountDir, '.git', 'HEAD');
+  if (!existsSync(gitHead)) return null;
   try {
-    const value = readFileSync(file, 'utf8').trim();
-    return value || null;
+    const head = readFileSync(gitHead, 'utf8').trim();
+    if (/^[a-f0-9]{7,40}$/i.test(head)) return head;
+    const refMatch = /^ref:\s*(.+)$/.exec(head);
+    if (refMatch?.[1]) {
+      const refPath = path.join(mountDir, '.git', refMatch[1]);
+      if (existsSync(refPath)) {
+        const sha = readFileSync(refPath, 'utf8').trim();
+        if (/^[a-f0-9]{7,40}$/i.test(sha)) return sha;
+      }
+    }
   } catch {
     return null;
   }
+  return null;
+}
+
+export function readSourceVersion(mountDir: string): string | null {
+  const file = path.join(mountDir, 'package.json');
+  if (!existsSync(file)) return null;
+  try {
+    const pkg = JSON.parse(readFileSync(file, 'utf8')) as { version?: unknown };
+    return typeof pkg.version === 'string' && pkg.version.trim() ? pkg.version.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+export function isSelfUpdateAvailable(opts: {
+  deployedRevision: string | null;
+  remoteRevision: string | null;
+  runningVersion: string;
+  sourceVersion: string | null;
+}): boolean {
+  if (
+    opts.remoteRevision &&
+    (!opts.deployedRevision || !revisionsMatch(opts.deployedRevision, opts.remoteRevision))
+  ) {
+    return true;
+  }
+  if (opts.sourceVersion && opts.sourceVersion !== opts.runningVersion) {
+    return true;
+  }
+  return false;
 }
 
 export function revisionsMatch(local: string, remote: string): boolean {
@@ -464,14 +525,30 @@ export function revisionsMatch(local: string, remote: string): boolean {
   return false;
 }
 
+function githubToken(): string | null {
+  const token = process.env.GITHUB_TOKEN?.trim() || process.env.GH_TOKEN?.trim() || '';
+  return token || null;
+}
+
+let githubShaCache: { key: string; sha: string; at: number } | null = null;
+const GITHUB_SHA_CACHE_MS = 60_000;
+
 export async function fetchGithubCommitSha(repo: string, branch: string): Promise<string> {
+  const key = `${repo}@${branch}`;
+  const now = Date.now();
+  if (githubShaCache && githubShaCache.key === key && now - githubShaCache.at < GITHUB_SHA_CACHE_MS) {
+    return githubShaCache.sha;
+  }
+
   const url = `https://api.github.com/repos/${repo}/commits/${encodeURIComponent(branch)}`;
-  const res = await request(url, {
-    headers: {
-      Accept: 'application/vnd.github+json',
-      'User-Agent': 'dockora-self-update',
-    },
-  });
+  const headers: Record<string, string> = {
+    Accept: 'application/vnd.github+json',
+    'User-Agent': 'dockora-self-update',
+  };
+  const token = githubToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const res = await request(url, { headers });
   if (res.statusCode >= 400) {
     throw new Error(`GitHub API ${res.statusCode}`);
   }
@@ -479,6 +556,7 @@ export async function fetchGithubCommitSha(repo: string, branch: string): Promis
   if (!body.sha || !/^[a-f0-9]{7,40}$/i.test(body.sha)) {
     throw new Error('Ungültige GitHub-Antwort (kein SHA)');
   }
+  githubShaCache = { key, sha: body.sha, at: now };
   return body.sha;
 }
 
