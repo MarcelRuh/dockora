@@ -1,0 +1,6 @@
+{
+  "name": "@dockora/tsconfig",
+  "version": "0.1.0",
+  "private": true,
+  "files": ["base.json", "node.json", "nextjs.json"]
+}
