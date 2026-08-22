@@ -1,0 +1,14 @@
+services:
+  # Override: vorgefertigte GHCR-Images statt lokalem Build
+  # Usage:
+  #   docker compose -f docker-compose.yml -f docker-compose.images.yml up -d
+  #   DOCKORA_IMAGE_TAG=1.1.0 docker compose -f docker-compose.yml -f docker-compose.images.yml pull
+  api:
+    image: ${DOCKORA_API_IMAGE:-ghcr.io/marcelruh/dockora-api:${DOCKORA_IMAGE_TAG:-latest}}
+    build: !reset
+    pull_policy: ${DOCKORA_PULL_POLICY:-always}
+
+  web:
+    image: ${DOCKORA_WEB_IMAGE:-ghcr.io/marcelruh/dockora-web:${DOCKORA_IMAGE_TAG:-latest}}
+    build: !reset
+    pull_policy: ${DOCKORA_PULL_POLICY:-always}

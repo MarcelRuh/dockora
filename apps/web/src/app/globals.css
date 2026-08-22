@@ -1,0 +1,455 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import 'xterm/css/xterm.css';
+@import '@xyflow/react/dist/style.css';
+
+/* NeonVerse 3D – adapted from CodePen jrck/XJNgxzV for Dockora ops UI */
+:root {
+  --dockora-bg: #0a0a0f;
+  --dockora-surface: #0d0d15;
+  --dockora-surface-2: #141422;
+  --dockora-border: rgba(131, 56, 236, 0.18);
+  --dockora-text: #ffffff;
+  --dockora-muted: #8888aa;
+  --dockora-accent: #ff006e;
+  --dockora-accent-soft: rgba(255, 0, 110, 0.12);
+  --dockora-accent-fg: #ffffff;
+  --dockora-blue: #00b4d8;
+  --dockora-purple: #8338ec;
+  --dockora-pink: #ff006e;
+  --dockora-success: #06d6a0;
+  --dockora-warning: #ffd60a;
+  --dockora-danger: #ff5400;
+  --dockora-glow-cyan: 0 0 20px rgba(0, 180, 216, 0.45);
+  --dockora-glow-pink: 0 0 20px rgba(255, 0, 110, 0.45);
+  --dockora-rail: rgba(10, 10, 15, 0.9);
+  --dockora-rail-text: #ffffff;
+  --dockora-rail-muted: #a0a0b0;
+  --dockora-rail-border: rgba(131, 56, 236, 0.2);
+}
+
+.light {
+  --dockora-bg: #f4f5fb;
+  --dockora-surface: #ffffff;
+  --dockora-surface-2: #e8eaf4;
+  --dockora-border: rgba(131, 56, 236, 0.22);
+  --dockora-text: #12121a;
+  --dockora-muted: #5c6278;
+  --dockora-accent: #c4005a;
+  --dockora-accent-soft: rgba(196, 0, 90, 0.1);
+  --dockora-accent-fg: #ffffff;
+  --dockora-blue: #0077a0;
+  --dockora-purple: #6b28c4;
+  --dockora-pink: #c4005a;
+  --dockora-success: #0a9f78;
+  --dockora-warning: #b89000;
+  --dockora-danger: #d44500;
+  --dockora-glow-cyan: 0 0 0 transparent;
+  --dockora-glow-pink: 0 0 0 transparent;
+  --dockora-rail: #0d0d15;
+  --dockora-rail-text: #ffffff;
+  --dockora-rail-muted: #a0a0b0;
+  --dockora-rail-border: rgba(131, 56, 236, 0.2);
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  background: var(--dockora-bg);
+  color: var(--dockora-text);
+  overflow-x: hidden;
+}
+
+::selection {
+  background: var(--dockora-pink);
+  color: #fff;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--dockora-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(var(--dockora-pink), var(--dockora-purple));
+  border-radius: 4px;
+}
+
+@keyframes dockora-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes dockora-pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.85);
+  }
+}
+
+@keyframes dockora-orb-float {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  25% {
+    transform: translate(30px, -40px) scale(1.1);
+  }
+  50% {
+    transform: translate(-20px, 20px) scale(0.95);
+  }
+  75% {
+    transform: translate(40px, 30px) scale(1.05);
+  }
+}
+
+@keyframes dockora-shape-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 0.35;
+  }
+  50% {
+    transform: translateY(-24px) rotate(12deg);
+    opacity: 0.55;
+  }
+}
+
+@keyframes dockora-badge-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 10px rgba(131, 56, 236, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(131, 56, 236, 0.4);
+  }
+}
+
+.animate-in.fade-in {
+  /* forwards only – avoid fill-mode:both shifting hit-targets during enter */
+  animation: dockora-fade-in 0.45s ease forwards;
+}
+
+.dockora-panel {
+  border: 1px solid var(--dockora-border);
+  background: color-mix(in srgb, var(--dockora-surface) 94%, transparent);
+  border-radius: 4px;
+  backdrop-filter: blur(12px);
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.35s ease, box-shadow 0.35s ease, transform 0.35s ease;
+}
+
+.dockora-panel:hover {
+  border-color: rgba(131, 56, 236, 0.35);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35), 0 0 24px rgba(131, 56, 236, 0.08);
+}
+
+.dockora-panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--dockora-pink), var(--dockora-purple), transparent);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s ease;
+}
+
+.dockora-panel:hover::before {
+  opacity: 1;
+}
+
+.dockora-brand-mark {
+  background: transparent;
+  color: var(--dockora-pink);
+  border: 1px solid rgba(255, 0, 110, 0.5);
+  border-radius: 4px;
+  box-shadow: 0 0 16px rgba(255, 0, 110, 0.25);
+  font-family: var(--font-display), sans-serif;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
+.dockora-logo-gradient {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  background: linear-gradient(135deg, var(--dockora-pink), var(--dockora-purple), var(--dockora-blue));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 18px rgba(131, 56, 236, 0.45));
+}
+
+.dockora-nav-active {
+  color: #ffffff !important;
+  background: rgba(255, 0, 110, 0.1);
+  box-shadow: inset 3px 0 0 var(--dockora-pink), 0 0 18px rgba(255, 0, 110, 0.15);
+  text-shadow: 0 0 16px rgba(255, 0, 110, 0.45);
+}
+
+.dockora-pulse {
+  animation: dockora-pulse-dot 1.8s ease-in-out infinite;
+}
+
+.dockora-neon-text {
+  color: var(--dockora-blue);
+  text-shadow: 0 0 18px rgba(0, 180, 216, 0.5);
+}
+
+.dockora-neon-pink {
+  color: var(--dockora-pink);
+  text-shadow: var(--dockora-glow-pink);
+}
+
+.dockora-section-tag {
+  font-family: var(--font-display), sans-serif;
+  font-size: 0.7rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--dockora-blue);
+  text-shadow: 0 0 18px rgba(0, 180, 216, 0.45);
+}
+
+.dockora-title-gradient {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 900;
+  background: linear-gradient(135deg, #fff, #aaa);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.dockora-stat-gradient {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 900;
+  background: linear-gradient(135deg, var(--dockora-pink), var(--dockora-purple));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 16px rgba(255, 0, 110, 0.3));
+}
+
+.dockora-neon-line {
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--dockora-pink),
+    var(--dockora-purple),
+    var(--dockora-blue),
+    transparent
+  );
+  opacity: 0.5;
+  box-shadow: 0 0 10px rgba(255, 0, 110, 0.3);
+}
+
+.dockora-glow-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.28;
+  pointer-events: none;
+  animation: dockora-orb-float 10s ease-in-out infinite;
+}
+
+.dockora-clip-btn {
+  /* kept for rare marketing CTAs; default buttons are rectangular for UI consistency */
+  clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
+}
+
+.dockora-link,
+.dockora-link:visited {
+  color: var(--dockora-pink);
+  text-decoration: none;
+  transition: color 0.2s ease, text-shadow 0.2s ease;
+}
+
+.dockora-link:hover {
+  color: #ffffff;
+  text-shadow: 0 0 12px rgba(255, 0, 110, 0.55);
+}
+
+.dockora-link-muted,
+.dockora-link-muted:visited {
+  color: var(--dockora-blue);
+  text-decoration: none;
+  transition: color 0.2s ease, text-shadow 0.2s ease;
+}
+
+.dockora-link-muted:hover {
+  color: #ffffff;
+  text-shadow: 0 0 12px rgba(0, 180, 216, 0.45);
+}
+
+/* NeonVerse form fields (filters, dropdowns, inputs) */
+.dockora-field {
+  appearance: none;
+  background-color: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(131, 56, 236, 0.45);
+  color: var(--dockora-text);
+  font-size: 0.875rem;
+  line-height: 1.25;
+  outline: none;
+  transition:
+    border-color 0.3s ease,
+    box-shadow 0.3s ease,
+    background-color 0.3s ease;
+  color-scheme: dark;
+  box-sizing: border-box;
+}
+
+.light .dockora-field {
+  background-color: #ffffff;
+  color-scheme: light;
+}
+
+.dockora-field::placeholder {
+  color: #555577;
+}
+
+.light .dockora-field::placeholder {
+  color: #8a90a8;
+}
+
+.dockora-field:hover {
+  border-color: rgba(131, 56, 236, 0.5);
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.dockora-field:focus,
+.dockora-field:focus-visible {
+  border-color: var(--dockora-pink);
+  box-shadow: 0 0 24px rgba(255, 0, 110, 0.22);
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+.dockora-field:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.dockora-field option,
+.dockora-field optgroup {
+  background: #0d0d15;
+  color: #ffffff;
+}
+
+.dockora-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%238338ec' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.9rem center;
+  background-size: 12px 8px;
+  padding-right: 2.4rem !important;
+  cursor: pointer;
+}
+
+.dockora-field-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0.85rem;
+  border: 1px solid rgba(131, 56, 236, 0.28);
+  background: rgba(13, 13, 21, 0.55);
+  backdrop-filter: blur(12px);
+  transition:
+    border-color 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+.dockora-field-group:focus-within {
+  border-color: var(--dockora-pink);
+  box-shadow: 0 0 28px rgba(255, 0, 110, 0.18);
+}
+
+.dockora-field-group.grid {
+  display: grid;
+}
+
+.dockora-field::-webkit-calendar-picker-indicator {
+  filter: invert(0.7) sepia(1) saturate(3) hue-rotate(230deg);
+  cursor: pointer;
+  opacity: 0.75;
+}
+
+.dockora-field:-webkit-autofill,
+.dockora-field:-webkit-autofill:hover,
+.dockora-field:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--dockora-text);
+  box-shadow: 0 0 0 1000px #0d0d15 inset;
+  transition: background-color 9999s ease-in-out 0s;
+}
+
+/* React Flow */
+.react-flow__controls {
+  border: 1px solid var(--dockora-border) !important;
+  border-radius: 4px !important;
+  overflow: hidden;
+  box-shadow: 0 0 20px rgba(131, 56, 236, 0.2) !important;
+}
+
+.react-flow__controls-button {
+  background: var(--dockora-surface) !important;
+  border-bottom: 1px solid var(--dockora-border) !important;
+  fill: var(--dockora-text) !important;
+  width: 28px !important;
+  height: 28px !important;
+}
+
+.react-flow__controls-button:hover {
+  background: var(--dockora-surface-2) !important;
+}
+
+.react-flow__controls-button svg {
+  fill: inherit;
+  max-width: 12px;
+  max-height: 12px;
+}
+
+.react-flow__controls-button:last-child {
+  border-bottom: none !important;
+}
+
+.react-flow__minimap {
+  background: var(--dockora-surface) !important;
+  border: 1px solid var(--dockora-border) !important;
+  border-radius: 4px !important;
+  overflow: hidden;
+}
+
+.react-flow__minimap-mask {
+  fill: color-mix(in srgb, var(--dockora-bg) 55%, transparent) !important;
+}
+
+.react-flow__minimap-node {
+  fill: var(--dockora-purple) !important;
+  stroke: none !important;
+}
+
+.react-flow__attribution {
+  display: none !important;
+}

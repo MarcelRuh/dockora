@@ -1,0 +1,55 @@
+name: Bug report
+description: Report a bug or unexpected behaviour
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. For security issues use private reporting (SECURITY.md).
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Clear description of the problem
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. …
+        2. …
+        3. …
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version / commit
+      placeholder: 1.0.0 or commit SHA
+  - type: dropdown
+    id: install
+    attributes:
+      label: How do you run Dockora?
+      options:
+        - Docker Compose
+        - pnpm dev (local)
+        - Other
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      render: shell
