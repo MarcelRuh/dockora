@@ -5,7 +5,7 @@
 [![CI](https://github.com/MarcelRuh/dockora/actions/workflows/ci.yml/badge.svg)](https://github.com/MarcelRuh/dockora/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
-> Status: **v1.5.3** – self-hosted Docker management with in-app updates and GHCR images.
+> Status: **v1.5.3.1** – self-hosted Docker management with in-app updates and GHCR images.
 
 ## One-line install (wget)
 
@@ -99,10 +99,12 @@ pnpm dev
 | API health | http://localhost:3001/api/v1/health |
 | OpenAPI | http://localhost:3001/api/docs |
 
-Default bootstrap admin (first empty DB only):
+Authentication is **enabled by default**. Sign in with the bootstrap admin (first empty DB only):
 
 - Email: `admin@dockora.local`
 - Password: `dockora-admin-change-me` → **change immediately**
+
+`install.sh` prints the generated password once at the end.
 
 ## Production (Docker Compose)
 

@@ -728,7 +728,10 @@ async function recreateStandaloneContainer(
   }
   await container.remove({ force: true });
 
-  const created = await docker.createContainer({
+  // Brief settle so docker-proxy can release host ports after force-remove
+  await sleep(500);
+
+  const createOpts = {
     name,
     Image: imageOverride || info.Config?.Image,
     Env: info.Config?.Env,
@@ -738,9 +741,32 @@ async function recreateStandaloneContainer(
     Labels: info.Config?.Labels ?? undefined,
     ExposedPorts: info.Config?.ExposedPorts ?? undefined,
     HostConfig: info.HostConfig ?? undefined,
-  });
+  };
 
-  await created.start();
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt > 0) await sleep(1_000 * attempt);
+    try {
+      // Remove a half-created leftover from a previous failed attempt
+      if (attempt > 0 && name) {
+        try {
+          await docker.getContainer(name).remove({ force: true });
+        } catch {
+          // none
+        }
+      }
+      const created = await docker.createContainer(createOpts);
+      await created.start();
+      return;
+    } catch (error) {
+      lastError = error;
+      const msg = error instanceof Error ? error.message : String(error);
+      if (!/port is already allocated|address already in use/i.test(msg)) {
+        throw error;
+      }
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }
 
 /** repo/name:tag → repo/name (für Digest-Pin). */

@@ -15,6 +15,10 @@ import {
 } from './compose.service.js';
 import { UnsafeProjectPathError } from './safe-project-dir.js';
 import { destructiveRateLimit } from '../../presentation/http/destructive-rate-limit.js';
+import {
+  enrichPortConflictMessage,
+  isPortConflictMessage,
+} from '../../domain/port-conflict.js';
 
 const COMPOSE_ACTIONS = new Set<ComposeAction>([
   'up',
@@ -44,7 +48,7 @@ export const composeModule: FastifyPluginAsync = async (app: FastifyInstance) =>
     try {
       return await service.list();
     } catch (error) {
-      throwComposeError(app, error);
+      return await throwComposeError(app, error);
     }
   });
 
@@ -84,7 +88,7 @@ export const composeModule: FastifyPluginAsync = async (app: FastifyInstance) =>
       });
       return created;
     } catch (error) {
-      throwComposeError(app, error);
+      return await throwComposeError(app, error);
     }
   });
 
@@ -95,7 +99,7 @@ export const composeModule: FastifyPluginAsync = async (app: FastifyInstance) =>
         // Wrap as JSON — bare strings are sent as text by Fastify and break the web client JSON.parse
         return { logs: await service.logs(request.params.id) };
       } catch (error) {
-        throwComposeError(app, error);
+        return await throwComposeError(app, error);
       }
     },
   );
@@ -107,7 +111,7 @@ export const composeModule: FastifyPluginAsync = async (app: FastifyInstance) =>
         // `docker compose config` returns YAML; wrap so the response is valid JSON
         return { config: await service.validateConfig(request.params.id) };
       } catch (error) {
-        throwComposeError(app, error);
+        return await throwComposeError(app, error);
       }
     },
   );
@@ -118,7 +122,7 @@ export const composeModule: FastifyPluginAsync = async (app: FastifyInstance) =>
       try {
         return await service.previewChanges(request.params.id);
       } catch (error) {
-        throwComposeError(app, error);
+        return await throwComposeError(app, error);
       }
     },
   );
@@ -132,7 +136,7 @@ export const composeModule: FastifyPluginAsync = async (app: FastifyInstance) =>
       try {
         return await service.updateYaml(request.params.id, request.body.content);
       } catch (error) {
-        throwComposeError(app, error);
+        return await throwComposeError(app, error);
       }
     },
   );
@@ -143,7 +147,7 @@ export const composeModule: FastifyPluginAsync = async (app: FastifyInstance) =>
       try {
         return await service.getEnvFile(request.params.id, request.query.file ?? '.env');
       } catch (error) {
-        throwComposeError(app, error);
+        return await throwComposeError(app, error);
       }
     },
   );
@@ -162,7 +166,7 @@ export const composeModule: FastifyPluginAsync = async (app: FastifyInstance) =>
         request.body.fileName ?? '.env',
       );
     } catch (error) {
-      throwComposeError(app, error);
+      return await throwComposeError(app, error);
     }
   });
 
@@ -172,7 +176,7 @@ export const composeModule: FastifyPluginAsync = async (app: FastifyInstance) =>
       try {
         return await service.backup(request.params.id);
       } catch (error) {
-        throwComposeError(app, error);
+        return await throwComposeError(app, error);
       }
     },
   );
@@ -204,7 +208,7 @@ export const composeModule: FastifyPluginAsync = async (app: FastifyInstance) =>
         });
         return result;
       } catch (error) {
-        throwComposeError(app, error);
+        return await throwComposeError(app, error);
       }
     },
   );
@@ -241,7 +245,7 @@ export const composeModule: FastifyPluginAsync = async (app: FastifyInstance) =>
         }
         return result;
       } catch (error) {
-        throwComposeError(app, error);
+        return await throwComposeError(app, error);
       }
     },
   );
@@ -252,23 +256,36 @@ export const composeModule: FastifyPluginAsync = async (app: FastifyInstance) =>
       try {
         return await service.getDetails(request.params.id);
       } catch (error) {
-        throwComposeError(app, error);
+        return await throwComposeError(app, error);
       }
     },
   );
 };
 
-function throwComposeError(app: FastifyInstance, error: unknown): never {
+async function enrichIfPortConflict(
+  app: FastifyInstance,
+  message: string,
+): Promise<string> {
+  if (!isPortConflictMessage(message) || !app.docker) return message;
+  try {
+    const containers = await app.docker.listContainers(true);
+    return enrichPortConflictMessage(message, containers);
+  } catch {
+    return message;
+  }
+}
+
+async function throwComposeError(app: FastifyInstance, error: unknown): Promise<never> {
   if (error instanceof ComposeNotFoundError) {
     throw app.httpErrors.notFound(error.message);
   }
   if (error instanceof ComposeValidationError || error instanceof UnsafeProjectPathError) {
-    throw app.httpErrors.badRequest(error.message);
+    throw app.httpErrors.badRequest(await enrichIfPortConflict(app, error.message));
   }
 
   const err = error as { code?: number; killed?: boolean; message?: string; stderr?: string };
   const raw = err.stderr?.trim() || err.message || 'Compose operation failed';
-  const message = summarizeComposeCliError(raw);
+  let message = summarizeComposeCliError(raw);
 
   if (message.toLowerCase().includes('no such file')) {
     throw app.httpErrors.notFound(message);
@@ -276,6 +293,8 @@ function throwComposeError(app: FastifyInstance, error: unknown): never {
   if (err.code === 127 || message.includes('ENOENT')) {
     throw app.httpErrors.internalServerError('docker compose CLI not available');
   }
+
+  message = await enrichIfPortConflict(app, message);
 
   // Port conflicts / start failures are user-fixable, not opaque 500s
   const lower = message.toLowerCase();

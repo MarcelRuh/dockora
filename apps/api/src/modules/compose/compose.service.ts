@@ -354,6 +354,7 @@ export class ComposeService {
         'up',
         '-d',
         '--force-recreate',
+        '--remove-orphans',
         '--no-deps',
         '--pull',
         'never',
@@ -518,7 +519,7 @@ export class ComposeService {
     if (input.start) {
       const upArgs = ['--project-directory', projectDir, '-f', composePath];
       if (hasEnv) upArgs.push('--env-file', envPath);
-      upArgs.push('up', '-d');
+      upArgs.push('up', '-d', '--remove-orphans');
       try {
         await execCompose(upArgs, { cwd: projectDir });
       } catch (error) {
@@ -570,6 +571,7 @@ export class ComposeService {
       '-f',
       project.absoluteComposePath,
       'down',
+      '--remove-orphans',
     ]);
     if (removeVolumes) {
       downArgs.push('-v');
@@ -655,9 +657,9 @@ async function buildComposeArgs(
 
   switch (action) {
     case 'up':
-      return [...base, 'up', '-d'];
+      return [...base, 'up', '-d', '--remove-orphans'];
     case 'down':
-      return [...base, 'down'];
+      return [...base, 'down', '--remove-orphans'];
     case 'restart':
       return [...base, 'restart'];
     case 'pull':
@@ -665,7 +667,7 @@ async function buildComposeArgs(
     case 'build':
       return [...base, 'build'];
     case 'recreate':
-      return [...base, 'up', '-d', '--force-recreate'];
+      return [...base, 'up', '-d', '--force-recreate', '--remove-orphans'];
     case 'logs':
       return [...base, 'logs', '--no-color', '--tail', '200'];
     default:
