@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [1.5.3.3] – 2026-08-22
+
+### Fixed
+
+- GHCR/buildx image build: TypeScript configs extend relative paths so `@dockora/tsconfig` resolves without pnpm symlinks
+
 ## [1.5.3.2] – 2026-08-22
 
 ### Fixed
