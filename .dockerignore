@@ -1,0 +1,57 @@
+# Git & docs
+.git
+.github
+.cursor
+.gitignore
+.editorconfig
+.nvmrc
+*.md
+!README.md
+docs
+LICENSE
+CODE_OF_CONDUCT.md
+CONTRIBUTING.md
+SECURITY.md
+CHANGELOG.md
+
+# Env & secrets
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+*.pem
+*.key
+
+# Dependencies & build caches
+node_modules
+.pnpm-store
+.turbo
+.cache
+coverage
+.next
+dist
+out
+build
+*.tsbuildinfo
+
+# Runtime
+data
+backups
+*.db
+*.db-journal
+logs
+*.log
+tmp
+temp
+
+# IDE / OS
+.idea
+.vscode
+.DS_Store
+Thumbs.db
+
+# Tests
+playwright-report
+test-results
