@@ -110,10 +110,16 @@ export function SelfUpdateSection() {
             <span className="text-dockora-muted">{t.settings.selfUpdate.mode}: </span>
             <span className="font-medium">{modeLabel}</span>
           </p>
-          <p>
-            <span className="text-dockora-muted">{t.settings.selfUpdate.version}: </span>
-            <span className="font-mono">{status.currentVersion}</span>
-          </p>
+              <p>
+                <span className="text-dockora-muted">{t.settings.selfUpdate.version}: </span>
+                <span className="font-mono">{status.currentVersion}</span>
+                {status.sourceVersion && status.sourceVersion !== status.currentVersion ? (
+                  <span className="text-dockora-muted">
+                    {' '}
+                    → {status.sourceVersion}
+                  </span>
+                ) : null}
+              </p>
           {status.mode === 'compose' ? (
             <>
               <p>

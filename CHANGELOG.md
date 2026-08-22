@@ -5,6 +5,14 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [1.5.3.2] – 2026-08-22
+
+### Fixed
+
+- GHCR image build: keep workspace `node_modules` / `@dockora/tsconfig` when overlaying API and web sources (v1.5.3.1 publish failed)
+- Self-update compared git HEAD to GitHub, so a clone that already matched `main` hid pending container rebuilds; it now uses `.dockora-revision` plus running vs source version
+- Self-update writes `.dockora-revision` only after a successful compose rebuild, prefers git fast-forward, and caches GitHub SHA checks (optional `GITHUB_TOKEN`)
+
 ## [1.5.3.1] – 2026-08-22
 
 ### Improved

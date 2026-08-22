@@ -303,6 +303,7 @@ export async function fetchSelfUpdateStatus(): Promise<{
   enabled: boolean;
   mode: 'compose' | 'image' | 'none';
   currentVersion: string;
+  sourceVersion: string | null;
   localRevision: string | null;
   remoteRevision: string | null;
   image: string | null;
