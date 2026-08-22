@@ -1,0 +1,53 @@
+name: Release Notes
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release-notes:
+    name: Sync release notes from CHANGELOG
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Extract changelog section
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          VERSION="${TAG#v}"
+          export VERSION
+          python3 <<'PY'
+          import pathlib, re, os
+          version = os.environ["VERSION"]
+          text = pathlib.Path("CHANGELOG.md").read_text(encoding="utf-8")
+          pattern = rf"## \[{re.escape(version)}\][^\n]*\n(.*?)(?=\n## \[|\Z)"
+          m = re.search(pattern, text, re.S)
+          body = m.group(1).strip() if m else f"Release {version}. See CHANGELOG.md."
+          header = f"## Dockora {version}\n\n"
+          footer = (
+              "\n\n### Install\n\n"
+              "```bash\n"
+              "wget -qO- https://raw.githubusercontent.com/MarcelRuh/dockora/main/scripts/install.sh | bash\n"
+              "```\n\n"
+              f"Images: `ghcr.io/marcelruh/dockora-api:{version}` / "
+              f"`ghcr.io/marcelruh/dockora-web:{version}`\n"
+          )
+          pathlib.Path("/tmp/notes.md").write_text(header + body + footer, encoding="utf-8")
+          print(f"Wrote notes for {version} ({len(body)} chars body)")
+          PY
+
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --notes-file /tmp/notes.md
+          else
+            gh release create "$TAG" --title "Dockora ${TAG#v}" --notes-file /tmp/notes.md --latest
+          fi

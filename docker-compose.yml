@@ -1,0 +1,104 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    container_name: dockora-api
+    restart: unless-stopped
+    # Host-Docker-Gruppe (Socket ist root:docker) – sonst EACCES auf /var/run/docker.sock
+    group_add:
+      - "${DOCKER_GID:-999}"
+    ports:
+      - "${DOCKORA_API_PORT:-3001}:3001"
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3001
+      LOG_LEVEL: info
+      DATABASE_URL: file:/data/dockora.db
+      BACKUP_DIR: /data/backups
+      DOCKER_SOCKET: /var/run/docker.sock
+      DOCKORA_HOST_PROC_SNAP: /data/host-proc.snap
+      # Public browser origin (scheme + host + port)
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+      # Required – compose will fail if unset; must be strong in production
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-admin@dockora.local}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:?BOOTSTRAP_ADMIN_PASSWORD is required}
+      COMPOSE_SEARCH_PATHS: ${COMPOSE_SEARCH_PATHS:-/home,/opt,/srv,/data/compose}
+      DOCKORA_SELF_IMAGE: ${DOCKORA_SELF_IMAGE:-}
+      # In-App Self-Update (Compose-Install via install.sh)
+      DOCKORA_INSTALL_DIR: ${DOCKORA_INSTALL_DIR:-/opt/dockora}
+      DOCKORA_INSTALL_MOUNT: /dockora-install
+      DOCKORA_REPO: ${DOCKORA_REPO:-MarcelRuh/dockora}
+      DOCKORA_UPDATE_BRANCH: ${DOCKORA_UPDATE_BRANCH:-main}
+      DOCKORA_GIT_SHA: ${DOCKORA_GIT_SHA:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+    volumes:
+      - dockora-data:/data
+      - ${DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock
+      # Compose-Version + Self-Update-Hilfen (CLI liegt nicht im API-Image)
+      - /usr/bin/docker:/usr/bin/docker:ro
+      - /usr/libexec/docker/cli-plugins:/usr/libexec/docker/cli-plugins:ro
+      # Installationsbaum nur lesen (Update schreibt der One-Shot-Updater auf dem Host-Pfad)
+      - ${DOCKORA_INSTALL_DIR:-/opt/dockora}:/dockora-install:ro
+      # Compose-Discovery + Create (rw – sonst schlägt Projekt-Anlegen fehl)
+      - /opt:/opt
+      - /srv:/srv
+      - /home:/home
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3001/api/v1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # Liefert korrekte LXC-/Host-Metriken (Docker-in-LXC sieht sonst oft den Hypervisor)
+  host-agent:
+    image: alpine:3.20
+    container_name: dockora-host-agent
+    restart: unless-stopped
+    pid: host
+    network_mode: none
+    cap_add:
+      - SYS_ADMIN
+      - SYS_PTRACE
+    volumes:
+      - dockora-data:/data
+      - ./scripts/host-proc-agent.sh:/agent.sh:ro
+    command: ["sh", "/agent.sh"]
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.web
+      args:
+        DOCKORA_API_URL: http://api:3001
+    container_name: dockora-web
+    restart: unless-stopped
+    ports:
+      - "${DOCKORA_WEB_PORT:-3000}:3000"
+    environment:
+      DOCKORA_API_URL: http://api:3001
+    depends_on:
+      api:
+        condition: service_healthy
+
+  # Optional: Same-Origin Proxy (SSE/WS) – docker compose --profile proxy up
+  proxy:
+    profiles: ["proxy"]
+    image: nginx:1.27-alpine
+    container_name: dockora-proxy
+    restart: unless-stopped
+    ports:
+      - "${DOCKORA_PROXY_PORT:-8080}:80"
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_started
+
+volumes:
+  dockora-data:

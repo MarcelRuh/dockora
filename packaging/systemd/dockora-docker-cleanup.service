@@ -1,0 +1,11 @@
+[Unit]
+Description=Dockora Docker disk cleanup
+Documentation=file:///opt/dockora/scripts/docker-cleanup.sh
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/dockora/scripts/docker-cleanup.sh
+Nice=10
+IOSchedulingClass=idle
