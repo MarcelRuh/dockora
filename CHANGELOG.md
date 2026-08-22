@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [1.7.6] – 2026-08-22
+
+### Changed
+
+- Dashboard spacing is looser again; notifications show title, message and time (4 items)
+
 ## [1.7.5] – 2026-08-22
 
 ### Changed

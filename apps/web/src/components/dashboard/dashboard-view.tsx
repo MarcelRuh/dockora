@@ -26,7 +26,7 @@ export function DashboardView({
   const loc = locale === 'de' ? 'de-DE' : 'en-US';
 
   return (
-    <div className="space-y-3 animate-in fade-in">
+    <div className="space-y-5 animate-in fade-in">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="dockora-title-gradient text-2xl tracking-tight sm:text-3xl">
           {t.dashboard.title}
@@ -51,7 +51,7 @@ export function DashboardView({
       ) : null}
 
       {data ? (
-        <div className="space-y-3">
+        <div className="space-y-5">
           <EngineStrip overview={data} onUpdated={() => void refresh()} />
           <ContainerStrip overview={data} labels={t.dashboard} />
           <LiveResources overview={data} labels={t.dashboard} locale={loc} />
@@ -104,20 +104,20 @@ function ContainerStrip({
   const unhealthy = overview.unhealthyContainers ?? [];
 
   return (
-    <section className="space-y-2">
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+    <section className="space-y-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {stats.map((item) => (
           <Link
             key={item.key}
             href="/containers"
-            className="dockora-panel px-3 py-2.5 transition-colors hover:border-dockora-pink/40"
+            className="dockora-panel px-4 py-3 transition-colors hover:border-dockora-pink/40"
           >
-            <p className="text-[10px] font-medium uppercase tracking-wide text-dockora-muted">
+            <p className="text-xs font-medium uppercase tracking-wide text-dockora-muted">
               {item.label}
             </p>
             <p
               className={cn(
-                'mt-0.5 font-mono text-xl tabular-nums',
+                'mt-1 font-mono text-2xl tabular-nums',
                 item.danger ? 'text-dockora-danger' : 'dockora-stat-gradient',
               )}
             >
@@ -127,8 +127,8 @@ function ContainerStrip({
         ))}
       </div>
       {unhealthy.length > 0 ? (
-        <div className="dockora-panel flex flex-wrap items-baseline gap-x-3 gap-y-1 px-3 py-2">
-          <h3 className="text-[10px] font-medium uppercase tracking-wide text-dockora-danger">
+        <div className="dockora-panel flex flex-wrap items-baseline gap-x-3 gap-y-1 px-4 py-3">
+          <h3 className="text-xs font-medium uppercase tracking-wide text-dockora-danger">
             {labels.containers.unhealthyList}
           </h3>
           <ul className="flex flex-wrap gap-x-3 gap-y-1">
@@ -211,16 +211,16 @@ function LiveResources({
   ];
 
   return (
-    <section className="grid gap-2 sm:grid-cols-3">
+    <section className="grid gap-3 sm:grid-cols-3">
       {rows.map((row) => (
-        <div key={row.key} className="dockora-panel space-y-1.5 px-3 py-2.5">
+        <div key={row.key} className="dockora-panel space-y-2 px-4 py-3">
           <div className="flex items-baseline justify-between gap-2">
-            <p className="text-[10px] font-medium uppercase tracking-wide text-dockora-muted">
+            <p className="text-xs font-medium uppercase tracking-wide text-dockora-muted">
               {row.label}
             </p>
-            <p className="dockora-stat-gradient font-mono text-lg tabular-nums">{row.primary}</p>
+            <p className="dockora-stat-gradient font-mono text-xl tabular-nums">{row.primary}</p>
           </div>
-          <ProgressBar value={row.ratio} className="h-1.5" />
+          <ProgressBar value={row.ratio} />
           {row.secondary ? (
             <p className="font-mono text-[11px] text-dockora-muted">{row.secondary}</p>
           ) : null}
@@ -364,17 +364,17 @@ function EngineStrip({
         : null;
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       {error ? <ErrorBanner message={error} /> : null}
       {success ? <SuccessBanner message={success} /> : null}
-      <section className="grid gap-2 sm:grid-cols-3">
-        <div className="dockora-panel px-3 py-2.5">
-          <p className="text-[10px] font-medium uppercase tracking-wide text-dockora-muted">
+      <section className="grid gap-3 sm:grid-cols-3">
+        <div className="dockora-panel px-4 py-3">
+          <p className="text-xs font-medium uppercase tracking-wide text-dockora-muted">
             {labels.status}
           </p>
           <p
             className={cn(
-              'mt-0.5 text-sm font-semibold',
+              'mt-1 text-base font-semibold',
               overview.docker.engineStatus === 'online'
                 ? 'text-dockora-success'
                 : overview.docker.engineStatus === 'offline'
@@ -457,10 +457,10 @@ function VersionUpdateCard({
   onApply: () => void;
 }) {
   return (
-    <div className="dockora-panel flex items-center justify-between gap-2 px-3 py-2.5">
+    <div className="dockora-panel flex items-center justify-between gap-3 px-4 py-3">
       <div className="min-w-0">
-        <p className="text-[10px] font-medium uppercase tracking-wide text-dockora-muted">{label}</p>
-        <p className="mt-0.5 truncate font-mono text-sm font-semibold">
+        <p className="text-xs font-medium uppercase tracking-wide text-dockora-muted">{label}</p>
+        <p className="mt-1 truncate font-mono text-base font-semibold">
           {current ?? unknownLabel}
           {updateAvailable && latest ? (
             <span className="text-dockora-warning"> → {latest}</span>
@@ -490,20 +490,20 @@ function AsideColumn({
   };
   locale: string;
 }) {
-  const latestNotes = notifications.slice(0, 3);
+  const latestNotes = notifications.slice(0, 4);
 
   return (
-    <div className="grid gap-2 lg:grid-cols-2">
+    <div className="grid gap-3 lg:grid-cols-2">
       <Link
         href="/updates"
-        className="dockora-panel px-3 py-2.5 transition-colors hover:border-dockora-pink/40"
+        className="dockora-panel px-4 py-3 transition-colors hover:border-dockora-pink/40"
       >
-        <h2 className="text-[10px] font-medium uppercase tracking-wide text-dockora-muted">
+        <h2 className="text-xs font-medium uppercase tracking-wide text-dockora-muted">
           {labels.updates.title}
         </h2>
         <p
           className={cn(
-            'mt-1 text-sm',
+            'mt-2 text-sm',
             updatesAvailable > 0 ? 'text-dockora-warning' : 'text-dockora-muted',
           )}
         >
@@ -513,20 +513,28 @@ function AsideColumn({
         </p>
       </Link>
 
-      <section className="dockora-panel px-3 py-2.5">
-        <h2 className="text-[10px] font-medium uppercase tracking-wide text-dockora-muted">
+      <section className="dockora-panel px-4 py-3">
+        <h2 className="text-xs font-medium uppercase tracking-wide text-dockora-muted">
           {labels.notifications.title}
         </h2>
         {latestNotes.length === 0 ? (
-          <p className="mt-1 text-sm text-dockora-muted">{labels.notifications.empty}</p>
+          <p className="mt-2 text-sm text-dockora-muted">{labels.notifications.empty}</p>
         ) : (
-          <ul className="mt-1.5 space-y-1">
+          <ul className="mt-2 space-y-2">
             {latestNotes.map((n) => (
-              <li key={n.id} className="flex items-baseline justify-between gap-3">
-                <p className="truncate text-sm">{n.title}</p>
-                <time className="shrink-0 font-mono text-[11px] text-dockora-muted">
-                  {formatRelativeTime(n.timestamp, locale)}
-                </time>
+              <li
+                key={n.id}
+                className="border border-dockora-border bg-dockora-surface2/40 px-3 py-2"
+              >
+                <div className="flex items-baseline justify-between gap-3">
+                  <p className="truncate text-sm font-medium">{n.title}</p>
+                  <time className="shrink-0 font-mono text-[11px] text-dockora-muted">
+                    {formatRelativeTime(n.timestamp, locale)}
+                  </time>
+                </div>
+                {n.message ? (
+                  <p className="mt-0.5 line-clamp-2 text-xs text-dockora-muted">{n.message}</p>
+                ) : null}
               </li>
             ))}
           </ul>
