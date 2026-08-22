@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [1.6.0] – 2026-08-22
+
+### Added
+
+- Compose Redeploy (`up -d --force-recreate`) so YAML/.env changes apply without a separate down + up
+
 ## [1.5.5] – 2026-08-22
 
 ### Fixed

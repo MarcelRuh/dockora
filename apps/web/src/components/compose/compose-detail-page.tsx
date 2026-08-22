@@ -36,7 +36,7 @@ import {
   SuccessBanner,
 } from '@/components/ui/page-parts';
 
-type ConfirmKind = 'up' | 'down' | 'restart' | 'delete';
+type ConfirmKind = 'up' | 'down' | 'restart' | 'recreate' | 'delete';
 type ConfirmState = {
   kind: ConfirmKind;
   consequences: string[];
@@ -182,7 +182,7 @@ export function ComposeDetailPage({ id }: { id: string }) {
     setError(null);
     try {
       let consequences: string[] = [];
-      if (kind === 'up' || kind === 'delete') {
+      if (kind === 'up' || kind === 'recreate' || kind === 'delete') {
         try {
           const preview = await previewComposeChanges(id);
           consequences = formatComposePreviewLines(preview, t.compose);
@@ -192,6 +192,9 @@ export function ComposeDetailPage({ id }: { id: string }) {
       }
       if (kind === 'down') consequences = [...t.compose.downConsequences];
       if (kind === 'restart') consequences = [...t.compose.restartConsequences];
+      if (kind === 'recreate') {
+        consequences = [...consequences, ...t.compose.recreateConsequences];
+      }
       if (kind === 'delete') consequences = [...consequences, ...t.compose.deleteConsequences];
       setConfirm({
         kind,
@@ -266,6 +269,11 @@ export function ComposeDetailPage({ id }: { id: string }) {
                 {t.compose.up}
               </Button>
             ) : null}
+            {canOps ? (
+              <Button disabled={busy || confirmBusy} onClick={() => void openConfirm('recreate')}>
+                {t.compose.recreate}
+              </Button>
+            ) : null}
             {isAdmin ? (
               <Button disabled={busy || confirmBusy} onClick={() => void openConfirm('down')}>
                 {t.compose.down}
@@ -312,6 +320,11 @@ export function ComposeDetailPage({ id }: { id: string }) {
           {canOps ? (
             <Button variant="primary" disabled={busy} onClick={() => void handleSave()}>
               {t.compose.saveYaml}
+            </Button>
+          ) : null}
+          {canOps ? (
+            <Button disabled={busy || confirmBusy} onClick={() => void openConfirm('recreate')}>
+              {t.compose.recreate}
             </Button>
           ) : null}
           <Button disabled={busy} onClick={() => void handleValidate()}>
@@ -396,7 +409,9 @@ export function ComposeDetailPage({ id }: { id: string }) {
               ? t.compose.down
               : confirm?.kind === 'restart'
                 ? t.compose.restart
-                : t.compose.previewTitle
+                : confirm?.kind === 'recreate'
+                  ? t.compose.recreate
+                  : t.compose.previewTitle
         }
         description={
           confirm?.kind === 'delete'
@@ -405,7 +420,9 @@ export function ComposeDetailPage({ id }: { id: string }) {
               ? t.compose.downConfirm.replace('{name}', project.name)
               : confirm?.kind === 'restart'
                 ? t.compose.restartConfirm.replace('{name}', project.name)
-                : t.compose.upConfirm.replace('{name}', project.name)
+                : confirm?.kind === 'recreate'
+                  ? t.compose.recreateConfirm.replace('{name}', project.name)
+                  : t.compose.upConfirm.replace('{name}', project.name)
         }
         consequences={confirm?.consequences}
         confirmLabel={t.common.confirm}

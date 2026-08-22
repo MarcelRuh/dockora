@@ -5,7 +5,7 @@
 [![CI](https://github.com/MarcelRuh/dockora/actions/workflows/ci.yml/badge.svg)](https://github.com/MarcelRuh/dockora/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
-> Status: **v1.5.5** – self-hosted Docker management with in-app updates and GHCR images.
+> Status: **v1.6.0** – self-hosted Docker management with in-app updates and GHCR images.
 
 ## One-line install (wget)
 

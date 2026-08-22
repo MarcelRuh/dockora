@@ -196,6 +196,7 @@ export const messages = {
       up: 'Up',
       down: 'Down',
       restart: 'Neustart',
+      recreate: 'Redeploy',
       pull: 'Pull',
       build: 'Build',
       detail: 'Projekt',
@@ -249,6 +250,13 @@ export const messages = {
         'Alle Services des Projekts werden neu gestartet.',
         'Kurzzeitige Unterbrechung der Erreichbarkeit möglich.',
       ],
+      recreateConfirm:
+        '„{name}“ neu ausrollen? Container werden mit der aktuellen YAML/.env neu erstellt.',
+      recreateConsequences: [
+        'Entspricht compose up -d --force-recreate – Down+Up ist nicht nötig.',
+        'Env-, Port- und Service-Änderungen werden übernommen.',
+        'Kurze Unterbrechung; Volumes bleiben erhalten.',
+      ],
       deleteConsequences: [
         'Container werden gestoppt und entfernt.',
         'Der gesamte Projektordner wird gelöscht (compose.yaml, .env, lokale Daten wie appdata).',
@@ -262,6 +270,7 @@ export const messages = {
       previewNone: 'Keine bekannten Diffs zum laufenden Stand.',
       bulkUp: 'Up',
       bulkRestart: 'Neustart',
+      bulkRecreate: 'Redeploy',
       bulkDown: 'Down',
       bulkDelete: 'Löschen',
     },
@@ -809,6 +818,7 @@ export const messages = {
       up: 'Up',
       down: 'Down',
       restart: 'Restart',
+      recreate: 'Redeploy',
       pull: 'Pull',
       build: 'Build',
       detail: 'Project',
@@ -862,6 +872,13 @@ export const messages = {
         'All project services will be restarted.',
         'Brief downtime is possible.',
       ],
+      recreateConfirm:
+        'Redeploy "{name}"? Containers will be recreated from the current YAML/.env.',
+      recreateConsequences: [
+        'Runs compose up -d --force-recreate – no separate down + up needed.',
+        'Env, port, and service changes are applied.',
+        'Brief interruption; volumes are kept.',
+      ],
       deleteConsequences: [
         'Containers will be stopped and removed.',
         'The entire project folder will be deleted (compose.yaml, .env, local data such as appdata).',
@@ -875,6 +892,7 @@ export const messages = {
       previewNone: 'No known diffs vs running state.',
       bulkUp: 'Up',
       bulkRestart: 'Restart',
+      bulkRecreate: 'Redeploy',
       bulkDown: 'Down',
       bulkDelete: 'Delete',
     },

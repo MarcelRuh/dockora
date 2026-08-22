@@ -32,7 +32,7 @@ import {
   StatusBadge,
 } from '@/components/ui/page-parts';
 
-type ConfirmKind = 'up' | 'down' | 'restart' | 'delete';
+type ConfirmKind = 'up' | 'down' | 'restart' | 'recreate' | 'delete';
 type ConfirmState = {
   kind: ConfirmKind;
   ids: string[];
@@ -152,7 +152,7 @@ export function ComposeListPage() {
     setError(null);
     try {
       let consequences: string[] = [];
-      if (kind === 'up' || kind === 'delete') {
+      if (kind === 'up' || kind === 'recreate' || kind === 'delete') {
         const previews = await Promise.all(
           targets.map(async (p) => {
             try {
@@ -173,6 +173,9 @@ export function ComposeListPage() {
       }
       if (kind === 'restart') {
         consequences = [...t.compose.restartConsequences];
+      }
+      if (kind === 'recreate') {
+        consequences = [...consequences, ...t.compose.recreateConsequences];
       }
       if (kind === 'delete') {
         consequences = [...consequences, ...t.compose.deleteConsequences];
@@ -209,7 +212,15 @@ export function ComposeListPage() {
             removeVolumes: Boolean(removeVolumes),
           });
         } else {
-          await composeAction(id, kind === 'up' ? 'up' : kind === 'down' ? 'down' : 'restart');
+          const action =
+            kind === 'up'
+              ? 'up'
+              : kind === 'down'
+                ? 'down'
+                : kind === 'recreate'
+                  ? 'recreate'
+                  : 'restart';
+          await composeAction(id, action);
         }
         setBulkProgress({ done: i + 1, total: ids.length });
       }
@@ -353,6 +364,13 @@ export function ComposeListPage() {
             onClick={() => void openConfirm('up', [p.id])}
           >
             {t.compose.up}
+          </Button>
+          <Button
+            size="sm"
+            disabled={anyBusy}
+            onClick={() => void openConfirm('recreate', [p.id])}
+          >
+            {t.compose.recreate}
           </Button>
           {isAdmin ? (
             <Button
@@ -543,6 +561,13 @@ export function ComposeListPage() {
             <Button
               size="sm"
               disabled={anyBusy}
+              onClick={() => void openConfirm('recreate', selectedIds)}
+            >
+              {t.compose.bulkRecreate}
+            </Button>
+            <Button
+              size="sm"
+              disabled={anyBusy}
               onClick={() => void openConfirm('restart', selectedIds)}
             >
               {t.compose.bulkRestart}
@@ -610,8 +635,10 @@ export function ComposeListPage() {
             ? t.common.delete
             : confirm?.kind === 'down'
               ? t.compose.down
-              : confirm?.kind === 'restart'
-                ? t.compose.restart
+            : confirm?.kind === 'restart'
+              ? t.compose.restart
+              : confirm?.kind === 'recreate'
+                ? t.compose.recreate
                 : t.compose.previewTitle
         }
         description={
@@ -621,9 +648,11 @@ export function ComposeListPage() {
               ? t.compose.downConfirm.replace('{name}', confirm.names.join(', '))
               : confirm?.kind === 'restart'
                 ? t.compose.restartConfirm.replace('{name}', confirm.names.join(', '))
-                : confirm?.kind === 'up'
-                  ? t.compose.upConfirm.replace('{name}', confirm.names.join(', '))
-                  : undefined
+                : confirm?.kind === 'recreate'
+                  ? t.compose.recreateConfirm.replace('{name}', confirm.names.join(', '))
+                  : confirm?.kind === 'up'
+                    ? t.compose.upConfirm.replace('{name}', confirm.names.join(', '))
+                    : undefined
         }
         consequences={confirm?.consequences}
         confirmLabel={t.common.confirm}
