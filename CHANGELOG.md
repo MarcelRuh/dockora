@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [1.5.3.4] – 2026-08-22
+
+### Fixed
+
+- GHCR/buildx: re-run `pnpm install` in the image build stage so workspace links and `@types/node` exist after source overlay
+
 ## [1.5.3.3] – 2026-08-22
 
 ### Fixed
