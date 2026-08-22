@@ -231,7 +231,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         ) : null}
 
-        <main className="mx-auto w-full max-w-shell min-h-0 flex-1 overflow-y-auto px-4 py-8 sm:px-6 sm:py-10 xl:px-8">
+        <main
+          className={cn(
+            'mx-auto w-full max-w-shell min-h-0 flex-1 overflow-y-auto px-4 sm:px-6 xl:px-8',
+            pathname === '/' ? 'py-4 sm:py-5' : 'py-8 sm:py-10',
+          )}
+        >
           {children}
         </main>
       </div>

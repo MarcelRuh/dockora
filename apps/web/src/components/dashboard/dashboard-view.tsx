@@ -26,31 +26,22 @@ export function DashboardView({
   const loc = locale === 'de' ? 'de-DE' : 'en-US';
 
   return (
-    <div className="space-y-8 animate-in fade-in">
-      <header className="space-y-5">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div className="space-y-2">
-            <p className="dockora-section-tag">
-              Dockora · {t.dashboard.live.live}
-            </p>
-            <h1 className="dockora-title-gradient text-4xl tracking-tight sm:text-5xl">
-              {t.dashboard.title}
-            </h1>
-            <p className="max-w-xl text-sm text-dockora-muted sm:text-base">{t.dashboard.subtitle}</p>
-          </div>
-          <LiveBadge
-            state={state}
-            lastUpdated={lastUpdated}
-            labels={t.dashboard.live}
-            locale={loc}
-            onRefresh={() => void refresh()}
-          />
-        </div>
-        <div className="dockora-neon-line" />
+    <div className="space-y-3 animate-in fade-in">
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="dockora-title-gradient text-2xl tracking-tight sm:text-3xl">
+          {t.dashboard.title}
+        </h1>
+        <LiveBadge
+          state={state}
+          lastUpdated={lastUpdated}
+          labels={t.dashboard.live}
+          locale={loc}
+          onRefresh={() => void refresh()}
+        />
       </header>
 
       {state === 'error' && !data ? (
-        <p className="border border-dockora-danger/35 bg-dockora-danger/8 px-4 py-3 text-sm text-dockora-danger">
+        <p className="border border-dockora-danger/35 bg-dockora-danger/8 px-3 py-2 text-sm text-dockora-danger">
           {t.dashboard.loadError}: {error}
         </p>
       ) : null}
@@ -60,7 +51,7 @@ export function DashboardView({
       ) : null}
 
       {data ? (
-        <div className="space-y-8">
+        <div className="space-y-3">
           <EngineStrip overview={data} onUpdated={() => void refresh()} />
           <ContainerStrip overview={data} labels={t.dashboard} />
           <LiveResources overview={data} labels={t.dashboard} locale={loc} />
@@ -110,39 +101,39 @@ function ContainerStrip({
     },
   ];
 
+  const unhealthy = overview.unhealthyContainers ?? [];
+
   return (
-    <section className="space-y-3">
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 className="dockora-title-gradient text-lg tracking-tight">{labels.containers.title}</h2>
-        <Link href="/containers" className="dockora-link text-xs uppercase tracking-wide">
-          {labels.containers.title}
-        </Link>
-      </div>
-      <div className="grid gap-3 sm:grid-cols-4">
+    <section className="space-y-2">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {stats.map((item) => (
-          <div key={item.key} className="dockora-panel px-4 py-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-dockora-muted">
+          <Link
+            key={item.key}
+            href="/containers"
+            className="dockora-panel px-3 py-2.5 transition-colors hover:border-dockora-pink/40"
+          >
+            <p className="text-[10px] font-medium uppercase tracking-wide text-dockora-muted">
               {item.label}
             </p>
             <p
               className={cn(
-                'mt-1 font-mono text-2xl tabular-nums',
+                'mt-0.5 font-mono text-xl tabular-nums',
                 item.danger ? 'text-dockora-danger' : 'dockora-stat-gradient',
               )}
             >
               {item.value}
             </p>
-          </div>
+          </Link>
         ))}
       </div>
-      <div className="dockora-panel px-4 py-4">
-        <h3 className="text-sm font-medium">{labels.containers.unhealthyList}</h3>
-        {(overview.unhealthyContainers ?? []).length === 0 ? (
-          <p className="mt-2 text-sm text-dockora-muted">{labels.containers.unhealthyEmpty}</p>
-        ) : (
-          <ul className="mt-2 space-y-1.5">
-            {(overview.unhealthyContainers ?? []).map((c) => (
-              <li key={c.id} className="flex flex-wrap items-baseline gap-2 text-sm">
+      {unhealthy.length > 0 ? (
+        <div className="dockora-panel flex flex-wrap items-baseline gap-x-3 gap-y-1 px-3 py-2">
+          <h3 className="text-[10px] font-medium uppercase tracking-wide text-dockora-danger">
+            {labels.containers.unhealthyList}
+          </h3>
+          <ul className="flex flex-wrap gap-x-3 gap-y-1">
+            {unhealthy.map((c) => (
+              <li key={c.id} className="flex items-baseline gap-1.5 text-sm">
                 <Link
                   href={`/containers/${encodeURIComponent(c.id)}`}
                   className="dockora-link font-mono"
@@ -150,13 +141,13 @@ function ContainerStrip({
                   {c.name}
                 </Link>
                 {c.composeProject ? (
-                  <span className="text-xs text-dockora-muted">{c.composeProject}</span>
+                  <span className="text-[11px] text-dockora-muted">{c.composeProject}</span>
                 ) : null}
               </li>
             ))}
           </ul>
-        )}
-      </div>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -220,25 +211,21 @@ function LiveResources({
   ];
 
   return (
-    <section className="space-y-4">
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 className="dockora-title-gradient text-lg tracking-tight">{labels.resources.title}</h2>
-        <p className="dockora-section-tag !mb-0">{labels.resources.realtime}</p>
-      </div>
-      <div className="grid gap-3 sm:grid-cols-3">
-        {rows.map((row) => (
-          <div key={row.key} className="dockora-panel space-y-3 p-4">
-            <div className="flex items-baseline justify-between gap-2">
-              <p className="text-sm font-medium text-dockora-muted">{row.label}</p>
-              <p className="dockora-stat-gradient font-mono text-2xl tabular-nums">{row.primary}</p>
-            </div>
-            <ProgressBar value={row.ratio} />
-            {row.secondary ? (
-              <p className="font-mono text-[11px] text-dockora-muted">{row.secondary}</p>
-            ) : null}
+    <section className="grid gap-2 sm:grid-cols-3">
+      {rows.map((row) => (
+        <div key={row.key} className="dockora-panel space-y-1.5 px-3 py-2.5">
+          <div className="flex items-baseline justify-between gap-2">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-dockora-muted">
+              {row.label}
+            </p>
+            <p className="dockora-stat-gradient font-mono text-lg tabular-nums">{row.primary}</p>
           </div>
-        ))}
-      </div>
+          <ProgressBar value={row.ratio} className="h-1.5" />
+          {row.secondary ? (
+            <p className="font-mono text-[11px] text-dockora-muted">{row.secondary}</p>
+          ) : null}
+        </div>
+      ))}
     </section>
   );
 }
@@ -259,8 +246,8 @@ function LiveBadge({
   const isLive = state === 'ready' || state === 'loading';
 
   return (
-    <div className="dockora-panel flex items-center gap-3 self-start px-3 py-2 sm:self-auto">
-      <div className="flex items-center gap-2 text-xs">
+    <div className="dockora-panel flex items-center gap-2 self-start px-2.5 py-1.5 sm:self-auto">
+      <div className="flex items-center gap-2 text-[11px]">
         <span
           className={cn(
             'h-2 w-2 rounded-full',
@@ -281,7 +268,9 @@ function LiveBadge({
           </span>
         ) : null}
       </div>
-      <Button onClick={onRefresh}>{labels.refresh}</Button>
+      <Button size="sm" onClick={onRefresh}>
+        {labels.refresh}
+      </Button>
     </div>
   );
 }
@@ -375,17 +364,17 @@ function EngineStrip({
         : null;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {error ? <ErrorBanner message={error} /> : null}
       {success ? <SuccessBanner message={success} /> : null}
-      <section className="grid gap-3 sm:grid-cols-3">
-        <div className="dockora-panel px-4 py-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-dockora-muted">
+      <section className="grid gap-2 sm:grid-cols-3">
+        <div className="dockora-panel px-3 py-2.5">
+          <p className="text-[10px] font-medium uppercase tracking-wide text-dockora-muted">
             {labels.status}
           </p>
           <p
             className={cn(
-              'mt-1 text-lg font-semibold',
+              'mt-0.5 text-sm font-semibold',
               overview.docker.engineStatus === 'online'
                 ? 'text-dockora-success'
                 : overview.docker.engineStatus === 'offline'
@@ -468,22 +457,18 @@ function VersionUpdateCard({
   onApply: () => void;
 }) {
   return (
-    <div className="dockora-panel flex flex-col px-4 py-4">
-      <p className="text-xs font-medium uppercase tracking-wide text-dockora-muted">{label}</p>
-      <p className="mt-1 text-lg font-semibold font-mono">
-        {current ?? unknownLabel}
-        {updateAvailable && latest ? (
-          <span className="text-dockora-warning"> → {latest}</span>
-        ) : null}
-      </p>
+    <div className="dockora-panel flex items-center justify-between gap-2 px-3 py-2.5">
+      <div className="min-w-0">
+        <p className="text-[10px] font-medium uppercase tracking-wide text-dockora-muted">{label}</p>
+        <p className="mt-0.5 truncate font-mono text-sm font-semibold">
+          {current ?? unknownLabel}
+          {updateAvailable && latest ? (
+            <span className="text-dockora-warning"> → {latest}</span>
+          ) : null}
+        </p>
+      </div>
       {showButton && updateAvailable ? (
-        <Button
-          size="sm"
-          variant="primary"
-          className="mt-3 self-start"
-          disabled={busy}
-          onClick={onApply}
-        >
+        <Button size="sm" variant="primary" disabled={busy} onClick={onApply}>
           {applying ? applyingLabel : applyLabel}
         </Button>
       ) : null}
@@ -505,13 +490,20 @@ function AsideColumn({
   };
   locale: string;
 }) {
+  const latestNotes = notifications.slice(0, 3);
+
   return (
-    <div className="grid gap-3 lg:grid-cols-2">
-      <section className="dockora-panel px-4 py-4">
-        <h2 className="dockora-title-gradient text-base">{labels.updates.title}</h2>
+    <div className="grid gap-2 lg:grid-cols-2">
+      <Link
+        href="/updates"
+        className="dockora-panel px-3 py-2.5 transition-colors hover:border-dockora-pink/40"
+      >
+        <h2 className="text-[10px] font-medium uppercase tracking-wide text-dockora-muted">
+          {labels.updates.title}
+        </h2>
         <p
           className={cn(
-            'mt-2 text-sm',
+            'mt-1 text-sm',
             updatesAvailable > 0 ? 'text-dockora-warning' : 'text-dockora-muted',
           )}
         >
@@ -519,22 +511,20 @@ function AsideColumn({
             ? labels.updates.available.replace('{count}', String(updatesAvailable))
             : labels.updates.none}
         </p>
-      </section>
+      </Link>
 
-      <section className="dockora-panel px-4 py-4">
-        <h2 className="dockora-title-gradient text-base">{labels.notifications.title}</h2>
-        {notifications.length === 0 ? (
-          <p className="mt-2 text-sm text-dockora-muted">{labels.notifications.empty}</p>
+      <section className="dockora-panel px-3 py-2.5">
+        <h2 className="text-[10px] font-medium uppercase tracking-wide text-dockora-muted">
+          {labels.notifications.title}
+        </h2>
+        {latestNotes.length === 0 ? (
+          <p className="mt-1 text-sm text-dockora-muted">{labels.notifications.empty}</p>
         ) : (
-          <ul className="mt-3 space-y-2">
-            {notifications.map((n) => (
-              <li
-                key={n.id}
-                className="border border-dockora-border bg-dockora-surface2/40 px-3 py-2"
-              >
-                <p className="text-sm font-medium">{n.title}</p>
-                <p className="text-xs text-dockora-muted">{n.message}</p>
-                <time className="font-mono text-[11px] text-dockora-muted">
+          <ul className="mt-1.5 space-y-1">
+            {latestNotes.map((n) => (
+              <li key={n.id} className="flex items-baseline justify-between gap-3">
+                <p className="truncate text-sm">{n.title}</p>
+                <time className="shrink-0 font-mono text-[11px] text-dockora-muted">
                   {formatRelativeTime(n.timestamp, locale)}
                 </time>
               </li>
