@@ -156,12 +156,30 @@ replace_env DOCKORA_UPDATE_BRANCH "$BRANCH"
 rm -f .env.bak
 
 info "Recording installed revision"
+resolve_remote_sha() {
+  local repo="$1" branch="$2" sha=""
+  if command -v git >/dev/null 2>&1; then
+    sha="$(git ls-remote "https://github.com/${repo}.git" "refs/heads/${branch}" | awk '{print $1}' | head -1 || true)"
+  fi
+  if [[ -z "$sha" ]]; then
+    sha="$(wget -qO- --header='User-Agent: git/2.43.0' \
+      "https://github.com/${repo}.git/info/refs?service=git-upload-pack" \
+      | tr -d '\000' \
+      | grep -oE "[0-9a-f]{40}[[:space:]]+refs/heads/${branch}" \
+      | awk '{print $1}' | head -1 || true)"
+  fi
+  if [[ -z "$sha" ]]; then
+    sha="$(wget -qO- --header='User-Agent: dockora-install' \
+      "https://github.com/${repo}/commits/${branch}.atom" \
+      | sed -n 's/.*Grit::Commit\/\([a-f0-9]\{40\}\).*/\1/p' | head -1 || true)"
+  fi
+  printf '%s' "$sha"
+}
+
 if [[ -d .git ]] && command -v git >/dev/null 2>&1; then
   git rev-parse HEAD >.dockora-revision
 else
-  REV="$(wget -qO- --header='Accept: application/vnd.github+json' --header='User-Agent: dockora-install' \
-    "https://api.github.com/repos/${DOCKORA_REPO:-MarcelRuh/dockora}/commits/${BRANCH}" \
-    | sed -n 's/.*"sha": *"\([a-f0-9]\{40\}\)".*/\1/p' | head -1 || true)"
+  REV="$(resolve_remote_sha "${DOCKORA_REPO:-MarcelRuh/dockora}" "$BRANCH")"
   if [[ -n "${REV:-}" ]]; then
     printf '%s\n' "$REV" >.dockora-revision
   else

@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [1.5.5] – 2026-08-22
+
+### Fixed
+
+- Self-update / wget installs no longer hit GitHub REST `403` rate limits; revision checks use git-upload-pack and the commit atom feed first
+
 ## [1.5.4] – 2026-08-22
 
 ### Added
