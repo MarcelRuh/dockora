@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import type { DashboardOverview } from '@dockora/shared';
 import { useAuth } from '@/components/auth/auth-provider';
 import { useLocale } from '@/i18n/locale-provider';
-import { ApiError, applyDockerHostUpdate } from '@/lib/api';
+import { ApiError, applyDockerHostUpdate, fetchDockerHostUpdateStatus } from '@/lib/api';
 import { formatBytes, formatPercent, formatRelativeTime, usageRatio } from '@/lib/format';
 import { canAdmin } from '@/lib/roles';
 import { cn } from '@/lib/utils';
@@ -306,6 +306,35 @@ function EngineStrip({
   const [confirmTarget, setConfirmTarget] = useState<DockerUpdateTarget | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [progress, setProgress] = useState<{
+    updating: boolean;
+    target: DockerUpdateTarget | null;
+    percent: number;
+    step: string;
+    detail: string | null;
+    message: string | null;
+    ok: boolean | null;
+  } | null>(null);
+
+  const loadProgress = useCallback(async () => {
+    try {
+      const next = await fetchDockerHostUpdateStatus();
+      setProgress(next);
+      if (next.updating && next.target) setBusyTarget(next.target);
+    } catch {
+      // API can drop during an engine restart
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadProgress();
+  }, [loadProgress]);
+
+  useEffect(() => {
+    if (!busyTarget && !progress?.updating) return;
+    const timer = window.setInterval(() => void loadProgress(), 1000);
+    return () => window.clearInterval(timer);
+  }, [busyTarget, progress?.updating, loadProgress]);
 
   const statusLabel =
     overview.docker.engineStatus === 'online'
@@ -318,24 +347,41 @@ function EngineStrip({
     setBusyTarget(target);
     setError(null);
     setSuccess(null);
+    setProgress({
+      updating: true,
+      target,
+      percent: 2,
+      step: 'start',
+      detail: null,
+      message: null,
+      ok: null,
+    });
     try {
       const result = await applyDockerHostUpdate(target);
       setSuccess(result.message);
+      await loadProgress();
       onUpdated();
     } catch (err) {
       const likelyRestart =
         target === 'engine' && (!(err instanceof ApiError) || err.status >= 500);
       if (likelyRestart) {
+        setProgress((prev) =>
+          prev
+            ? { ...prev, percent: Math.max(prev.percent, 88), step: 'restart', updating: true }
+            : prev,
+        );
         setSuccess(labels.dockerUpdate.waitingHealth);
         const ok = await waitForApiHealth();
         if (ok) {
           setSuccess(null);
+          await loadProgress();
           onUpdated();
         } else {
           setError(err instanceof Error ? err.message : t.common.failed);
         }
       } else {
         setError(err instanceof Error ? err.message : t.common.failed);
+        await loadProgress();
       }
     } finally {
       setBusyTarget(null);
@@ -393,9 +439,16 @@ function EngineStrip({
           unknownLabel={labels.versionUnknown}
           applyLabel={labels.dockerUpdate.apply}
           applyingLabel={labels.dockerUpdate.applying}
+          percentLabel={labels.dockerUpdate.percent}
+          stepLabels={labels.dockerUpdate.steps}
           showButton={isAdmin}
           busy={busyTarget !== null}
-          applying={busyTarget === 'engine'}
+          applying={busyTarget === 'engine' || Boolean(progress?.updating && progress.target === 'engine')}
+          progress={
+            busyTarget === 'engine' || (progress?.updating && progress.target === 'engine')
+              ? progress
+              : null
+          }
           onApply={() => setConfirmTarget('engine')}
         />
         <VersionUpdateCard
@@ -406,9 +459,16 @@ function EngineStrip({
           unknownLabel={labels.versionUnknown}
           applyLabel={labels.dockerUpdate.apply}
           applyingLabel={labels.dockerUpdate.applying}
+          percentLabel={labels.dockerUpdate.percent}
+          stepLabels={labels.dockerUpdate.steps}
           showButton={isAdmin}
           busy={busyTarget !== null}
-          applying={busyTarget === 'compose'}
+          applying={busyTarget === 'compose' || Boolean(progress?.updating && progress.target === 'compose')}
+          progress={
+            busyTarget === 'compose' || (progress?.updating && progress.target === 'compose')
+              ? progress
+              : null
+          }
           onApply={() => setConfirmTarget('compose')}
         />
       </section>
@@ -439,9 +499,12 @@ function VersionUpdateCard({
   unknownLabel,
   applyLabel,
   applyingLabel,
+  percentLabel,
+  stepLabels,
   showButton,
   busy,
   applying,
+  progress,
   onApply,
 }: {
   label: string;
@@ -451,26 +514,50 @@ function VersionUpdateCard({
   unknownLabel: string;
   applyLabel: string;
   applyingLabel: string;
+  percentLabel: string;
+  stepLabels: Record<string, string>;
   showButton: boolean;
   busy: boolean;
   applying: boolean;
+  progress: {
+    percent: number;
+    step: string;
+    updating?: boolean;
+  } | null;
   onApply: () => void;
 }) {
+  const showProgress = Boolean(applying && (progress || busy));
+  const percent = progress?.percent ?? (showProgress ? 2 : 0);
+  const stepLabel = (progress?.step && stepLabels[progress.step]) || applyingLabel;
+
   return (
-    <div className="dockora-panel flex items-center justify-between gap-3 px-4 py-3">
-      <div className="min-w-0">
-        <p className="text-xs font-medium uppercase tracking-wide text-dockora-muted">{label}</p>
-        <p className="mt-1 truncate font-mono text-base font-semibold">
-          {current ?? unknownLabel}
-          {updateAvailable && latest ? (
-            <span className="text-dockora-warning"> → {latest}</span>
-          ) : null}
-        </p>
+    <div className="dockora-panel flex flex-col gap-2 px-4 py-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs font-medium uppercase tracking-wide text-dockora-muted">{label}</p>
+          <p className="mt-1 truncate font-mono text-base font-semibold">
+            {current ?? unknownLabel}
+            {updateAvailable && latest ? (
+              <span className="text-dockora-warning"> → {latest}</span>
+            ) : null}
+          </p>
+        </div>
+        {showButton && updateAvailable && !showProgress ? (
+          <Button size="sm" variant="primary" disabled={busy} onClick={onApply}>
+            {applyLabel}
+          </Button>
+        ) : null}
       </div>
-      {showButton && updateAvailable ? (
-        <Button size="sm" variant="primary" disabled={busy} onClick={onApply}>
-          {applying ? applyingLabel : applyLabel}
-        </Button>
+      {showProgress ? (
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[11px] uppercase tracking-wide text-dockora-blue">{stepLabel}</p>
+            <span className="font-mono text-[11px] text-dockora-muted">
+              {percentLabel.replace('{percent}', String(Math.round(percent)))}
+            </span>
+          </div>
+          <ProgressBar value={percent} autoTone={false} tone={progress?.step === 'error' ? 'danger' : 'accent'} />
+        </div>
       ) : null}
     </div>
   );

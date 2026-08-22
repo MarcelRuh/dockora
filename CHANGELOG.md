@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [1.7.7] – 2026-08-22
+
+### Added
+
+- Dashboard Engine/Compose update shows a live progress bar with the current step
+
 ## [1.7.6] – 2026-08-22
 
 ### Changed

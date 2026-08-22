@@ -338,6 +338,18 @@ export async function applySelfUpdate(): Promise<{
   return request('/system/self-update', { method: 'POST' });
 }
 
+export async function fetchDockerHostUpdateStatus(): Promise<{
+  updating: boolean;
+  target: 'engine' | 'compose' | null;
+  percent: number;
+  step: string;
+  detail: string | null;
+  message: string | null;
+  ok: boolean | null;
+}> {
+  return request('/system/docker-update');
+}
+
 export async function applyDockerHostUpdate(
   target: 'engine' | 'compose',
 ): Promise<ActionResult> {

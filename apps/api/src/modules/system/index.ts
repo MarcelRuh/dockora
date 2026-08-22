@@ -62,6 +62,10 @@ export const systemModule: FastifyPluginAsync = async (app: FastifyInstance) => 
     },
   );
 
+  app.get(`${API_PREFIX}/system/docker-update`, async () => {
+    return dockerHostUpdates.status();
+  });
+
   app.post<{ Body: { target?: string } }>(
     `${API_PREFIX}/system/docker-update`,
     { ...destructiveRateLimit, preHandler: [app.requireRole('admin')] },

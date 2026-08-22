@@ -86,6 +86,7 @@ export const messages = {
         apply: 'Aktualisieren',
         applying: 'Aktualisiere…',
         waitingHealth: 'Warte auf Docker nach dem Engine-Update…',
+        percent: '{percent} %',
         confirmEngine: 'Docker Engine auf {version} aktualisieren?',
         confirmCompose: 'Docker Compose auf {version} aktualisieren?',
         consequencesEngine: [
@@ -96,6 +97,17 @@ export const messages = {
           'Das Compose-Plugin auf dem Host wird aktualisiert.',
           'Laufende Stacks bleiben in der Regel unberührt.',
         ],
+        steps: {
+          start: 'Starte Update…',
+          aptUpdate: 'Paketliste wird aktualisiert',
+          install: 'Paket wird installiert',
+          download: 'Binary wird geladen',
+          installBinary: 'Binary wird installiert',
+          verify: 'Version wird geprüft',
+          restart: 'Warte auf Docker',
+          done: 'Fertig',
+          error: 'Update fehlgeschlagen',
+        },
       },
       containers: {
         title: 'Container',
@@ -743,6 +755,7 @@ export const messages = {
         apply: 'Update',
         applying: 'Updating…',
         waitingHealth: 'Waiting for Docker after the engine update…',
+        percent: '{percent}%',
         confirmEngine: 'Update Docker Engine to {version}?',
         confirmCompose: 'Update Docker Compose to {version}?',
         consequencesEngine: [
@@ -753,6 +766,17 @@ export const messages = {
           'The Compose plugin on the host is upgraded.',
           'Running stacks are typically left untouched.',
         ],
+        steps: {
+          start: 'Starting update…',
+          aptUpdate: 'Refreshing package lists',
+          install: 'Installing package',
+          download: 'Downloading binary',
+          installBinary: 'Installing binary',
+          verify: 'Checking version',
+          restart: 'Waiting for Docker',
+          done: 'Done',
+          error: 'Update failed',
+        },
       },
       containers: {
         title: 'Containers',
