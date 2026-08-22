@@ -8,6 +8,13 @@ import type Docker from 'dockerode';
 import type { IDockerClient } from '../../domain/ports.js';
 import { apiRepositoryPath, parseImageRef, pickDigest } from '../updates/registry.js';
 import { SELF_UPDATE_APPLY_SCRIPT } from './self-update-apply.sh.js';
+import {
+  mergeProgress,
+  parseProgressFile,
+  parseUpdaterLogs,
+  progressFileName,
+  type SelfUpdateProgress,
+} from './self-update-progress.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -29,6 +36,7 @@ export interface SelfUpdateStatus {
   repo: string | null;
   branch: string | null;
   updating: boolean;
+  progress: SelfUpdateProgress | null;
 }
 
 export interface SelfUpdateApplyResult {
@@ -69,29 +77,33 @@ export class SelfUpdateService {
     const updating = this.applyInFlight || (await this.isUpdaterRunning());
 
     const compose = await this.composeStatus(updating);
-    if (compose.enabled) return compose;
+    if (compose.enabled) return this.withProgress(compose, updating);
 
     const image = await this.imageStatus(updating);
-    if (image.enabled) return image;
+    if (image.enabled) return this.withProgress(image, updating);
 
-    return {
-      enabled: false,
-      mode: 'none',
-      currentVersion: APP_VERSION,
-      sourceVersion: null,
-      localRevision: null,
-      remoteRevision: null,
-      image: null,
-      currentDigest: null,
-      remoteDigest: null,
-      updateAvailable: false,
-      message:
-        'Self-Update nicht verfügbar. Setze DOCKORA_INSTALL_DIR (Compose-Install) oder DOCKORA_SELF_IMAGE.',
-      installDir: this.options.installDirHost,
-      repo: this.options.repo,
-      branch: this.options.branch,
+    return this.withProgress(
+      {
+        enabled: false,
+        mode: 'none',
+        currentVersion: APP_VERSION,
+        sourceVersion: null,
+        localRevision: null,
+        remoteRevision: null,
+        image: null,
+        currentDigest: null,
+        remoteDigest: null,
+        updateAvailable: false,
+        message:
+          'Self-Update nicht verfügbar. Setze DOCKORA_INSTALL_DIR (Compose-Install) oder DOCKORA_SELF_IMAGE.',
+        installDir: this.options.installDirHost,
+        repo: this.options.repo,
+        branch: this.options.branch,
+        updating,
+        progress: null,
+      },
       updating,
-    };
+    );
   }
 
   async apply(): Promise<SelfUpdateApplyResult> {
@@ -133,6 +145,7 @@ export class SelfUpdateService {
       repo: this.options.repo,
       branch: this.options.branch,
       updating,
+      progress: null,
     };
 
     if (!hostDir || !mount) {
@@ -207,6 +220,7 @@ export class SelfUpdateService {
       repo: this.options.repo,
       branch: this.options.branch,
       updating,
+      progress: null,
     };
 
     if (!image) return base;
@@ -436,6 +450,43 @@ export class SelfUpdateService {
         message: error instanceof Error ? error.message : String(error),
       };
     }
+  }
+
+  private async withProgress(
+    status: SelfUpdateStatus,
+    updating: boolean,
+  ): Promise<SelfUpdateStatus> {
+    if (!updating) return { ...status, progress: null };
+    const mount = this.options.installDirMount ?? this.options.installDirHost;
+    return { ...status, progress: await this.readProgress(mount) };
+  }
+
+  private async readProgress(mount: string | null): Promise<SelfUpdateProgress | null> {
+    let fromFile: SelfUpdateProgress | null = null;
+    if (mount) {
+      const file = path.join(mount, progressFileName());
+      try {
+        if (existsSync(file)) {
+          fromFile = parseProgressFile(readFileSync(file, 'utf8'));
+        }
+      } catch {
+        // unreadable while the updater rewrites the file
+      }
+    }
+
+    let fromLogs: SelfUpdateProgress | null = null;
+    try {
+      const logs = await this.docker.getContainerLogs(UPDATER_NAME, {
+        tail: 250,
+        stdout: true,
+        stderr: true,
+      });
+      fromLogs = parseUpdaterLogs(logs);
+    } catch {
+      // updater container not present
+    }
+
+    return mergeProgress(fromFile, fromLogs);
   }
 
   private async isUpdaterRunning(): Promise<boolean> {

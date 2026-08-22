@@ -12,8 +12,54 @@ API_URL="https://api.github.com/repos/${REPO}/commits/${BRANCH}"
 TARBALL_URL="https://github.com/${REPO}/archive/refs/heads/${BRANCH}.tar.gz"
 CLONE_URL="https://github.com/${REPO}.git"
 
+PROGRESS_FILE="${INSTALL_DIR}/.dockora-update-progress"
+
+write_progress() {
+  percent="$1"
+  step="$2"
+  detail="${3:-}"
+  last=0
+  if [ -f "$PROGRESS_FILE" ]; then
+    parsed="$(sed -n 's/^percent=\([0-9][0-9]*\).*/\1/p' "$PROGRESS_FILE" | head -1)"
+    if [ -n "${parsed:-}" ]; then
+      last="$parsed"
+    fi
+  fi
+  if [ "$step" = "error" ]; then
+    if [ "$last" -gt 0 ]; then
+      percent="$last"
+    fi
+  elif [ "$percent" -lt "$last" ]; then
+    percent="$last"
+  fi
+  echo "==> [${percent}%] ${step}${detail:+ – $detail}"
+  printf 'percent=%s\nstep=%s\ndetail=%s\n' "$percent" "$step" "$detail" > "$PROGRESS_FILE"
+}
+
+watch_compose_log() {
+  pid="$1"
+  logf="$2"
+  while kill -0 "$pid" 2>/dev/null; do
+    log="$(tail -c 16000 "$logf" 2>/dev/null || true)"
+    # Highest matching phase first – older lines stay in the tail buffer.
+    case "$log" in
+      *"Container dockora-web"*"Started"*) write_progress 90 startWeb "Web startet" ;;
+      *"Container dockora-api"*"Healthy"*) write_progress 88 startApi "API ist bereit" ;;
+      *"Container dockora-api"*"Started"*) write_progress 84 startApi "API startet" ;;
+      *"Image dockora-web Built"*) write_progress 80 buildWeb "Web-Image fertig" ;;
+      *"Image dockora-api Built"*) write_progress 76 buildApi "API-Image fertig" ;;
+      *"exporting to image"*) write_progress 72 export "Images werden exportiert" ;;
+      *"Compiled successfully"*) write_progress 64 buildWeb "Web-Build kompiliert" ;;
+      *"dockora-web Building"*|*" Building web"*) write_progress 52 buildWeb "Web-Image wird gebaut" ;;
+      *"dockora-api Building"*|*" Building api"*) write_progress 38 buildApi "API-Image wird gebaut" ;;
+    esac
+    sleep 1
+  done
+}
+
 echo "==> Dockora self-update"
 echo "    dir=${INSTALL_DIR} repo=${REPO} branch=${BRANCH} skip_compose=${SKIP_COMPOSE}"
+write_progress 4 start "Update gestartet"
 
 if [ ! -f "${INSTALL_DIR}/docker-compose.yml" ]; then
   echo "ERROR: docker-compose.yml missing in ${INSTALL_DIR}" >&2
@@ -111,6 +157,7 @@ sync_via_tarball() {
     --exclude='./.env' \
     --exclude='./data' \
     --exclude='./.dockora-revision' \
+    --exclude='./.dockora-update-progress' \
     --exclude='./.git' \
     --exclude='./node_modules' \
     --exclude='./apps/api/node_modules' \
@@ -123,37 +170,59 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
 echo "==> Resolving remote revision"
+write_progress 8 resolve "Remote-Revision wird gelesen"
 ensure_git || true
 SHA="$(resolve_sha)"
 echo "    remote=$SHA"
+write_progress 12 resolve "Remote-Revision ermittelt"
 
 if [ -d "${INSTALL_DIR}/.git" ] && ensure_git && sync_via_git; then
   echo "==> Git sync complete"
   SHA="$(git -C "$INSTALL_DIR" rev-parse HEAD)"
+  write_progress 22 sync "Quellcode synchronisiert"
 else
+  write_progress 16 sync "Quellcode wird geladen"
   sync_via_tarball
+  write_progress 22 sync "Quellcode synchronisiert"
 fi
 
 if [ "$SKIP_COMPOSE" = "1" ]; then
   printf '%s\n' "$SHA" > "${INSTALL_DIR}/.dockora-revision"
   echo "    wrote .dockora-revision"
   echo "==> Skip compose rebuild (host/dev mode)"
+  write_progress 100 done "Dateien aktualisiert"
   echo "==> Done. Restart API/Web if they do not hot-reload."
   exit 0
 fi
 
 echo "==> Rebuilding stack (docker compose up -d --build)"
+write_progress 28 build "Stack-Rebuild startet"
 cd "$INSTALL_DIR"
 PROFILES=""
 if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx 'dockora-proxy'; then
   PROFILES="--profile proxy"
 fi
 # shellcheck disable=SC2086
-docker compose $PROFILES up -d --build --remove-orphans
+docker compose $PROFILES up -d --build --remove-orphans > "$TMP/compose.log" 2>&1 &
+CPID=$!
+watch_compose_log "$CPID" "$TMP/compose.log" &
+WATCH=$!
+set +e
+wait "$CPID"
+COMPOSE_RC=$?
+set -e
+kill "$WATCH" 2>/dev/null || true
+wait "$WATCH" 2>/dev/null || true
+cat "$TMP/compose.log" || true
+if [ "$COMPOSE_RC" -ne 0 ]; then
+  write_progress 0 error "Compose-Rebuild fehlgeschlagen"
+  exit "$COMPOSE_RC"
+fi
 
 # Nginx resolves upstream IPs at start; force-recreate so a stale web/api IP cannot 502
 if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -qx 'dockora-proxy'; then
   echo "==> Refreshing proxy (pick up new api/web IPs + nginx.conf)"
+  write_progress 93 proxy "Proxy wird aktualisiert"
   # shellcheck disable=SC2086
   docker compose $PROFILES up -d --force-recreate --no-deps proxy
 fi
@@ -161,10 +230,13 @@ fi
 # Only mark deployed after a successful rebuild
 printf '%s\n' "$SHA" > "${INSTALL_DIR}/.dockora-revision"
 echo "    wrote .dockora-revision"
+write_progress 95 finalize "Revision gespeichert"
 
 echo "==> Pruning Docker build cache"
+write_progress 97 finalize "Build-Cache wird bereinigt"
 docker builder prune -af || true
 echo "==> Pruning dangling images"
 docker image prune -f || true
 
+write_progress 100 done "Update abgeschlossen"
 echo "==> Done. Dockora should come back shortly."

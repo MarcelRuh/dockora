@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [1.5.4] – 2026-08-22
+
+### Added
+
+- Self-update shows a live progress bar (sync, image build, container start) while the stack rebuilds
+
 ## [1.5.3.5] – 2026-08-22
 
 ### Fixed

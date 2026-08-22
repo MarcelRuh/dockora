@@ -315,6 +315,7 @@ export async function fetchSelfUpdateStatus(): Promise<{
   repo: string | null;
   branch: string | null;
   updating: boolean;
+  progress: { percent: number; step: string; detail: string | null } | null;
 }> {
   return request('/system/self-update');
 }

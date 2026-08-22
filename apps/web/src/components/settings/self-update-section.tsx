@@ -1,13 +1,15 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { applySelfUpdate, fetchSelfUpdateStatus } from '@/lib/api';
 import { useLocale } from '@/i18n/locale-provider';
 import { Button } from '@/components/ui/form-controls';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ErrorBanner, Section, SuccessBanner } from '@/components/ui/page-parts';
+import { ProgressBar } from '@/components/ui/progress-bar';
 
 type SelfStatus = Awaited<ReturnType<typeof fetchSelfUpdateStatus>>;
+type SelfProgress = NonNullable<SelfStatus['progress']>;
 
 function shortRev(value: string | null | undefined): string {
   if (!value) return '—';
@@ -31,19 +33,29 @@ async function waitForApiHealth(timeoutMs = 180_000): Promise<boolean> {
 export function SelfUpdateSection() {
   const { t } = useLocale();
   const [status, setStatus] = useState<SelfStatus | null>(null);
+  const [progress, setProgress] = useState<SelfProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const statusRef = useRef<SelfStatus | null>(null);
+  statusRef.current = status;
+
+  const applyProgress = (next: SelfStatus) => {
+    setStatus(next);
+    if (next.progress) setProgress(next.progress);
+    else if (!next.updating) setProgress(null);
+  };
 
   const load = useCallback(async () => {
     try {
-      setStatus(await fetchSelfUpdateStatus());
+      applyProgress(await fetchSelfUpdateStatus());
       setError(null);
     } catch (err) {
+      if (busy || statusRef.current?.updating) return;
       setError(err instanceof Error ? err.message : t.common.failed);
     }
-  }, [t.common.failed]);
+  }, [busy, t.common.failed]);
 
   useEffect(() => {
     void load();
@@ -52,7 +64,7 @@ export function SelfUpdateSection() {
   // Poll while an updater container is running (even after page reload).
   useEffect(() => {
     if (!status?.updating && !busy) return;
-    const timer = window.setInterval(() => void load(), 3000);
+    const timer = window.setInterval(() => void load(), 1500);
     return () => window.clearInterval(timer);
   }, [status?.updating, busy, load]);
 
@@ -60,6 +72,7 @@ export function SelfUpdateSection() {
     setBusy(true);
     setError(null);
     setSuccess(null);
+    setProgress({ percent: 2, step: 'start', detail: null });
     try {
       const result = await applySelfUpdate();
       setSuccess(result.message);
@@ -67,13 +80,16 @@ export function SelfUpdateSection() {
 
       if (result.mode === 'compose' && result.ok) {
         setSuccess(`${result.message}\n${t.settings.selfUpdate.waitingHealth}`);
-        // Wait until updater finishes, then until API is healthy again.
         const deadline = Date.now() + 20 * 60 * 1000;
         while (Date.now() < deadline) {
-          await new Promise((r) => setTimeout(r, 3000));
-          const next = await fetchSelfUpdateStatus();
-          setStatus(next);
-          if (!next.updating) break;
+          await new Promise((r) => setTimeout(r, 1500));
+          try {
+            const next = await fetchSelfUpdateStatus();
+            applyProgress(next);
+            if (!next.updating) break;
+          } catch {
+            // API down during recreate
+          }
         }
         const ok = await waitForApiHealth(180_000);
         if (ok) {
@@ -99,6 +115,12 @@ export function SelfUpdateSection() {
         ? t.settings.selfUpdate.modeImage
         : t.settings.selfUpdate.modeNone;
 
+  const showProgress = Boolean(busy || status?.updating || (progress && progress.step === 'error'));
+  const stepLabels = t.settings.selfUpdate.steps as Record<string, string>;
+  const stepLabel =
+    (progress?.step && stepLabels[progress.step]) || t.settings.selfUpdate.applying;
+  const percent = progress?.percent ?? (showProgress ? 2 : 0);
+
   return (
     <Section title={t.settings.selfUpdate.title}>
       <p className="mb-3 text-sm text-dockora-muted">{t.settings.selfUpdate.hint}</p>
@@ -110,16 +132,16 @@ export function SelfUpdateSection() {
             <span className="text-dockora-muted">{t.settings.selfUpdate.mode}: </span>
             <span className="font-medium">{modeLabel}</span>
           </p>
-              <p>
-                <span className="text-dockora-muted">{t.settings.selfUpdate.version}: </span>
-                <span className="font-mono">{status.currentVersion}</span>
-                {status.sourceVersion && status.sourceVersion !== status.currentVersion ? (
-                  <span className="text-dockora-muted">
-                    {' '}
-                    → {status.sourceVersion}
-                  </span>
-                ) : null}
-              </p>
+          <p>
+            <span className="text-dockora-muted">{t.settings.selfUpdate.version}: </span>
+            <span className="font-mono">{status.currentVersion}</span>
+            {status.sourceVersion && status.sourceVersion !== status.currentVersion ? (
+              <span className="text-dockora-muted">
+                {' '}
+                → {status.sourceVersion}
+              </span>
+            ) : null}
+          </p>
           {status.mode === 'compose' ? (
             <>
               <p>
@@ -148,6 +170,23 @@ export function SelfUpdateSection() {
             </p>
           )}
           <p className="text-dockora-muted whitespace-pre-wrap">{status.message}</p>
+          {showProgress ? (
+            <div className="space-y-2 pt-2">
+              <div className="flex items-center justify-between gap-3">
+                <p className="font-display text-[11px] uppercase tracking-wider text-dockora-blue">
+                  {stepLabel}
+                </p>
+                <span className="font-mono text-xs text-dockora-muted">
+                  {t.settings.selfUpdate.percent.replace('{percent}', String(Math.round(percent)))}
+                </span>
+              </div>
+              <ProgressBar
+                value={percent}
+                autoTone={false}
+                tone={progress?.step === 'error' ? 'danger' : 'accent'}
+              />
+            </div>
+          ) : null}
           <div className="flex flex-wrap gap-2 pt-2">
             <Button disabled={busy} onClick={() => void load()}>
               {t.common.refresh}
