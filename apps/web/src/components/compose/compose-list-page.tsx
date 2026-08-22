@@ -47,6 +47,8 @@ const DEFAULT_YAML = `services:
     ports:
       - "18080:80"
     restart: unless-stopped
+    labels:
+      - icon=https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/nginx.png
 `;
 
 type CreateStep = 'validate' | 'write' | 'start' | 'done';

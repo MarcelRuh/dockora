@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [1.6.1] – 2026-08-22
+
+### Changed
+
+- Compose service icons use the `icon=` label (`- icon=https://…`); Arcane/Unraid/Homarr keys remain as fallbacks
+
 ## [1.6.0] – 2026-08-22
 
 ### Added

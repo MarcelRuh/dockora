@@ -1,16 +1,15 @@
-/** Known Docker label keys used by Portainer/Arcane/Unraid/Homarr-style stacks. */
+/** Canonical Dockora icon label, then vendor fallbacks (Arcane/Unraid/Homarr). */
 const ICON_LABEL_KEYS = [
-  'com.getarcaneapp.arcane.icon',
+  'icon',
   'dockora.icon',
+  'com.getarcaneapp.arcane.icon',
   'net.unraid.docker.icon',
   'org.homarr.icon',
   'homepage.icon',
-  'icon',
 ] as const;
 
 /**
- * Resolves a http(s) icon URL from container labels (e.g. Compose
- * `com.getarcaneapp.arcane.icon=https://…/seerr.png`).
+ * Resolves a http(s) icon URL from container labels (e.g. Compose `icon=https://…/seerr.png`).
  */
 export function resolveContainerIconUrl(
   labels: Record<string, string> | null | undefined,
