@@ -173,17 +173,21 @@ export async function fetchGithubCommitSha(repo: string, branch: string): Promis
   throw new Error(errors[0] ? `Remote-Revision unbekannt (${errors.join('; ')})` : 'Remote-Revision unbekannt');
 }
 
-/** package.json version on a public GitHub branch (raw.githubusercontent, not REST API). */
-export async function fetchGithubPackageVersion(repo: string, branch: string): Promise<string | null> {
-  const key = `${repo}@${branch}`;
+/** package.json version for a public GitHub ref (branch or commit SHA). */
+export async function fetchGithubPackageVersion(repo: string, ref: string): Promise<string | null> {
+  const key = `${repo}@${ref}`;
   const now = Date.now();
   if (versionCache && versionCache.key === key && now - versionCache.at < CACHE_MS) {
     return versionCache.version;
   }
 
   const { status, text } = await readBody(
-    `https://raw.githubusercontent.com/${repo}/${encodeURIComponent(branch)}/package.json`,
-    { Accept: 'application/json', 'User-Agent': 'dockora-self-update' },
+    `https://raw.githubusercontent.com/${repo}/${encodeURIComponent(ref)}/package.json`,
+    {
+      Accept: 'application/json',
+      'User-Agent': 'dockora-self-update',
+      'Cache-Control': 'no-cache',
+    },
   );
   if (status >= 400) {
     throw new Error(`GitHub package.json ${status}`);
@@ -198,18 +202,22 @@ let changelogCache: { key: string; text: string; at: number } | null = null;
 
 export async function fetchGithubChangelog(
   repo: string,
-  branch: string,
+  ref: string,
   currentVersion: string,
 ): Promise<string | null> {
-  const key = `${repo}@${branch}@${currentVersion}`;
+  const key = `${repo}@${ref}@${currentVersion}`;
   const now = Date.now();
   if (changelogCache && changelogCache.key === key && now - changelogCache.at < CACHE_MS) {
     return changelogCache.text || null;
   }
 
   const { status, text } = await readBody(
-    `https://raw.githubusercontent.com/${repo}/${encodeURIComponent(branch)}/CHANGELOG.md`,
-    { Accept: 'text/plain', 'User-Agent': 'dockora-self-update' },
+    `https://raw.githubusercontent.com/${repo}/${encodeURIComponent(ref)}/CHANGELOG.md`,
+    {
+      Accept: 'text/plain',
+      'User-Agent': 'dockora-self-update',
+      'Cache-Control': 'no-cache',
+    },
   );
   if (status >= 400) {
     throw new Error(`GitHub changelog ${status}`);

@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [1.7.1] – 2026-08-22
+
+### Fixed
+
+- Self-update no longer shows a reverse version arrow (`1.7.0 → 1.6.2`) when GitHub’s branch `package.json` is cached stale; versions are compared and `package.json`/changelog are read at the commit SHA
+
 ## [1.7.0] – 2026-08-22
 
 ### Added

@@ -135,11 +135,9 @@ export function SelfUpdateSection() {
           <p>
             <span className="text-dockora-muted">{t.settings.selfUpdate.version}: </span>
             <span className="font-mono">{status.currentVersion}</span>
-            {(() => {
-              const latest = status.remoteVersion ?? status.sourceVersion;
-              if (!latest || latest === status.currentVersion) return null;
-              return <span className="text-dockora-muted"> → {latest}</span>;
-            })()}
+            {status.targetVersion ? (
+              <span className="text-dockora-muted"> → {status.targetVersion}</span>
+            ) : null}
           </p>
           {status.mode === 'compose' ? (
             <>

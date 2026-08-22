@@ -3,6 +3,8 @@ import {
   revisionsMatch,
   readLocalRevision,
   isSelfUpdateAvailable,
+  compareDockoraVersions,
+  selfUpdateTargetVersion,
 } from './self-update.service.js';
 import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
@@ -91,6 +93,18 @@ describe('isSelfUpdateAvailable', () => {
     ).toBe(true);
   });
 
+  it('is false when GitHub version is stale/older than running', () => {
+    expect(
+      isSelfUpdateAvailable({
+        deployedRevision: 'aaaaaaaaaaaaaaaa',
+        remoteRevision: 'aaaaaaaaaaaaaaaa',
+        runningVersion: '1.7.0',
+        sourceVersion: '1.7.0',
+        remoteVersion: '1.6.2',
+      }),
+    ).toBe(false);
+  });
+
   it('is false when deployed SHA and running version match remote/source', () => {
     expect(
       isSelfUpdateAvailable({
@@ -100,5 +114,19 @@ describe('isSelfUpdateAvailable', () => {
         sourceVersion: '1.5.3.2',
       }),
     ).toBe(false);
+  });
+});
+
+describe('compareDockoraVersions / selfUpdateTargetVersion', () => {
+  it('orders dotted versions including extra segments', () => {
+    expect(compareDockoraVersions('1.7.0', '1.6.2')).toBe(1);
+    expect(compareDockoraVersions('1.6.2', '1.7.0')).toBe(-1);
+    expect(compareDockoraVersions('1.5.3.2', '1.5.3.1')).toBe(1);
+    expect(compareDockoraVersions('1.7.0', '1.7.0')).toBe(0);
+  });
+
+  it('only returns a target when it is newer than running', () => {
+    expect(selfUpdateTargetVersion('1.7.0', '1.6.2', '1.7.0')).toBeNull();
+    expect(selfUpdateTargetVersion('1.6.2', '1.6.2', '1.7.0')).toBe('1.7.0');
   });
 });

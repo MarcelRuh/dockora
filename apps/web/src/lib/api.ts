@@ -325,6 +325,7 @@ export async function fetchSelfUpdateStatus(): Promise<{
   updating: boolean;
   progress: { percent: number; step: string; detail: string | null } | null;
   changelog: string | null;
+  targetVersion: string | null;
 }> {
   return request('/system/self-update');
 }

@@ -40,6 +40,8 @@ export interface SelfUpdateStatus {
   updating: boolean;
   progress: SelfUpdateProgress | null;
   changelog: string | null;
+  /** Newer-than-running version to show as `current → target`; null if none. */
+  targetVersion: string | null;
 }
 
 export interface SelfUpdateApplyResult {
@@ -106,6 +108,7 @@ export class SelfUpdateService {
         updating,
         progress: null,
         changelog: null,
+        targetVersion: null,
       },
       updating,
     );
@@ -153,6 +156,7 @@ export class SelfUpdateService {
       updating,
       progress: null,
       changelog: null,
+      targetVersion: null,
     };
 
     if (!hostDir || !mount) {
@@ -168,17 +172,28 @@ export class SelfUpdateService {
     }
 
     const localRevision = readLocalRevision(mount, this.options.gitSha);
-    const [shaResult, versionResult] = await Promise.allSettled([
-      fetchGithubCommitSha(this.options.repo, this.options.branch),
-      fetchGithubPackageVersion(this.options.repo, this.options.branch),
-    ]);
-    const remoteRevision = shaResult.status === 'fulfilled' ? shaResult.value : null;
-    const remoteVersion = versionResult.status === 'fulfilled' ? versionResult.value : null;
-    const shaError = shaResult.status === 'rejected' ? shaResult.reason : null;
+    let remoteRevision: string | null = null;
+    let shaError: unknown = null;
+    try {
+      remoteRevision = await fetchGithubCommitSha(this.options.repo, this.options.branch);
+    } catch (error) {
+      shaError = error;
+    }
+
+    let remoteVersion: string | null = null;
+    try {
+      remoteVersion = await fetchGithubPackageVersion(
+        this.options.repo,
+        remoteRevision ?? this.options.branch,
+      );
+    } catch {
+      remoteVersion = null;
+    }
+
+    const targetVersion = selfUpdateTargetVersion(APP_VERSION, remoteVersion, sourceVersion);
 
     if (!remoteRevision && shaError) {
-      const latest = remoteVersion ?? sourceVersion;
-      const versionDrift = Boolean(latest && latest !== APP_VERSION);
+      const versionDrift = Boolean(targetVersion);
       const reason = shaError instanceof Error ? shaError.message : String(shaError);
       return {
         ...base,
@@ -187,9 +202,10 @@ export class SelfUpdateService {
         localRevision,
         remoteRevision: null,
         updateAvailable: versionDrift,
-        changelog: await this.maybeChangelog(versionDrift),
+        targetVersion,
+        changelog: await this.maybeChangelog(versionDrift, remoteRevision),
         message: versionDrift
-          ? `GitHub-Check fehlgeschlagen (${reason}). Laufende Version ${APP_VERSION} ≠ ${latest} – Rebuild möglich.`
+          ? `GitHub-Check fehlgeschlagen (${reason}). Laufende Version ${APP_VERSION} ≠ ${targetVersion} – Rebuild möglich.`
           : `GitHub-Check fehlgeschlagen: ${reason}`,
       };
     }
@@ -201,7 +217,6 @@ export class SelfUpdateService {
       sourceVersion,
       remoteVersion,
     });
-    const latest = remoteVersion ?? sourceVersion;
 
     return {
       ...base,
@@ -210,21 +225,29 @@ export class SelfUpdateService {
       localRevision,
       remoteRevision,
       updateAvailable,
-      changelog: await this.maybeChangelog(updateAvailable),
+      targetVersion,
+      changelog: await this.maybeChangelog(updateAvailable, remoteRevision),
       message: updating
         ? 'Update läuft…'
         : updateAvailable
-          ? latest && latest !== APP_VERSION
-            ? `Update verfügbar – ${APP_VERSION} → ${latest}`
+          ? targetVersion
+            ? `Update verfügbar – ${APP_VERSION} → ${targetVersion}`
             : 'Update verfügbar – Source von GitHub holen und anwenden'
           : 'Up to date',
     };
   }
 
-  private async maybeChangelog(updateAvailable: boolean): Promise<string | null> {
+  private async maybeChangelog(
+    updateAvailable: boolean,
+    ref: string | null,
+  ): Promise<string | null> {
     if (!updateAvailable) return null;
     try {
-      return await fetchGithubChangelog(this.options.repo, this.options.branch, APP_VERSION);
+      return await fetchGithubChangelog(
+        this.options.repo,
+        ref ?? this.options.branch,
+        APP_VERSION,
+      );
     } catch {
       return null;
     }
@@ -251,6 +274,7 @@ export class SelfUpdateService {
       updating,
       progress: null,
       changelog: null,
+      targetVersion: null,
     };
 
     if (!image) return base;
@@ -580,6 +604,39 @@ export function readSourceVersion(mountDir: string): string | null {
   }
 }
 
+export function compareDockoraVersions(a: string, b: string): number {
+  const pa = a
+    .trim()
+    .replace(/^v/i, '')
+    .split(/[.-]/)
+    .map((p) => Number.parseInt(p, 10) || 0);
+  const pb = b
+    .trim()
+    .replace(/^v/i, '')
+    .split(/[.-]/)
+    .map((p) => Number.parseInt(p, 10) || 0);
+  const n = Math.max(pa.length, pb.length);
+  for (let i = 0; i < n; i++) {
+    const da = pa[i] ?? 0;
+    const db = pb[i] ?? 0;
+    if (da !== db) return da < db ? -1 : 1;
+  }
+  return 0;
+}
+
+export function selfUpdateTargetVersion(
+  running: string,
+  ...candidates: Array<string | null | undefined>
+): string | null {
+  let newest: string | null = null;
+  for (const version of candidates) {
+    if (!version?.trim()) continue;
+    if (!newest || compareDockoraVersions(version, newest) > 0) newest = version.trim();
+  }
+  if (!newest || compareDockoraVersions(newest, running) <= 0) return null;
+  return newest;
+}
+
 export function isSelfUpdateAvailable(opts: {
   deployedRevision: string | null;
   remoteRevision: string | null;
@@ -593,13 +650,9 @@ export function isSelfUpdateAvailable(opts: {
   ) {
     return true;
   }
-  if (opts.sourceVersion && opts.sourceVersion !== opts.runningVersion) {
-    return true;
-  }
-  if (opts.remoteVersion && opts.remoteVersion !== opts.runningVersion) {
-    return true;
-  }
-  return false;
+  return Boolean(
+    selfUpdateTargetVersion(opts.runningVersion, opts.sourceVersion, opts.remoteVersion),
+  );
 }
 
 export function revisionsMatch(local: string, remote: string): boolean {
