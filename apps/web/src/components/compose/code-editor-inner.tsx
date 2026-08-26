@@ -8,7 +8,6 @@ import { EditorView, keymap } from '@codemirror/view';
 import { Prec } from '@codemirror/state';
 import { tags as t } from '@lezer/highlight';
 import { indentationMarkers } from '@replit/codemirror-indentation-markers';
-import { useTheme } from '@/components/theme-provider';
 import { Button } from '@/components/ui/form-controls';
 import { cn } from '@/lib/utils';
 import { dotenvLanguage } from '@/lib/dotenv-language';
@@ -16,7 +15,7 @@ import { formatComposeYaml, formatEnvFile } from '@/lib/format-yaml';
 
 export type CodeEditorLanguage = 'yaml' | 'env';
 
-const darkHighlight = HighlightStyle.define([
+const yamlHighlight = HighlightStyle.define([
   { tag: t.comment, color: '#8888aa', fontStyle: 'italic' },
   { tag: t.lineComment, color: '#8888aa', fontStyle: 'italic' },
   { tag: [t.propertyName, t.attributeName, t.definition(t.propertyName)], color: '#ff006e' },
@@ -32,72 +31,54 @@ const darkHighlight = HighlightStyle.define([
   { tag: t.labelName, color: '#ff006e' },
 ]);
 
-const lightHighlight = HighlightStyle.define([
-  { tag: t.comment, color: '#5c6278', fontStyle: 'italic' },
-  { tag: t.lineComment, color: '#5c6278', fontStyle: 'italic' },
-  { tag: [t.propertyName, t.attributeName, t.definition(t.propertyName)], color: '#c4005a' },
-  { tag: t.string, color: '#0077a0' },
-  { tag: t.number, color: '#b89000' },
-  { tag: [t.bool, t.null, t.keyword], color: '#0a9f78' },
-  { tag: t.atom, color: '#6b28c4' },
-  { tag: [t.separator, t.punctuation], color: '#8a90a8' },
-  { tag: t.operator, color: '#6b28c4' },
-  { tag: t.invalid, color: '#d44500', textDecoration: 'underline' },
-  { tag: t.meta, color: '#6b28c4' },
-  { tag: t.variableName, color: '#0077a0' },
-  { tag: t.labelName, color: '#c4005a' },
-]);
-
-function editorTheme(dark: boolean) {
-  return EditorView.theme(
-    {
-      '&': {
-        backgroundColor: 'transparent',
-        color: 'var(--dockora-text)',
-        fontSize: '13px',
-        fontFamily: 'var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace',
-      },
-      '.cm-content': {
-        caretColor: 'var(--dockora-pink)',
-        fontFamily: 'var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace',
-      },
-      '.cm-cursor, .cm-dropCursor': {
-        borderLeftColor: 'var(--dockora-pink)',
-      },
-      '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection': {
-        backgroundColor: dark ? 'rgba(255, 0, 110, 0.28)' : 'rgba(196, 0, 90, 0.18)',
-      },
-      '.cm-activeLine': {
-        backgroundColor: dark ? 'rgba(131, 56, 236, 0.08)' : 'rgba(131, 56, 236, 0.06)',
-      },
-      '.cm-activeLineGutter': {
-        backgroundColor: dark ? 'rgba(131, 56, 236, 0.12)' : 'rgba(131, 56, 236, 0.08)',
-      },
-      '.cm-gutters': {
-        backgroundColor: dark ? 'rgba(10, 10, 15, 0.65)' : 'rgba(232, 234, 244, 0.9)',
-        color: 'var(--dockora-muted)',
-        borderRight: '1px solid var(--dockora-border)',
-      },
-      '.cm-lineNumbers .cm-gutterElement': {
-        minWidth: '2.4rem',
-        padding: '0 0.5rem',
-      },
-      '.cm-foldPlaceholder': {
-        backgroundColor: 'transparent',
-        border: '1px solid var(--dockora-border)',
-        color: 'var(--dockora-muted)',
-      },
-      '.cm-matchingBracket': {
-        outline: '1px solid var(--dockora-blue)',
-        backgroundColor: dark ? 'rgba(0, 180, 216, 0.12)' : 'rgba(0, 119, 160, 0.1)',
-      },
-      '.cm-placeholder': {
-        color: 'var(--dockora-muted)',
-      },
+const editorTheme = EditorView.theme(
+  {
+    '&': {
+      backgroundColor: 'transparent',
+      color: 'var(--dockora-text)',
+      fontSize: '13px',
+      fontFamily: 'var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace',
     },
-    { dark },
-  );
-}
+    '.cm-content': {
+      caretColor: 'var(--dockora-pink)',
+      fontFamily: 'var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace',
+    },
+    '.cm-cursor, .cm-dropCursor': {
+      borderLeftColor: 'var(--dockora-pink)',
+    },
+    '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection': {
+      backgroundColor: 'rgba(255, 0, 110, 0.28)',
+    },
+    '.cm-activeLine': {
+      backgroundColor: 'rgba(131, 56, 236, 0.08)',
+    },
+    '.cm-activeLineGutter': {
+      backgroundColor: 'rgba(131, 56, 236, 0.12)',
+    },
+    '.cm-gutters': {
+      backgroundColor: 'rgba(10, 10, 15, 0.65)',
+      color: 'var(--dockora-muted)',
+      borderRight: '1px solid var(--dockora-border)',
+    },
+    '.cm-lineNumbers .cm-gutterElement': {
+      minWidth: '2.4rem',
+      padding: '0 0.5rem',
+    },
+    '.cm-foldPlaceholder': {
+      backgroundColor: 'transparent',
+      border: '1px solid var(--dockora-border)',
+      color: 'var(--dockora-muted)',
+    },
+    '.cm-matchingBracket': {
+      outline: '1px solid var(--dockora-blue)',
+      backgroundColor: 'rgba(0, 180, 216, 0.12)',
+    },
+    '.cm-placeholder': {
+      color: 'var(--dockora-muted)',
+    },
+  },
+  { dark: true },
+);
 
 export function CodeEditorInner({
   value,
@@ -120,8 +101,6 @@ export function CodeEditorInner({
   formatFailed: string;
   leading?: ReactNode;
 }) {
-  const { theme } = useTheme();
-  const dark = theme === 'dark';
   const [formatError, setFormatError] = useState<string | null>(null);
   const valueRef = useRef(value);
   valueRef.current = value;
@@ -144,8 +123,8 @@ export function CodeEditorInner({
     () => [
       language === 'yaml' ? yaml() : new LanguageSupport(dotenvLanguage),
       indentUnit.of('  '),
-      editorTheme(dark),
-      syntaxHighlighting(dark ? darkHighlight : lightHighlight),
+      editorTheme,
+      syntaxHighlighting(yamlHighlight),
       indentationMarkers({
         highlightActiveBlock: true,
         hideFirstIndent: true,
@@ -155,7 +134,7 @@ export function CodeEditorInner({
           dark: 'rgba(131, 56, 236, 0.38)',
           light: 'rgba(131, 56, 236, 0.28)',
           activeDark: '#ff006e',
-          activeLight: '#c4005a',
+          activeLight: '#ff006e',
         },
       }),
       Prec.high(
@@ -171,7 +150,7 @@ export function CodeEditorInner({
         ]),
       ),
     ],
-    [applyFormat, dark, language],
+    [applyFormat, language],
   );
 
   return (

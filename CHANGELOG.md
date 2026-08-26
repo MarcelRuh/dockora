@@ -5,6 +5,16 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [1.8.1] – 2026-08-26
+
+### Changed
+
+- UI is dark-only: light theme, theme toggle, and settings theme field are removed
+
+### Fixed
+
+- Compose YAML formatter pretty-prints the whole document as block style (flow maps/lists included)
+
 ## [1.8.0] – 2026-08-22
 
 ### Added

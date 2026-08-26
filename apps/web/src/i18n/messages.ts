@@ -625,7 +625,6 @@ export const messages = {
         discordEnabled: 'Discord aktiv',
         discordEvents: 'Discord-Events',
         locale: 'Sprache',
-        theme: 'Theme',
         timezone: 'Zeitzone',
         updateCheckIntervalMinutes: 'Update-Intervall (Min.)',
         autoUpdateImages: 'Auto-Update Images',
@@ -700,11 +699,6 @@ export const messages = {
         stateOff: 'Deaktiviert',
         loaded: 'geladen',
       },
-    },
-    theme: {
-      dark: 'Dunkel',
-      light: 'Hell',
-      toggle: 'Theme umschalten',
     },
     locale: {
       label: 'Sprache',
@@ -1334,7 +1328,6 @@ export const messages = {
         discordEnabled: 'Discord enabled',
         discordEvents: 'Discord events',
         locale: 'Locale',
-        theme: 'Theme',
         timezone: 'Timezone',
         updateCheckIntervalMinutes: 'Update interval (min)',
         autoUpdateImages: 'Auto-update images',
@@ -1409,11 +1402,6 @@ export const messages = {
         stateOff: 'Disabled',
         loaded: 'loaded',
       },
-    },
-    theme: {
-      dark: 'Dark',
-      light: 'Light',
-      toggle: 'Toggle theme',
     },
     locale: {
       label: 'Language',

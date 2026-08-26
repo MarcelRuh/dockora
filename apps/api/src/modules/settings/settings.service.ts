@@ -14,7 +14,6 @@ const DEFAULTS: AppSettings = {
     'backup.completed',
   ],
   locale: 'de',
-  theme: 'dark',
   timezone: 'Europe/Berlin',
   updateCheckIntervalMinutes: 120,
   autoUpdateImages: false,
@@ -77,7 +76,6 @@ export class SettingsService {
         ? safeJson<NotificationEvent[]>(stored.discordEvents, base.discordEvents)
         : base.discordEvents,
       locale: (stored.locale as AppSettings['locale']) ?? base.locale,
-      theme: (stored.theme as AppSettings['theme']) ?? base.theme,
       timezone: stored.timezone ?? base.timezone,
       updateCheckIntervalMinutes: num(
         stored.updateCheckIntervalMinutes,

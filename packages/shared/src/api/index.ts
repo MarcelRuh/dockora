@@ -231,7 +231,6 @@ export interface AppSettings {
   discordEnabled: boolean;
   discordEvents: NotificationEvent[];
   locale: 'de' | 'en';
-  theme: 'dark' | 'light' | 'system';
   timezone: string;
   updateCheckIntervalMinutes: number;
   autoUpdateImages: boolean;

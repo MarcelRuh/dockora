@@ -30,30 +30,6 @@
   --dockora-rail-border: rgba(131, 56, 236, 0.2);
 }
 
-.light {
-  --dockora-bg: #f4f5fb;
-  --dockora-surface: #ffffff;
-  --dockora-surface-2: #e8eaf4;
-  --dockora-border: rgba(131, 56, 236, 0.22);
-  --dockora-text: #12121a;
-  --dockora-muted: #5c6278;
-  --dockora-accent: #c4005a;
-  --dockora-accent-soft: rgba(196, 0, 90, 0.1);
-  --dockora-accent-fg: #ffffff;
-  --dockora-blue: #0077a0;
-  --dockora-purple: #6b28c4;
-  --dockora-pink: #c4005a;
-  --dockora-success: #0a9f78;
-  --dockora-warning: #b89000;
-  --dockora-danger: #d44500;
-  --dockora-glow-cyan: 0 0 0 transparent;
-  --dockora-glow-pink: 0 0 0 transparent;
-  --dockora-rail: #0d0d15;
-  --dockora-rail-text: #ffffff;
-  --dockora-rail-muted: #a0a0b0;
-  --dockora-rail-border: rgba(131, 56, 236, 0.2);
-}
-
 html,
 body {
   min-height: 100%;
@@ -323,17 +299,8 @@ body {
   box-sizing: border-box;
 }
 
-.light .dockora-field {
-  background-color: #ffffff;
-  color-scheme: light;
-}
-
 .dockora-field::placeholder {
   color: #555577;
-}
-
-.light .dockora-field::placeholder {
-  color: #8a90a8;
 }
 
 .dockora-field:hover {
@@ -460,10 +427,6 @@ body {
   transition:
     border-color 0.15s ease,
     box-shadow 0.15s ease;
-}
-
-.light .dockora-code-editor {
-  background-color: #ffffff;
 }
 
 .dockora-code-editor:hover {

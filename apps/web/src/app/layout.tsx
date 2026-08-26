@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { Inter, Orbitron, JetBrains_Mono } from 'next/font/google';
-import { ThemeProvider } from '@/components/theme-provider';
+import { DarkTheme } from '@/components/dark-theme';
 import { AuthProvider } from '@/components/auth/auth-provider';
 import { LocaleProvider } from '@/i18n/locale-provider';
 import { AppShell } from '@/components/app-shell';
@@ -44,13 +44,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body
         className={`${inter.variable} ${orbitron.variable} ${jetbrains.variable} font-sans antialiased`}
       >
-        <ThemeProvider>
+        <DarkTheme>
           <LocaleProvider>
             <AuthProvider>
               <AppShell>{children}</AppShell>
             </AuthProvider>
           </LocaleProvider>
-        </ThemeProvider>
+        </DarkTheme>
       </body>
     </html>
   );

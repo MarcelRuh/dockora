@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { useLocale } from '@/i18n/locale-provider';
-import { useTheme } from '@/components/theme-provider';
 import { cn } from '@/lib/utils';
 import type { Locale } from '@dockora/shared';
 import { AuthLogoutButton } from '@/components/auth/auth-provider';
@@ -70,9 +69,8 @@ function NavList({
   );
 }
 
-function LocaleThemeControls({ dense = false }: { dense?: boolean }) {
+function LocaleControls({ dense = false }: { dense?: boolean }) {
   const { t, locale, setLocale } = useLocale();
-  const { theme, toggleTheme } = useTheme();
 
   return (
     <div className={cn('flex gap-2', dense && 'items-center')}>
@@ -88,17 +86,6 @@ function LocaleThemeControls({ dense = false }: { dense?: boolean }) {
         <option value="de">DE</option>
         <option value="en">EN</option>
       </select>
-      <button
-        type="button"
-        onClick={toggleTheme}
-        className={cn(
-          'dockora-field font-mono text-xs uppercase tracking-wider transition-shadow hover:border-dockora-pink hover:shadow-neon-pink',
-          dense ? 'px-2 py-1' : 'px-3 py-1.5',
-        )}
-        aria-label={t.theme.toggle}
-      >
-        {theme === 'dark' ? t.theme.light : t.theme.dark}
-      </button>
     </div>
   );
 }
@@ -146,7 +133,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div className="space-y-2 border-t border-dockora-railBorder px-3 py-4">
-          <LocaleThemeControls />
+          <LocaleControls />
           <AuthLogoutButton />
         </div>
       </aside>
@@ -170,7 +157,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <BrandLogo size="sm" priority />
             </Link>
           </div>
-          <LocaleThemeControls dense />
+          <LocaleControls dense />
         </header>
 
         <nav className="flex items-center gap-2 border-b border-dockora-border bg-dockora-surface/60 px-3 py-2 backdrop-blur-md md:hidden">
@@ -225,7 +212,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <NavList compact onNavigate={() => setDrawerOpen(false)} />
               </nav>
               <div className="space-y-2 border-t border-dockora-railBorder px-3 py-4">
-                <LocaleThemeControls />
+                <LocaleControls />
                 <AuthLogoutButton />
               </div>
             </aside>

@@ -248,18 +248,6 @@ export function SettingsPageView() {
                     <option value="en">English</option>
                   </Select>
                 </Field>
-                <Field label={t.settings.fields.theme}>
-                  <Select
-                    value={settings.theme}
-                    onChange={(e) => patch('theme', e.target.value as AppSettings['theme'])}
-                    disabled={!isAdmin}
-                    className="w-full"
-                  >
-                    <option value="dark">dark</option>
-                    <option value="light">light</option>
-                    <option value="system">system</option>
-                  </Select>
-                </Field>
                 <Field label={t.settings.fields.timezone} hint={t.settings.hints.timezone}>
                   <Input
                     value={settings.timezone}
