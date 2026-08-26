@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   composeAction,
@@ -15,6 +15,7 @@ import { ProgressBar } from '@/components/ui/progress-bar';
 import { ErrorBanner, PageHeader } from '@/components/ui/page-parts';
 import { EnvEditor } from '@/components/compose/env-editor';
 import { CodeEditor } from '@/components/compose/code-editor';
+import { previewComposeInterpolation } from '@/lib/compose-lint';
 
 export const DEFAULT_COMPOSE_YAML = `services:
   web:
@@ -47,6 +48,11 @@ export function ComposeCreatePage() {
     percent: number;
     step: CreateStep;
   } | null>(null);
+
+  const missingEnv = useMemo(
+    () => previewComposeInterpolation(yaml, envContent).missing,
+    [yaml, envContent],
+  );
 
   const createStepLabel = (step: CreateStep) => {
     switch (step) {
@@ -243,7 +249,13 @@ export function ComposeCreatePage() {
             minHeight={360}
             formatLabel={t.compose.format}
             formatFailed={t.compose.formatFailed}
+            envText={envContent}
           />
+          {missingEnv.length > 0 ? (
+            <p className="text-xs text-dockora-warning">
+              {t.compose.envMissingVars.replace('{keys}', missingEnv.join(', '))}
+            </p>
+          ) : null}
         </div>
 
         <div className="space-y-1.5 text-sm">

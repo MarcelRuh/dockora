@@ -1,4 +1,4 @@
-import { getAuthToken } from '@/lib/auth';
+import { getSessionToken } from '@/lib/auth';
 
 /**
  * Basis-URL für SSE/WS.
@@ -17,7 +17,7 @@ export function apiDirectBaseUrl(): string {
 }
 
 export function withAuthQuery(url: string): string {
-  const token = getAuthToken();
+  const token = getSessionToken();
   if (!token) return url;
   const sep = url.includes('?') ? '&' : '?';
   return `${url}${sep}token=${encodeURIComponent(token)}`;
@@ -25,5 +25,5 @@ export function withAuthQuery(url: string): string {
 
 export function openEventSource(pathWithQuery: string): EventSource {
   const url = withAuthQuery(`${apiDirectBaseUrl()}${pathWithQuery}`);
-  return new EventSource(url);
+  return new EventSource(url, { withCredentials: true });
 }

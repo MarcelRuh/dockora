@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ComposeProjectDetails, ContainerSummary } from '@dockora/shared';
 import {
   backupComposeProject,
@@ -18,6 +18,7 @@ import {
   validateComposeConfig,
 } from '@/lib/api';
 import { formatComposePreviewLines } from '@/lib/compose-preview';
+import { previewComposeInterpolation } from '@/lib/compose-lint';
 import { useLocale } from '@/i18n/locale-provider';
 import { useAuth } from '@/components/auth/auth-provider';
 import { canAdmin, canOperate } from '@/lib/roles';
@@ -257,6 +258,11 @@ export function ComposeDetailPage({ id }: { id: string }) {
     }
   };
 
+  const missingEnv = useMemo(
+    () => previewComposeInterpolation(yaml, envContent).missing,
+    [yaml, envContent],
+  );
+
   if (loading && !project) return <LoadingState message={t.common.loading} />;
 
   if (!project) {
@@ -341,7 +347,13 @@ export function ComposeDetailPage({ id }: { id: string }) {
           minHeight={440}
           formatLabel={t.compose.format}
           formatFailed={t.compose.formatFailed}
+          envText={envContent}
         />
+        {missingEnv.length > 0 ? (
+          <p className="mt-2 text-xs text-dockora-warning">
+            {t.compose.envMissingVars.replace('{keys}', missingEnv.join(', '))}
+          </p>
+        ) : null}
         <div className="mt-3 flex flex-wrap gap-2">
           {canOps ? (
             <Button variant="primary" disabled={busy} onClick={() => void handleSave()}>

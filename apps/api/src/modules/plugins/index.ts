@@ -8,6 +8,8 @@ import {
   importPlugin,
   loadPluginsFromDir,
   registerPluginSandboxed,
+  unregisterPluginSandboxed,
+  withTimeout,
 } from './plugin-loader.js';
 
 const DISABLED_KEY = 'plugins.disabled';
@@ -127,7 +129,11 @@ export const pluginsModule: FastifyPluginAsync = async (app: FastifyInstance) =>
         if (!entry) {
           throw app.httpErrors.notFound(`Plugin not found: ${dirName}`);
         }
-        const plugin = await importPlugin(entry.indexPath, app.config.pluginDir);
+        const plugin = await withTimeout(
+          importPlugin(entry.indexPath, app.config.pluginDir),
+          5_000,
+          `Plugin "${dirName}" import timed out`,
+        );
         if (!plugin) {
           throw app.httpErrors.badRequest('Invalid plugin export');
         }
@@ -158,7 +164,7 @@ export const pluginsModule: FastifyPluginAsync = async (app: FastifyInstance) =>
 
       const live = registry.get(dirName) ?? findLoadedByDirHint(registry, dirName);
       if (live) {
-        await registry.unregister(live.name);
+        await unregisterPluginSandboxed(registry, live.name);
       }
 
       void auditService.record({

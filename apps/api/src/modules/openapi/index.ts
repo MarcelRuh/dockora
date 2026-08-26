@@ -20,6 +20,11 @@ export const openApiModule: FastifyPluginAsync = async (app: FastifyInstance) =>
             scheme: 'bearer',
             bearerFormat: 'JWT',
           },
+          cookieAuth: {
+            type: 'apiKey',
+            in: 'cookie',
+            name: 'dockora_session',
+          },
         },
       },
     },

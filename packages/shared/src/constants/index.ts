@@ -1,5 +1,5 @@
 export const APP_NAME = 'Dockora';
-export const APP_VERSION = '1.8.1';
+export const APP_VERSION = '1.9.0';
 
 /** Unterstützte UI-Sprachen */
 export const LOCALES = ['de', 'en'] as const;
@@ -28,3 +28,9 @@ export const WS_EVENTS = {
   NOTIFICATION: 'notification',
   UPDATE_AVAILABLE: 'update:available',
 } as const;
+
+/** HttpOnly JWT session cookie */
+export const SESSION_COOKIE = 'dockora_session';
+/** Readable CSRF cookie (double-submit) */
+export const CSRF_COOKIE = 'dockora_csrf';
+export const CSRF_HEADER = 'x-csrf-token';

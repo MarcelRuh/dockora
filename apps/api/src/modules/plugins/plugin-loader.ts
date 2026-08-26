@@ -80,7 +80,19 @@ export async function importPlugin(
   if (!PLUGIN_NAME_RE.test(plugin.name)) {
     return null;
   }
-  return plugin;
+  return sealPlugin(plugin);
+}
+
+/** Copy only the plugin contract so loaded modules cannot mutate the registry later. */
+export function sealPlugin(plugin: DockoraPlugin): DockoraPlugin {
+  const register = plugin.register.bind(plugin);
+  const unregister = plugin.unregister?.bind(plugin);
+  return Object.freeze({
+    name: String(plugin.name),
+    version: String(plugin.version ?? '0'),
+    register: () => register(),
+    unregister: unregister ? () => unregister() : undefined,
+  });
 }
 
 export async function withTimeout<T>(
@@ -117,6 +129,18 @@ export async function registerPluginSandboxed(
   );
 }
 
+export async function unregisterPluginSandboxed(
+  registry: PluginRegistry,
+  name: string,
+  timeoutMs = DEFAULT_REGISTER_TIMEOUT_MS,
+): Promise<void> {
+  await withTimeout(
+    registry.unregister(name),
+    timeoutMs,
+    `Plugin "${name}" unregister timed out after ${timeoutMs}ms`,
+  );
+}
+
 /**
  * Lädt Plugins aus Unterordnern: PLUGIN_DIR/<name>/index.js
  * `disabled` = Plugin-Namen die übersprungen werden.
@@ -140,7 +164,11 @@ export async function loadPluginsFromDir(
       continue;
     }
     try {
-      const plugin = await importPlugin(entry.indexPath, pluginDir);
+      const plugin = await withTimeout(
+        importPlugin(entry.indexPath, pluginDir),
+        DEFAULT_REGISTER_TIMEOUT_MS,
+        `Plugin "${entry.dirName}" import timed out after ${DEFAULT_REGISTER_TIMEOUT_MS}ms`,
+      );
       if (!plugin) {
         log.warn({ dir: entry.dirName }, 'Skipping plugin – invalid DockoraPlugin export');
         continue;

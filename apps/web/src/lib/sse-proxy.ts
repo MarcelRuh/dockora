@@ -15,11 +15,14 @@ export async function proxySse(apiPath: string, request: Request): Promise<Respo
   };
   const authorization = request.headers.get('authorization');
   if (authorization) headers.Authorization = authorization;
+  const cookie = request.headers.get('cookie');
+  if (cookie) headers.Cookie = cookie;
 
   const upstream = await fetch(upstreamUrl, {
     method: 'GET',
     headers,
     cache: 'no-store',
+    credentials: 'include',
     signal: request.signal,
   });
 

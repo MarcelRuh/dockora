@@ -20,7 +20,7 @@
 | 16 | OpenAPI | erledigt |
 | 17 | Plugin-System (Registry + FS-Loader) | erledigt |
 | 18 | App Self-Update | erledigt (Compose/GitHub In-App + DOCKORA_SELF_IMAGE) |
-| 19 | Hardening & erweiterte Tests | teilweise (Unit + Smoke + GitHub CI) |
+| 19 | Hardening & erweiterte Tests | teilweise (Unit + Smoke + GitHub CI + API ESLint) |
 
 ## Bekannte Ausbaustufen
 
@@ -44,8 +44,8 @@
 - ~~Scheduler nextRunAt + lastError + Labels~~
 - ~~Backup-Restore Preview (Dry-Run + apply*-Flags)~~
 - ~~User Edit (DisplayName / Passwort)~~
-- CSRF-Token bei Cookie-Sessions (aktuell Bearer JWT)
-- Plugin-Worker-Isolation (derzeit Pfad-Allowlist + Register-Timeout)
+- ~~CSRF-Token bei Cookie-Sessions (aktuell Bearer JWT)~~ (HttpOnly-Cookie + Double-Submit)
+- Plugin-Worker-Isolation (Timeout + Contract-Freeze + Pfad-Allowlist; kein Worker-Prozess)
 - ~~HTTPS-Profil (Caddy / Let’s Encrypt + interne CA)~~
 - ~~Volume-Liste, Größe, unused prune, Browse~~
 - ~~Compose-Projekt anlegen (eigene Seite)~~

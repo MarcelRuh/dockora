@@ -5,6 +5,25 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [1.9.0] – 2026-08-26
+
+### Added
+
+- HttpOnly session cookie + CSRF double-submit (JWT no longer stored in localStorage)
+- Global search (Ctrl/⌘K) across pages, containers, compose projects and images
+- Compose editor diagnostics: YAML errors, missing `image`/`build`, unset `${VAR}` from `.env`
+- List search on Compose and Images pages
+- API ESLint (typescript-eslint)
+
+### Changed
+
+- Plugin loader times out import/unregister and freezes the plugin contract
+- Auth logout is a server endpoint that clears session cookies
+
+### Security
+
+- CSRF required for cookie-authenticated mutations; Bearer API clients are unchanged
+
 ## [1.8.1] – 2026-08-26
 
 ### Changed

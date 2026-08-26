@@ -1,8 +1,8 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { fetchAuthStatus, fetchCurrentUser, login as apiLogin, loginTotp } from '@/lib/api';
-import { clearAuthToken, getAuthToken, setAuthToken } from '@/lib/auth';
+import { fetchAuthStatus, fetchCurrentUser, login as apiLogin, loginTotp, logout as apiLogout } from '@/lib/api';
+import { clearSessionToken } from '@/lib/auth';
 import type { AuthUser } from '@dockora/shared';
 import { useLocale } from '@/i18n/locale-provider';
 import { Button, Input } from '@/components/ui/form-controls';
@@ -29,8 +29,7 @@ function LoginForm({ onSuccess }: { onSuccess: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const finishWithToken = (token: string) => {
-    setAuthToken(token);
+  const finishLogin = () => {
     onSuccess();
   };
 
@@ -45,8 +44,8 @@ function LoginForm({ onSuccess }: { onSuccess: () => void }) {
         setTotpCode('');
         return;
       }
-      if (!res.token) throw new Error(t.auth.invalid);
-      finishWithToken(res.token);
+      if (!res.user && !res.token) throw new Error(t.auth.invalid);
+      finishLogin();
     } catch (err) {
       setError(err instanceof Error ? err.message : t.auth.invalid);
     } finally {
@@ -61,8 +60,8 @@ function LoginForm({ onSuccess }: { onSuccess: () => void }) {
     setError(null);
     try {
       const res = await loginTotp(tempToken, totpCode.trim());
-      if (!res.token) throw new Error(t.auth.invalid);
-      finishWithToken(res.token);
+      if (!res.user && !res.token) throw new Error(t.auth.invalid);
+      finishLogin();
     } catch (err) {
       setError(err instanceof Error ? err.message : t.auth.totpInvalid);
     } finally {
@@ -173,15 +172,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(null);
         return;
       }
-      const token = getAuthToken();
-      if (!token) {
-        setUser(null);
-        return;
-      }
       const me = await fetchCurrentUser();
       setUser(me);
     } catch {
-      clearAuthToken();
+      clearSessionToken();
       setUser(null);
     } finally {
       setLoading(false);
@@ -194,12 +188,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [loadAuth]);
 
   const logout = useCallback(() => {
-    clearAuthToken();
-    setUser(null);
+    void apiLogout().finally(() => setUser(null));
   }, []);
 
   const refreshUser = useCallback(async () => {
-    if (!getAuthToken()) return;
     const me = await fetchCurrentUser();
     setUser(me);
   }, []);

@@ -28,7 +28,7 @@ import type {
   UpdateApplyResult,
   UpdateCheckResult,
 } from '@dockora/shared';
-import { clearAuthToken, getAuthToken } from './auth';
+import { clearSessionToken, csrfHeaders, setSessionToken as setSessionTokenFromLogin } from './auth';
 
 const API_BASE = '/api/v1';
 
@@ -42,28 +42,26 @@ export class ApiError extends Error {
   }
 }
 
-function authHeaders(): HeadersInit {
-  const token = getAuthToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const headers: HeadersInit = {
-    ...authHeaders(),
-    ...init?.headers,
+  const method = (init?.method ?? 'GET').toUpperCase();
+  const headers: Record<string, string> = {
+    ...(method !== 'GET' && method !== 'HEAD' ? (csrfHeaders() as Record<string, string>) : {}),
+    ...(init?.headers as Record<string, string> | undefined),
   };
 
-  if (init?.body && !(headers as Record<string, string>)['Content-Type']) {
-    (headers as Record<string, string>)['Content-Type'] = 'application/json';
+  if (init?.body && !headers['Content-Type']) {
+    headers['Content-Type'] = 'application/json';
   }
 
   const res = await fetch(`${API_BASE}${path}`, {
     cache: 'no-store',
+    credentials: 'include',
     ...init,
     headers,
   });
 
   if (!res.ok) {
+    if (res.status === 401) clearSessionToken();
     let message = `API ${path} failed: ${res.status}`;
     try {
       const body = (await res.json()) as { message?: string };
@@ -527,17 +525,29 @@ export async function fetchAuthStatus(): Promise<AuthStatusResponse> {
 }
 
 export async function login(email: string, password: string): Promise<AuthLoginResponse> {
-  return request<AuthLoginResponse>('/auth/login', {
+  const result = await request<AuthLoginResponse>('/auth/login', {
     method: 'POST',
     body: JSON.stringify({ email, password }),
   });
+  if (result.token) setSessionTokenFromLogin(result.token);
+  return result;
 }
 
 export async function loginTotp(tempToken: string, code: string): Promise<AuthLoginResponse> {
-  return request<AuthLoginResponse>('/auth/login/totp', {
+  const result = await request<AuthLoginResponse>('/auth/login/totp', {
     method: 'POST',
     body: JSON.stringify({ tempToken, code }),
   });
+  if (result.token) setSessionTokenFromLogin(result.token);
+  return result;
+}
+
+export async function logout(): Promise<void> {
+  try {
+    await request('/auth/logout', { method: 'POST' });
+  } finally {
+    clearSessionToken();
+  }
 }
 
 export async function setupTotp(): Promise<import('@dockora/shared').AuthTotpSetupResponse> {
@@ -622,5 +632,3 @@ export async function fetchAuditLogs(params?: {
   const suffix = qs.toString() ? `?${qs}` : '';
   return request(`/audit${suffix}`);
 }
-
-export { clearAuthToken, getAuthToken };

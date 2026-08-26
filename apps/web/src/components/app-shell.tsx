@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { useLocale } from '@/i18n/locale-provider';
+import { GlobalSearch } from '@/components/global-search';
 import { cn } from '@/lib/utils';
 import type { Locale } from '@dockora/shared';
 import { AuthLogoutButton } from '@/components/auth/auth-provider';
@@ -73,7 +74,8 @@ function LocaleControls({ dense = false }: { dense?: boolean }) {
   const { t, locale, setLocale } = useLocale();
 
   return (
-    <div className={cn('flex gap-2', dense && 'items-center')}>
+    <div className={cn('flex gap-2', dense ? 'items-center' : 'flex-col')}>
+      <GlobalSearch compact={dense} />
       <select
         aria-label={t.locale.label}
         className={cn(

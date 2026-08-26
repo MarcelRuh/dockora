@@ -49,6 +49,9 @@ export const messages = {
       bulkProgress: '{done}/{total}…',
       menu: 'Menü',
       close: 'Schließen',
+      globalSearch: 'Suchen…',
+      globalSearchHint: 'Suchen  ⌘K',
+      pages: 'Seite',
     },
     auth: {
       title: 'Anmeldung',
@@ -259,6 +262,7 @@ export const messages = {
       envFile: '.env-Datei',
       envHint:
         'Rohtext: komplette .env einfügen. Felder: vorhandene Variablen nachbearbeiten. Ohne gültige Pfade schlagen Volumes fehl.',
+      envMissingVars: 'Nicht in .env gesetzt: {keys}',
       envFieldsEmpty:
         'Noch keine Variablen. Zuerst im Rohtext die komplette .env einfügen, danach hier nachbearbeiten.',
       envSaved: '.env gespeichert',
@@ -753,6 +757,9 @@ export const messages = {
       bulkProgress: '{done}/{total}…',
       menu: 'Menu',
       close: 'Close',
+      globalSearch: 'Search…',
+      globalSearchHint: 'Search  ⌘K',
+      pages: 'Page',
     },
     auth: {
       title: 'Sign in',
@@ -962,6 +969,7 @@ export const messages = {
       envFile: '.env file',
       envHint:
         'Raw: paste the full .env first. Fields: edit existing variables. Empty paths break volume mounts.',
+      envMissingVars: 'Not set in .env: {keys}',
       envFieldsEmpty:
         'No variables yet. Paste the full .env in Raw first, then edit here.',
       envSaved: '.env saved',

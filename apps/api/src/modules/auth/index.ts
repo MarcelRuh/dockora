@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs';
-import type { FastifyInstance, FastifyPluginAsync, FastifyRequest } from 'fastify';
+import type { FastifyInstance, FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import fp from 'fastify-plugin';
 import fjwt from '@fastify/jwt';
 import {
@@ -11,7 +11,8 @@ import {
   type UserRole,
 } from '@dockora/shared';
 import { prisma } from '../../infrastructure/db/prisma.js';
-import { invalidateAuthEnabledCache, isAuthEnabled, isPublicAuthRoute, liftBearerToken } from './auth-gate.js';
+import { invalidateAuthEnabledCache, isAuthEnabled, isPublicAuthRoute, liftBearerToken, csrfMismatch } from './auth-gate.js';
+import { clearSessionCookies, jwtExpiresToSeconds, setSessionCookies } from './session-cookies.js';
 import { ensureAuthEnabledStored } from '../settings/settings.service.js';
 import {
   assertLoginAllowed,
@@ -69,6 +70,9 @@ const authPlugin: FastifyPluginAsync = async (app: FastifyInstance) => {
   app.addHook('onRequest', async (request) => {
     liftBearerToken(request);
     if (isPublicAuthRoute(request.method, request.url)) return;
+    if (csrfMismatch(request)) {
+      throw app.httpErrors.forbidden('CSRF token mismatch');
+    }
     if (!(await isAuthEnabled())) return;
     try {
       await request.jwtVerify();
@@ -146,6 +150,7 @@ const authPlugin: FastifyPluginAsync = async (app: FastifyInstance) => {
         role: user.role as UserRole,
         email: user.email,
       });
+      attachSession(request, reply, token);
 
       void auditService.record({
         action: 'auth.login',
@@ -239,6 +244,7 @@ const authPlugin: FastifyPluginAsync = async (app: FastifyInstance) => {
         role: user.role as UserRole,
         email: user.email,
       });
+      attachSession(request, reply, token);
 
       void auditService.record({
         action: 'auth.login',
@@ -255,6 +261,11 @@ const authPlugin: FastifyPluginAsync = async (app: FastifyInstance) => {
       return body;
     },
   );
+
+  app.post(`${API_PREFIX}/auth/logout`, async (request, reply) => {
+    clearSessionCookies(reply, request.server.config.nodeEnv === 'production');
+    return { ok: true as const };
+  });
 
   app.get(`${API_PREFIX}/auth/me`, { preHandler: [app.authenticate] }, async (request) => {
     const user = await prisma.user.findUnique({ where: { id: request.user.sub } });
@@ -501,6 +512,13 @@ const authPlugin: FastifyPluginAsync = async (app: FastifyInstance) => {
     },
   );
 };
+
+function attachSession(request: FastifyRequest, reply: FastifyReply, token: string): void {
+  setSessionCookies(reply, token, {
+    secure: request.server.config.nodeEnv === 'production',
+    maxAge: jwtExpiresToSeconds(request.server.config.jwtExpiresIn),
+  });
+}
 
 async function ensureBootstrapAdmin(app: FastifyInstance): Promise<void> {
   const count = await prisma.user.count();

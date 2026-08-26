@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic';
 import { useLocale } from '@/i18n/locale-provider';
 import { useAuth } from '@/components/auth/auth-provider';
 import { canAdmin } from '@/lib/roles';
-import { getAuthToken } from '@/lib/auth';
+import { getSessionToken } from '@/lib/auth';
 import { ErrorBanner, PageHeader } from '@/components/ui/page-parts';
 
 const WebTerminal = dynamic(
@@ -28,7 +28,7 @@ export function HostTerminalPage() {
           <p className="text-sm text-dockora-muted">{t.hostTerminal.hint}</p>
           <WebTerminal
             path="/system/host-terminal"
-            token={getAuthToken()}
+            token={getSessionToken()}
             errorLabel={t.hostTerminal.error}
             unauthorizedLabel={t.hostTerminal.unauthorized}
           />

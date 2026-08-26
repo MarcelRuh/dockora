@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ImageSummary } from '@dockora/shared';
 import { fetchImages, pruneImages, pullImage, removeImage } from '@/lib/api';
 import { useLocale } from '@/i18n/locale-provider';
@@ -36,6 +36,7 @@ export function ImagesPage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
+  const [query, setQuery] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -114,7 +115,20 @@ export function ImagesPage() {
     }
   };
 
-  const rows = items.map((img) => [
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return items;
+    return items.filter((img) => {
+      const tags = img.tags.join(' ').toLowerCase();
+      return (
+        img.id.toLowerCase().includes(q) ||
+        tags.includes(q) ||
+        img.usedBy.some((name) => name.toLowerCase().includes(q))
+      );
+    });
+  }, [items, query]);
+
+  const rows = filtered.map((img) => [
     <span key={`id-${img.id}`} className="font-mono text-xs">
       {img.id.slice(0, 12)}
     </span>,
@@ -149,6 +163,15 @@ export function ImagesPage() {
         subtitle={t.images.subtitle}
         actions={<Button onClick={() => void load()}>{t.common.refresh}</Button>}
       />
+
+      <FilterBar>
+        <Input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={t.common.search}
+          className="max-w-md"
+        />
+      </FilterBar>
 
       {canOps ? (
         <form onSubmit={(e) => void handlePull(e)}>

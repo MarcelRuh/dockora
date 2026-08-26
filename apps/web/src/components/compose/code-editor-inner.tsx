@@ -8,10 +8,12 @@ import { EditorView, keymap } from '@codemirror/view';
 import { Prec } from '@codemirror/state';
 import { tags as t } from '@lezer/highlight';
 import { indentationMarkers } from '@replit/codemirror-indentation-markers';
+import { linter, lintGutter, type Diagnostic } from '@codemirror/lint';
 import { Button } from '@/components/ui/form-controls';
 import { cn } from '@/lib/utils';
 import { dotenvLanguage } from '@/lib/dotenv-language';
 import { formatComposeYaml, formatEnvFile } from '@/lib/format-yaml';
+import { lintComposeYaml, lintEnvFile } from '@/lib/compose-lint';
 
 export type CodeEditorLanguage = 'yaml' | 'env';
 
@@ -90,6 +92,7 @@ export function CodeEditorInner({
   formatLabel,
   formatFailed,
   leading,
+  envText = '',
 }: {
   value: string;
   onChange: (next: string) => void;
@@ -100,6 +103,8 @@ export function CodeEditorInner({
   formatLabel: string;
   formatFailed: string;
   leading?: ReactNode;
+  /** Compose `.env` used for ${VAR} interpolation hints */
+  envText?: string;
 }) {
   const [formatError, setFormatError] = useState<string | null>(null);
   const valueRef = useRef(value);
@@ -125,6 +130,24 @@ export function CodeEditorInner({
       indentUnit.of('  '),
       editorTheme,
       syntaxHighlighting(yamlHighlight),
+      lintGutter(),
+      linter((view) => {
+        const text = view.state.doc.toString();
+        const len = view.state.doc.length;
+        if (len === 0) return [];
+        const issues =
+          language === 'yaml' ? lintComposeYaml(text, envText) : lintEnvFile(text);
+        return issues.map((issue): Diagnostic => {
+          const from = Math.min(Math.max(issue.from, 0), len);
+          const to = Math.min(Math.max(issue.to, from + 1), len);
+          return {
+            from,
+            to: Math.max(to, from),
+            severity: issue.severity,
+            message: issue.message,
+          };
+        });
+      }),
       indentationMarkers({
         highlightActiveBlock: true,
         hideFirstIndent: true,
@@ -150,7 +173,7 @@ export function CodeEditorInner({
         ]),
       ),
     ],
-    [applyFormat, language],
+    [applyFormat, envText, language],
   );
 
   return (

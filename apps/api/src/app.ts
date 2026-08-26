@@ -1,5 +1,6 @@
 import Fastify, { type FastifyBaseLogger, type FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
+import cookie from '@fastify/cookie';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import sensible from '@fastify/sensible';
@@ -43,6 +44,7 @@ export async function buildApp(deps: BuildAppDeps): Promise<FastifyInstance> {
     origin: config.corsOrigin,
     credentials: true,
   });
+  await app.register(cookie);
   await app.register(rateLimit, {
     max: config.rateLimitMax,
     timeWindow: config.rateLimitTimeWindowMs,

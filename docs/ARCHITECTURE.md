@@ -46,7 +46,7 @@ Client → Fastify (Helmet, CORS, Rate-Limit)
 ## Frontend
 
 - Next.js App Router
-- Dark Mode via `class` + CSS-Variablen
+- Dark-only UI via `class="dark"` + CSS-Variablen
 - i18n: DE/EN (leichtgewichtiger Provider; später next-intl möglich)
 - API-Proxy über Next.js Rewrites (`/api/v1/*` → Backend) für REST
 - Dashboard/Log Live-Updates: **SSE** über dedizierte Next Route-Handler
@@ -55,16 +55,16 @@ Client → Fastify (Helmet, CORS, Rate-Limit)
   für Same-Origin inkl. WebSocket-Upgrade
 - Fallback Dev: `NEXT_PUBLIC_API_HTTP` / `NEXT_PUBLIC_API_WS` direkt auf API-Port
 
-## Sicherheit (vorbereitet)
+## Sicherheit
 
-| Thema | Status Phase 0 |
-|-------|----------------|
+| Thema | Status |
+|-------|--------|
 | Helmet | aktiv |
 | Rate Limiting | aktiv |
-| CORS | konfigurierbar |
-| JWT / Auth | Schema vorbereitet, Modul folgt |
-| CSRF | folgt mit Auth/Session |
-| HTTPS | Compose/Reverse-Proxy-Vorbereitung |
+| CORS | konfigurierbar (`credentials: true`) |
+| JWT / Auth | HttpOnly-Cookie `dockora_session` + CSRF double-submit; Bearer weiter für API-Clients |
+| CSRF | `X-CSRF-Token` muss zum Cookie `dockora_csrf` passen (Cookie-Sessions, unsichere Methoden) |
+| HTTPS | Compose-Profile `tls` / `proxy` |
 | Docker Socket | Env-Pfad, Rechte am Host |
 
 ## Plugin-System

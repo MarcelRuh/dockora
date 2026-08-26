@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ComposeProjectSummary } from '@dockora/shared';
 import {
   composeAction,
@@ -16,7 +16,7 @@ import { useAuth } from '@/components/auth/auth-provider';
 import { canAdmin, canOperate } from '@/lib/roles';
 import { composeStatusTone } from '@/lib/status';
 import { resolveContainerIconUrl } from '@/lib/container-icon';
-import { Button, FilterBar, buttonClassName } from '@/components/ui/form-controls';
+import { Button, FilterBar, Input, buttonClassName } from '@/components/ui/form-controls';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ServiceIcon } from '@/components/ui/service-icon';
 import {
@@ -53,6 +53,7 @@ export function ComposeListPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
+  const [query, setQuery] = useState('');
 
   const load = useCallback(async (opts?: { clearError?: boolean }) => {
     setLoading(true);
@@ -195,6 +196,14 @@ export function ComposeListPage() {
     }
   };
 
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return items;
+    return items.filter(
+      (p) => p.name.toLowerCase().includes(q) || p.path.toLowerCase().includes(q) || p.status.toLowerCase().includes(q),
+    );
+  }, [items, query]);
+
   const toggleOne = (id: string) => {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -204,16 +213,16 @@ export function ComposeListPage() {
     });
   };
 
-  const allSelected = items.length > 0 && items.every((p) => selected.has(p.id));
+  const allSelected = filtered.length > 0 && filtered.every((p) => selected.has(p.id));
   const toggleAll = () => {
     if (allSelected) setSelected(new Set());
-    else setSelected(new Set(items.map((p) => p.id)));
+    else setSelected(new Set(filtered.map((p) => p.id)));
   };
 
   const selectedIds = Array.from(selected);
   const anyBusy = Boolean(busy) || bulkBusy || confirmBusy;
 
-  const rows = items.map((p) => [
+  const rows = filtered.map((p) => [
     <input
       key={`cb-${p.id}`}
       type="checkbox"
@@ -317,6 +326,14 @@ export function ComposeListPage() {
       />
 
       {error ? <ErrorBanner message={error} /> : null}
+      <FilterBar>
+        <Input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={t.common.search}
+          className="max-w-md"
+        />
+      </FilterBar>
       {bulkProgress ? (
         <p className="font-mono text-xs text-dockora-muted">
           {t.common.bulkProgress

@@ -6,6 +6,7 @@ import {
   PLUGIN_NAME_RE,
   assertSafePluginPath,
   discoverPlugins,
+  sealPlugin,
   withTimeout,
 } from './plugin-loader.js';
 
@@ -45,6 +46,16 @@ describe('plugin sandbox helpers', () => {
     } finally {
       await rm(root, { recursive: true, force: true });
     }
+  });
+
+  it('sealPlugin freezes the contract object', () => {
+    const plugin = sealPlugin({
+      name: 'hello',
+      version: '1',
+      register: async () => {},
+    });
+    expect(Object.isFrozen(plugin)).toBe(true);
+    expect(plugin.name).toBe('hello');
   });
 
   it('withTimeout rejects slow promises', async () => {

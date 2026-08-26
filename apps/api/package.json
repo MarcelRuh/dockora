@@ -1,6 +1,6 @@
 {
   "name": "@dockora/api",
-  "version": "1.8.1",
+  "version": "1.9.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,7 +8,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/main.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "echo \"lint: api – pending eslint setup\"",
+    "lint": "eslint src --max-warnings 0",
     "test": "vitest run",
     "test:watch": "vitest",
     "clean": "rm -rf dist",
@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@dockora/shared": "workspace:*",
+    "@fastify/cookie": "^11.1.2",
     "@fastify/cors": "^10.0.1",
     "@fastify/helmet": "^13.0.0",
     "@fastify/jwt": "^10.2.1",
@@ -52,9 +53,11 @@
     "@types/node-cron": "^3.0.11",
     "@types/qrcode": "^1.5.6",
     "@types/ws": "^8.18.1",
+    "eslint": "^10.9.1",
     "prisma": "^6.1.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
+    "typescript-eslint": "^8.68.0",
     "vitest": "^2.1.8"
   }
 }
