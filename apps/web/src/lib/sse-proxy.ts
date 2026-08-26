@@ -1,6 +1,6 @@
 /**
  * Proxy für Server-Sent Events ohne Buffering durch Next-Rewrites.
- * Route Handlers haben Vorrang vor rewrites() in next.config.ts.
+ * Spezifische Stream-Routen haben Vorrang vor dem REST-Catch-All.
  */
 export async function proxySse(apiPath: string, request: Request): Promise<Response> {
   const apiBase = (process.env.DOCKORA_API_URL ?? 'http://127.0.0.1:3001').replace(/\/$/, '');

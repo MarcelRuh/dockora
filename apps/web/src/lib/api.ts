@@ -28,7 +28,7 @@ import type {
   UpdateApplyResult,
   UpdateCheckResult,
 } from '@dockora/shared';
-import { clearSessionToken, csrfHeaders, setSessionToken as setSessionTokenFromLogin } from './auth';
+import { clearSessionToken, csrfHeaders, getSessionToken, setSessionToken as setSessionTokenFromLogin } from './auth';
 
 const API_BASE = '/api/v1';
 
@@ -44,7 +44,9 @@ export class ApiError extends Error {
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const method = (init?.method ?? 'GET').toUpperCase();
+  const token = getSessionToken();
   const headers: Record<string, string> = {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(method !== 'GET' && method !== 'HEAD' ? (csrfHeaders() as Record<string, string>) : {}),
     ...(init?.headers as Record<string, string> | undefined),
   };
@@ -61,7 +63,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
 
   if (!res.ok) {
-    if (res.status === 401) clearSessionToken();
+    if (res.status === 401 && path !== '/auth/login' && path !== '/auth/login/totp' && path !== '/auth/status') {
+      clearSessionToken();
+    }
     let message = `API ${path} failed: ${res.status}`;
     try {
       const body = (await res.json()) as { message?: string };

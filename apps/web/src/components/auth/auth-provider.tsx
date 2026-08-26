@@ -20,7 +20,7 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-function LoginForm({ onSuccess }: { onSuccess: () => void }) {
+function LoginForm({ onSuccess }: { onSuccess: (user: AuthUser) => void }) {
   const { t } = useLocale();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -29,8 +29,8 @@ function LoginForm({ onSuccess }: { onSuccess: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const finishLogin = () => {
-    onSuccess();
+  const finishLogin = (user: AuthUser) => {
+    onSuccess(user);
   };
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
@@ -44,8 +44,8 @@ function LoginForm({ onSuccess }: { onSuccess: () => void }) {
         setTotpCode('');
         return;
       }
-      if (!res.user && !res.token) throw new Error(t.auth.invalid);
-      finishLogin();
+      if (!res.user) throw new Error(t.auth.invalid);
+      finishLogin(res.user);
     } catch (err) {
       setError(err instanceof Error ? err.message : t.auth.invalid);
     } finally {
@@ -60,8 +60,8 @@ function LoginForm({ onSuccess }: { onSuccess: () => void }) {
     setError(null);
     try {
       const res = await loginTotp(tempToken, totpCode.trim());
-      if (!res.user && !res.token) throw new Error(t.auth.invalid);
-      finishLogin();
+      if (!res.user) throw new Error(t.auth.invalid);
+      finishLogin(res.user);
     } catch (err) {
       setError(err instanceof Error ? err.message : t.auth.totpInvalid);
     } finally {
@@ -206,7 +206,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   if (authEnabled && !user) {
-    return <LoginForm onSuccess={() => void loadAuth()} />;
+    return (
+      <LoginForm
+        onSuccess={(next) => {
+          setAuthEnabled(true);
+          setUser(next);
+        }}
+      />
+    );
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

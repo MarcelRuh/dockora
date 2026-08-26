@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { headerValue, jwtExpiresToSeconds } from './session-cookies.js';
+import { headerValue, isSecureCookieRequest, jwtExpiresToSeconds } from './session-cookies.js';
 
 describe('jwtExpiresToSeconds', () => {
   it('parses day/hour/minute/second units', () => {
@@ -19,5 +19,18 @@ describe('headerValue', () => {
     expect(headerValue(['abc', 'def'])).toBe('abc');
     expect(headerValue('xyz')).toBe('xyz');
     expect(headerValue(undefined)).toBeUndefined();
+  });
+});
+
+describe('isSecureCookieRequest', () => {
+  it('uses X-Forwarded-Proto over the socket protocol', () => {
+    expect(isSecureCookieRequest({ protocol: 'http', forwardedProto: 'https' })).toBe(true);
+    expect(isSecureCookieRequest({ protocol: 'https', forwardedProto: 'http' })).toBe(false);
+    expect(isSecureCookieRequest({ protocol: 'http', forwardedProto: 'https, http' })).toBe(true);
+  });
+
+  it('falls back to the request protocol', () => {
+    expect(isSecureCookieRequest({ protocol: 'https' })).toBe(true);
+    expect(isSecureCookieRequest({ protocol: 'http' })).toBe(false);
   });
 });

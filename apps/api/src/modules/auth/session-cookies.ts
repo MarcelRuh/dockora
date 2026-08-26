@@ -45,13 +45,27 @@ export function setSessionCookies(
   });
 }
 
-export function clearSessionCookies(reply: FastifyReply, secure: boolean): void {
-  const base = { path: '/', sameSite: 'lax' as const, secure };
-  reply.clearCookie(SESSION_COOKIE, base);
-  reply.clearCookie(CSRF_COOKIE, base);
+export function clearSessionCookies(reply: FastifyReply): void {
+  for (const secure of [false, true] as const) {
+    const base = { path: '/', sameSite: 'lax' as const, secure };
+    reply.clearCookie(SESSION_COOKIE, base);
+    reply.clearCookie(CSRF_COOKIE, base);
+  }
 }
 
 export function headerValue(value: string | string[] | undefined): string | undefined {
   if (Array.isArray(value)) return value[0];
   return value;
+}
+
+/** Secure cookies only when the browser actually used HTTPS (not merely NODE_ENV=production). */
+export function isSecureCookieRequest(input: {
+  protocol?: string;
+  forwardedProto?: string | string[];
+}): boolean {
+  const forwarded = headerValue(input.forwardedProto);
+  if (forwarded) {
+    return forwarded.split(',')[0]!.trim().toLowerCase() === 'https';
+  }
+  return input.protocol === 'https';
 }

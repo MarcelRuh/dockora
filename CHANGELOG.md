@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [1.9.1] – 2026-08-26
+
+### Fixed
+
+- Login no longer bounces back to the login page: session cookies are only `Secure` on HTTPS, and Next.js forwards `Set-Cookie` through a same-origin API proxy
+
 ## [1.9.0] – 2026-08-26
 
 ### Added

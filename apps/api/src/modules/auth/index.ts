@@ -12,7 +12,7 @@ import {
 } from '@dockora/shared';
 import { prisma } from '../../infrastructure/db/prisma.js';
 import { invalidateAuthEnabledCache, isAuthEnabled, isPublicAuthRoute, liftBearerToken, csrfMismatch } from './auth-gate.js';
-import { clearSessionCookies, jwtExpiresToSeconds, setSessionCookies } from './session-cookies.js';
+import { clearSessionCookies, isSecureCookieRequest, jwtExpiresToSeconds, setSessionCookies } from './session-cookies.js';
 import { ensureAuthEnabledStored } from '../settings/settings.service.js';
 import {
   assertLoginAllowed,
@@ -262,8 +262,8 @@ const authPlugin: FastifyPluginAsync = async (app: FastifyInstance) => {
     },
   );
 
-  app.post(`${API_PREFIX}/auth/logout`, async (request, reply) => {
-    clearSessionCookies(reply, request.server.config.nodeEnv === 'production');
+  app.post(`${API_PREFIX}/auth/logout`, async (_request, reply) => {
+    clearSessionCookies(reply);
     return { ok: true as const };
   });
 
@@ -515,7 +515,10 @@ const authPlugin: FastifyPluginAsync = async (app: FastifyInstance) => {
 
 function attachSession(request: FastifyRequest, reply: FastifyReply, token: string): void {
   setSessionCookies(reply, token, {
-    secure: request.server.config.nodeEnv === 'production',
+    secure: isSecureCookieRequest({
+      protocol: request.protocol,
+      forwardedProto: request.headers['x-forwarded-proto'],
+    }),
     maxAge: jwtExpiresToSeconds(request.server.config.jwtExpiresIn),
   });
 }
