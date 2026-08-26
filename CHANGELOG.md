@@ -5,6 +5,18 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [1.9.2] – 2026-08-26
+
+### Security
+
+- OpenAPI UI (`/api/docs`) requires a session when auth is enabled
+- Same-origin SSE no longer puts the JWT in the query string
+
+### Fixed
+
+- Expired sessions return to the login screen instead of leaving a broken UI
+- Smoke test asserts `Set-Cookie` on login and rejects `Secure` cookies over HTTP
+
 ## [1.9.1] – 2026-08-26
 
 ### Fixed

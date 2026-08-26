@@ -4,6 +4,8 @@ const LEGACY_TOKEN_KEY = 'dockora-token';
 
 /** In-memory JWT for split-origin SSE/WS fallback. Not persisted. */
 let memoryToken: string | null = null;
+let expired = false;
+const sessionListeners = new Set<() => void>();
 
 export function getSessionToken(): string | null {
   return memoryToken;
@@ -11,6 +13,7 @@ export function getSessionToken(): string | null {
 
 export function setSessionToken(token: string | null): void {
   memoryToken = token;
+  if (token) expired = false;
 }
 
 export function clearSessionToken(): void {
@@ -18,6 +21,37 @@ export function clearSessionToken(): void {
   if (typeof window !== 'undefined') {
     window.localStorage.removeItem(LEGACY_TOKEN_KEY);
   }
+}
+
+export function onSessionInvalidated(listener: () => void): () => void {
+  sessionListeners.add(listener);
+  return () => {
+    sessionListeners.delete(listener);
+  };
+}
+
+function hasReadableSessionHint(): boolean {
+  return Boolean(memoryToken) || Boolean(readCsrfToken());
+}
+
+/**
+ * Called on API 401. If a session existed, drop it and notify the UI (login screen).
+ * HttpOnly cookies are cleared via a public logout POST.
+ */
+export function notifyUnauthorized(): void {
+  const hadSession = hasReadableSessionHint();
+  clearSessionToken();
+  if (!hadSession || expired) return;
+  expired = true;
+  for (const listener of sessionListeners) listener();
+  if (typeof fetch === 'undefined') return;
+  void fetch('/api/v1/auth/logout', {
+    method: 'POST',
+    credentials: 'include',
+    cache: 'no-store',
+  }).catch(() => {
+    /* cookie clear is best-effort */
+  });
 }
 
 export function readCsrfToken(): string | null {

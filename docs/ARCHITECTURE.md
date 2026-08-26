@@ -63,6 +63,7 @@ Client → Fastify (Helmet, CORS, Rate-Limit)
 | Rate Limiting | aktiv |
 | CORS | konfigurierbar (`credentials: true`) |
 | JWT / Auth | HttpOnly-Cookie `dockora_session` + CSRF double-submit; Bearer weiter für API-Clients. `Secure` nur bei HTTPS (`X-Forwarded-Proto`), nicht pauschal bei `NODE_ENV=production`. |
+| OpenAPI | `/api/docs` ist hinter derselben Auth wie die API (öffentlich nur wenn Auth deaktiviert ist) |
 | CSRF | `X-CSRF-Token` muss zum Cookie `dockora_csrf` passen (Cookie-Sessions, unsichere Methoden) |
 | HTTPS | Compose-Profile `tls` / `proxy` |
 | Docker Socket | Env-Pfad, Rechte am Host |

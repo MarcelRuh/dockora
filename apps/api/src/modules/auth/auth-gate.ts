@@ -31,7 +31,6 @@ export async function isAuthEnabled(): Promise<boolean> {
 export function isPublicAuthRoute(method: string, url: string): boolean {
   const path = url.split('?')[0] ?? url;
 
-  if (path.startsWith('/api/docs')) return true;
   if (method === 'OPTIONS') return true;
 
   if (method === 'GET' && path === `${API_PREFIX}/health`) return true;

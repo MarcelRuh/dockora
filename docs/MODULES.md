@@ -4,7 +4,7 @@
 
 | Modul | Endpoints (Auszug) |
 |-------|-------------------|
-| openapi | `/api/docs` |
+| openapi | `/api/docs` (Auth erforderlich, wenn Auth aktiv) |
 | health | `GET /api/v1/health` |
 | system | `GET /api/v1/system/info` |
 | auth | `POST /auth/login`, `POST /auth/logout`, `GET /auth/me`, User-CRUD |

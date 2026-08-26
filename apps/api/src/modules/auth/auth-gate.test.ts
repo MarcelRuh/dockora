@@ -4,13 +4,11 @@ import { csrfMismatch, isPublicAuthRoute, liftBearerToken } from './auth-gate.js
 import type { FastifyRequest } from 'fastify';
 
 describe('isPublicAuthRoute', () => {
-  it('allows health, auth status, login, logout and docs', () => {
+  it('allows health, auth status, login and logout', () => {
     expect(isPublicAuthRoute('GET', '/api/v1/health')).toBe(true);
     expect(isPublicAuthRoute('GET', '/api/v1/auth/status')).toBe(true);
     expect(isPublicAuthRoute('POST', '/api/v1/auth/login')).toBe(true);
     expect(isPublicAuthRoute('POST', '/api/v1/auth/logout')).toBe(true);
-    expect(isPublicAuthRoute('GET', '/api/docs')).toBe(true);
-    expect(isPublicAuthRoute('GET', '/api/docs/json')).toBe(true);
     expect(isPublicAuthRoute('OPTIONS', '/api/v1/containers')).toBe(true);
   });
 
@@ -19,6 +17,8 @@ describe('isPublicAuthRoute', () => {
     expect(isPublicAuthRoute('GET', '/api/v1/settings')).toBe(false);
     expect(isPublicAuthRoute('PUT', '/api/v1/settings')).toBe(false);
     expect(isPublicAuthRoute('POST', '/api/v1/auth/users')).toBe(false);
+    expect(isPublicAuthRoute('GET', '/api/docs')).toBe(false);
+    expect(isPublicAuthRoute('GET', '/api/docs/json')).toBe(false);
   });
 
   it('ignores query strings', () => {

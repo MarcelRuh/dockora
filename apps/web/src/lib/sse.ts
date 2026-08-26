@@ -1,4 +1,4 @@
-import { getSessionToken } from '@/lib/auth';
+import { getSessionToken } from './auth';
 
 /**
  * Basis-URL für SSE/WS.
@@ -16,9 +16,17 @@ export function apiDirectBaseUrl(): string {
   return '';
 }
 
-export function withAuthQuery(url: string): string {
-  const token = getSessionToken();
-  if (!token) return url;
+/**
+ * JWT in the query string only for cross-origin EventSource (cookies are not sent).
+ * Same-origin uses the HttpOnly session cookie via `withCredentials`.
+ */
+export function withAuthQuery(
+  url: string,
+  options?: { token?: string | null; crossOrigin?: boolean },
+): string {
+  const crossOrigin = options?.crossOrigin ?? Boolean(apiDirectBaseUrl());
+  const token = options?.token !== undefined ? options.token : getSessionToken();
+  if (!crossOrigin || !token) return url;
   const sep = url.includes('?') ? '&' : '?';
   return `${url}${sep}token=${encodeURIComponent(token)}`;
 }

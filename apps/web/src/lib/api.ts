@@ -28,7 +28,13 @@ import type {
   UpdateApplyResult,
   UpdateCheckResult,
 } from '@dockora/shared';
-import { clearSessionToken, csrfHeaders, getSessionToken, setSessionToken as setSessionTokenFromLogin } from './auth';
+import {
+  clearSessionToken,
+  csrfHeaders,
+  getSessionToken,
+  notifyUnauthorized,
+  setSessionToken as setSessionTokenFromLogin,
+} from './auth';
 
 const API_BASE = '/api/v1';
 
@@ -63,8 +69,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
 
   if (!res.ok) {
-    if (res.status === 401 && path !== '/auth/login' && path !== '/auth/login/totp' && path !== '/auth/status') {
-      clearSessionToken();
+    if (res.status === 401 && path !== '/auth/login' && path !== '/auth/login/totp' && path !== '/auth/status' && path !== '/auth/logout') {
+      notifyUnauthorized();
     }
     let message = `API ${path} failed: ${res.status}`;
     try {

@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { fetchAuthStatus, fetchCurrentUser, login as apiLogin, loginTotp, logout as apiLogout } from '@/lib/api';
-import { clearSessionToken } from '@/lib/auth';
+import { clearSessionToken, onSessionInvalidated } from '@/lib/auth';
 import type { AuthUser } from '@dockora/shared';
 import { useLocale } from '@/i18n/locale-provider';
 import { Button, Input } from '@/components/ui/form-controls';
@@ -186,6 +186,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     void loadAuth();
   }, [loadAuth]);
+
+  useEffect(() => {
+    return onSessionInvalidated(() => {
+      setUser(null);
+    });
+  }, []);
 
   const logout = useCallback(() => {
     void apiLogout().finally(() => setUser(null));

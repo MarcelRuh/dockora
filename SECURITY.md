@@ -37,3 +37,4 @@ We aim to acknowledge reports within **7 days**.
 - The API talks to the Docker Engine via the mounted socket — treat Dockora as a privileged control plane.
 - Compose `.env` files and backup archives may contain sensitive values; protect filesystem permissions accordingly.
 - JWT session is an **HttpOnly cookie** (`dockora_session`) plus CSRF double-submit (`dockora_csrf` / `X-CSRF-Token`). The `Secure` flag is set only when the request is HTTPS (`X-Forwarded-Proto`), so HTTP installs keep a working login. Bearer JWT still works for API clients.
+- `/api/docs` (OpenAPI UI) requires a valid session when authentication is enabled.

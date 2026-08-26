@@ -7,6 +7,7 @@ export async function proxySse(apiPath: string, request: Request): Promise<Respo
   const upstreamUrl = new URL(apiPath, `${apiBase}/`);
   const incoming = new URL(request.url);
   incoming.searchParams.forEach((value, key) => {
+    if (key === 'token') return;
     upstreamUrl.searchParams.set(key, value);
   });
 
