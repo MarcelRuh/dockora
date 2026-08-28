@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [1.9.5] – 2026-08-28
+
+### Fixed
+
+- Network search sits in its own full-width row under “Freigegebene Ports”, then the table (not beside the heading)
+
 ## [1.9.4] – 2026-08-28
 
 ### Fixed

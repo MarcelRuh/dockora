@@ -60,20 +60,20 @@ export function PortCards({
       {cards.length === 0 ? (
         <p className="text-sm text-dockora-muted">{labels.empty}</p>
       ) : (
-        <div className="overflow-hidden rounded-md border border-dockora-border bg-dockora-surface/70">
-          <div className="grid grid-cols-1 gap-2 border-b border-dockora-border p-2 sm:grid-cols-[minmax(0,1fr)_8rem_9rem]">
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={labels.filterPlaceholder}
-              aria-label={t.common.search}
-              className="h-8 w-full min-w-0 text-xs"
-            />
+        <div className="space-y-2">
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={labels.filterPlaceholder}
+            aria-label={t.common.search}
+            className="h-9 w-full text-xs"
+          />
+          <div className="flex flex-wrap gap-2">
             <Select
               value={protocol}
               onChange={(e) => setProtocol(e.target.value)}
               aria-label={labels.protocol}
-              className="h-8 w-full min-w-0 text-xs"
+              className="h-8 w-auto min-w-[7.5rem] text-xs"
             >
               <option value="all">{t.common.all}</option>
               {protocols.map((p) => (
@@ -86,7 +86,7 @@ export function PortCards({
               value={status}
               onChange={(e) => setStatus(e.target.value)}
               aria-label={labels.status}
-              className="h-8 w-full min-w-0 text-xs"
+              className="h-8 w-auto min-w-[8rem] text-xs"
             >
               <option value="all">{t.common.all}</option>
               {statuses.map((s) => (
@@ -97,9 +97,9 @@ export function PortCards({
             </Select>
           </div>
           {filtered.length === 0 ? (
-            <p className="px-2.5 py-3 text-sm text-dockora-muted">{labels.filterNone}</p>
+            <p className="text-sm text-dockora-muted">{labels.filterNone}</p>
           ) : (
-            <div className="max-h-[9.5rem] overflow-auto">
+            <div className="max-h-[9.5rem] overflow-auto rounded-md border border-dockora-border bg-dockora-surface/70">
               <table className="w-full text-left text-xs">
             <thead className="sticky top-0 z-10 bg-[#0a0a12]/95">
               <tr className="border-b border-dockora-border text-[10px] font-display font-semibold uppercase tracking-[0.14em] text-dockora-muted">
