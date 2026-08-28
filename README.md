@@ -87,6 +87,34 @@ Images: `ghcr.io/marcelruh/dockora-api` / `dockora-web` (make packages **public*
 - JWT auth (admin/operator/viewer), audit log, OpenAPI at `/api/docs`
 - Plugin drop-in loader + **in-app self-update** (Compose/GitHub or `DOCKORA_SELF_IMAGE`)
 
+## Screenshots
+
+Live UI from a self-hosted instance.
+
+**Dashboard** — engine status, live CPU/RAM/disk, container counts, notifications.
+
+![Dockora dashboard](docs/screenshots/dashboard.png)
+
+**Containers** — lifecycle actions, published ports, filters.
+
+![Dockora containers](docs/screenshots/containers.png)
+
+**Compose** — discover stacks, up/down/redeploy from the UI.
+
+![Dockora Compose](docs/screenshots/compose.png)
+
+**Network** — published host ports and topology grouped by Docker network.
+
+![Dockora network](docs/screenshots/network.png)
+
+**Monitoring** — host resources, temperature, per-container alerts.
+
+![Dockora monitoring](docs/screenshots/monitoring.png)
+
+**Images** — list, pull, prune dangling/unused.
+
+![Dockora images](docs/screenshots/images.png)
+
 ## Stack
 
 | Layer | Tech |
