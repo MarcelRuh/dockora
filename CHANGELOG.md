@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [1.9.4] – 2026-08-28
+
+### Fixed
+
+- Network published-port search spans the table as a full-width toolbar (not a corner cluster)
+
 ## [1.9.3] – 2026-08-28
 
 ### Changed

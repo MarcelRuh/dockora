@@ -61,19 +61,19 @@ export function PortCards({
         <p className="text-sm text-dockora-muted">{labels.empty}</p>
       ) : (
         <div className="overflow-hidden rounded-md border border-dockora-border bg-dockora-surface/70">
-          <div className="flex w-full items-center gap-2 border-b border-dockora-border px-2.5 py-2">
+          <div className="grid grid-cols-1 gap-2 border-b border-dockora-border p-2 sm:grid-cols-[minmax(0,1fr)_8rem_9rem]">
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={labels.filterPlaceholder}
               aria-label={t.common.search}
-              className="h-8 min-w-0 flex-1 text-xs"
+              className="h-8 w-full min-w-0 text-xs"
             />
             <Select
               value={protocol}
               onChange={(e) => setProtocol(e.target.value)}
               aria-label={labels.protocol}
-              className="h-8 w-auto min-w-[7rem] shrink-0 text-xs"
+              className="h-8 w-full min-w-0 text-xs"
             >
               <option value="all">{t.common.all}</option>
               {protocols.map((p) => (
@@ -86,7 +86,7 @@ export function PortCards({
               value={status}
               onChange={(e) => setStatus(e.target.value)}
               aria-label={labels.status}
-              className="h-8 w-auto min-w-[8rem] shrink-0 text-xs"
+              className="h-8 w-full min-w-0 text-xs"
             >
               <option value="all">{t.common.all}</option>
               {statuses.map((s) => (
