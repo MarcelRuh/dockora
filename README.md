@@ -89,7 +89,7 @@ Images: `ghcr.io/marcelruh/dockora-api` / `dockora-web` (make packages **public*
 
 ## Screenshots
 
-Live UI from a self-hosted instance.
+Empty instance — UI chrome only, no host stacks or personal data.
 
 **Dashboard** — engine status, live CPU/RAM/disk, container counts, notifications.
 
