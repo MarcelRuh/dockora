@@ -5,7 +5,7 @@ import type { ContainerSummary } from '@dockora/shared';
 import Link from 'next/link';
 import { collectPublishedPorts, filterPublishedPorts } from '@/lib/published-ports';
 import { containerStatusTone } from '@/lib/status';
-import { FilterBar, Input, Select } from '@/components/ui/form-controls';
+import { Input, Select } from '@/components/ui/form-controls';
 import { StatusBadge } from '@/components/ui/page-parts';
 import { useLocale } from '@/i18n/locale-provider';
 
@@ -49,29 +49,31 @@ export function PortCards({
 
   return (
     <section className="space-y-2">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-baseline gap-2">
-          <h2 className="font-display text-base font-bold">{labels.title}</h2>
-          {cards.length > 0 ? (
-            <p className="font-mono text-[10px] tabular-nums text-dockora-muted">
-              {filtering ? `${filtered.length}/${cards.length}` : cards.length}
-            </p>
-          ) : null}
-        </div>
+      <div className="flex items-baseline gap-2">
+        <h2 className="font-display text-base font-bold">{labels.title}</h2>
         {cards.length > 0 ? (
-          <FilterBar className="min-w-0 flex-1 sm:max-w-xl sm:justify-end">
+          <p className="font-mono text-[10px] tabular-nums text-dockora-muted">
+            {filtering ? `${filtered.length}/${cards.length}` : cards.length}
+          </p>
+        ) : null}
+      </div>
+      {cards.length === 0 ? (
+        <p className="text-sm text-dockora-muted">{labels.empty}</p>
+      ) : (
+        <div className="overflow-hidden rounded-md border border-dockora-border bg-dockora-surface/70">
+          <div className="flex w-full items-center gap-2 border-b border-dockora-border px-2.5 py-2">
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={labels.filterPlaceholder}
               aria-label={t.common.search}
-              className="h-8 max-w-xs text-xs"
+              className="h-8 min-w-0 flex-1 text-xs"
             />
             <Select
               value={protocol}
               onChange={(e) => setProtocol(e.target.value)}
               aria-label={labels.protocol}
-              className="h-8 min-w-[7rem] text-xs"
+              className="h-8 w-auto min-w-[7rem] shrink-0 text-xs"
             >
               <option value="all">{t.common.all}</option>
               {protocols.map((p) => (
@@ -84,7 +86,7 @@ export function PortCards({
               value={status}
               onChange={(e) => setStatus(e.target.value)}
               aria-label={labels.status}
-              className="h-8 min-w-[8rem] text-xs"
+              className="h-8 w-auto min-w-[8rem] shrink-0 text-xs"
             >
               <option value="all">{t.common.all}</option>
               {statuses.map((s) => (
@@ -93,16 +95,12 @@ export function PortCards({
                 </option>
               ))}
             </Select>
-          </FilterBar>
-        ) : null}
-      </div>
-      {cards.length === 0 ? (
-        <p className="text-sm text-dockora-muted">{labels.empty}</p>
-      ) : filtered.length === 0 ? (
-        <p className="text-sm text-dockora-muted">{labels.filterNone}</p>
-      ) : (
-        <div className="max-h-[9.5rem] overflow-auto rounded-md border border-dockora-border bg-dockora-surface/70">
-          <table className="w-full text-left text-xs">
+          </div>
+          {filtered.length === 0 ? (
+            <p className="px-2.5 py-3 text-sm text-dockora-muted">{labels.filterNone}</p>
+          ) : (
+            <div className="max-h-[9.5rem] overflow-auto">
+              <table className="w-full text-left text-xs">
             <thead className="sticky top-0 z-10 bg-[#0a0a12]/95">
               <tr className="border-b border-dockora-border text-[10px] font-display font-semibold uppercase tracking-[0.14em] text-dockora-muted">
                 <th className="whitespace-nowrap px-2.5 py-1.5">{labels.host}</th>
@@ -140,6 +138,8 @@ export function PortCards({
               ))}
             </tbody>
           </table>
+            </div>
+          )}
         </div>
       )}
     </section>
