@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [1.9.3] – 2026-08-28
+
+### Changed
+
+- Network page: compact published-port table with full text/protocol/status filters; topology grouped by Docker network
+
 ## [1.9.2] – 2026-08-26
 
 ### Security

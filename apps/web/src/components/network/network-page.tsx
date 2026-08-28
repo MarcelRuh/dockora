@@ -33,7 +33,7 @@ export function NetworkPage() {
   }, [load]);
 
   return (
-    <div className="space-y-8 animate-in fade-in">
+    <div className="space-y-5 animate-in fade-in">
       <PageHeader
         title={t.network.title}
         subtitle={t.network.subtitle}
@@ -48,7 +48,7 @@ export function NetworkPage() {
       {loading && containers.length === 0 ? <LoadingState message={t.common.loading} /> : null}
 
       {!loading || containers.length > 0 ? (
-        <div className="space-y-8">
+        <div className="space-y-5">
           <PortCards containers={containers} labels={t.network.ports} />
           <NetworkTopology containers={containers} labels={t.network.topology} />
         </div>

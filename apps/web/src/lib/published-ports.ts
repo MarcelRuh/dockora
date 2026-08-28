@@ -1,3 +1,6 @@
+import type { ContainerSummary } from '@dockora/shared';
+import { formatHostBinding, parsePortBindings, uniquePublishedPorts as uniqueParsedPublishedPorts } from './parse-ports';
+
 /** Parse Docker port strings like `8080->80/tcp`, `0.0.0.0:5055->5055/tcp`, `:::6868->6868/tcp`. */
 export function publishedPortHref(
   portMapping: string,
@@ -65,4 +68,73 @@ export function uniquePublishedPorts(ports: string[]): string[] {
   }
 
   return preferred.length > 0 ? preferred : ports;
+}
+
+export interface PublishedPortCard {
+  key: string;
+  containerId: string;
+  containerName: string;
+  status: ContainerSummary['status'];
+  hostLabel: string;
+  containerPort: string;
+  protocol: string;
+  raw: string;
+}
+
+export type PortTableFilter = {
+  query: string;
+  protocol: string;
+  status: string;
+};
+
+export function collectPublishedPorts(containers: ContainerSummary[]): PublishedPortCard[] {
+  const cards: PublishedPortCard[] = [];
+  for (const c of containers) {
+    for (const port of uniqueParsedPublishedPorts(parsePortBindings(c.ports))) {
+      cards.push({
+        key: `${c.id}-${port.hostPort}-${port.containerPort}-${port.protocol}`,
+        containerId: c.id,
+        containerName: c.name,
+        status: c.status,
+        hostLabel: formatHostBinding(port),
+        containerPort: port.containerPort,
+        protocol: port.protocol,
+        raw: port.raw,
+      });
+    }
+  }
+  cards.sort((a, b) => {
+    const ap = Number.parseInt(a.hostLabel.replace(/\D/g, ''), 10) || 0;
+    const bp = Number.parseInt(b.hostLabel.replace(/\D/g, ''), 10) || 0;
+    if (ap !== bp) return ap - bp;
+    return a.containerName.localeCompare(b.containerName);
+  });
+  return cards;
+}
+
+export function filterPublishedPorts(
+  cards: PublishedPortCard[],
+  filter: PortTableFilter,
+): PublishedPortCard[] {
+  const q = filter.query.trim().toLowerCase();
+  const proto = filter.protocol === 'all' ? '' : filter.protocol.toLowerCase();
+  const status = filter.status === 'all' ? '' : filter.status.toLowerCase();
+
+  return cards.filter((card) => {
+    if (proto && card.protocol.toLowerCase() !== proto) return false;
+    if (status && card.status.toLowerCase() !== status) return false;
+    if (!q) return true;
+    const haystack = [
+      card.hostLabel,
+      card.containerPort,
+      card.protocol,
+      card.containerName,
+      card.status,
+      card.raw,
+      card.containerId,
+    ]
+      .join(' ')
+      .toLowerCase();
+    return haystack.includes(q);
+  });
 }

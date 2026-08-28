@@ -1,10 +1,13 @@
 'use client';
 
+import { useMemo, useState } from 'react';
 import type { ContainerSummary } from '@dockora/shared';
 import Link from 'next/link';
-import { formatHostBinding, parsePortBindings, uniquePublishedPorts } from '@/lib/parse-ports';
+import { collectPublishedPorts, filterPublishedPorts } from '@/lib/published-ports';
 import { containerStatusTone } from '@/lib/status';
+import { FilterBar, Input, Select } from '@/components/ui/form-controls';
 import { StatusBadge } from '@/components/ui/page-parts';
+import { useLocale } from '@/i18n/locale-provider';
 
 export interface PortCardLabels {
   title: string;
@@ -13,42 +16,9 @@ export interface PortCardLabels {
   container: string;
   protocol: string;
   status: string;
-}
-
-export interface PublishedPortCard {
-  key: string;
-  containerId: string;
-  containerName: string;
-  status: ContainerSummary['status'];
-  hostLabel: string;
-  containerPort: string;
-  protocol: string;
-  raw: string;
-}
-
-export function collectPublishedPorts(containers: ContainerSummary[]): PublishedPortCard[] {
-  const cards: PublishedPortCard[] = [];
-  for (const c of containers) {
-    for (const port of uniquePublishedPorts(parsePortBindings(c.ports))) {
-      cards.push({
-        key: `${c.id}-${port.hostPort}-${port.containerPort}-${port.protocol}`,
-        containerId: c.id,
-        containerName: c.name,
-        status: c.status,
-        hostLabel: formatHostBinding(port),
-        containerPort: port.containerPort,
-        protocol: port.protocol,
-        raw: port.raw,
-      });
-    }
-  }
-  cards.sort((a, b) => {
-    const ap = Number.parseInt(a.hostLabel.replace(/\D/g, ''), 10) || 0;
-    const bp = Number.parseInt(b.hostLabel.replace(/\D/g, ''), 10) || 0;
-    if (ap !== bp) return ap - bp;
-    return a.containerName.localeCompare(b.containerName);
-  });
-  return cards;
+  name: string;
+  filterPlaceholder: string;
+  filterNone: string;
 }
 
 export function PortCards({
@@ -58,40 +28,118 @@ export function PortCards({
   containers: ContainerSummary[];
   labels: PortCardLabels;
 }) {
-  const cards = collectPublishedPorts(containers);
+  const { t } = useLocale();
+  const [query, setQuery] = useState('');
+  const [protocol, setProtocol] = useState('all');
+  const [status, setStatus] = useState('all');
+  const cards = useMemo(() => collectPublishedPorts(containers), [containers]);
+  const protocols = useMemo(
+    () => [...new Set(cards.map((c) => c.protocol))].sort((a, b) => a.localeCompare(b)),
+    [cards],
+  );
+  const statuses = useMemo(
+    () => [...new Set(cards.map((c) => c.status))].sort((a, b) => a.localeCompare(b)),
+    [cards],
+  );
+  const filtered = useMemo(
+    () => filterPublishedPorts(cards, { query, protocol, status }),
+    [cards, query, protocol, status],
+  );
+  const filtering = query.trim() !== '' || protocol !== 'all' || status !== 'all';
 
   return (
-    <section className="space-y-3">
-      <h2 className="font-display text-lg font-bold">{labels.title}</h2>
+    <section className="space-y-2">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-baseline gap-2">
+          <h2 className="font-display text-base font-bold">{labels.title}</h2>
+          {cards.length > 0 ? (
+            <p className="font-mono text-[10px] tabular-nums text-dockora-muted">
+              {filtering ? `${filtered.length}/${cards.length}` : cards.length}
+            </p>
+          ) : null}
+        </div>
+        {cards.length > 0 ? (
+          <FilterBar className="min-w-0 flex-1 sm:max-w-xl sm:justify-end">
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={labels.filterPlaceholder}
+              aria-label={t.common.search}
+              className="h-8 max-w-xs text-xs"
+            />
+            <Select
+              value={protocol}
+              onChange={(e) => setProtocol(e.target.value)}
+              aria-label={labels.protocol}
+              className="h-8 min-w-[7rem] text-xs"
+            >
+              <option value="all">{t.common.all}</option>
+              {protocols.map((p) => (
+                <option key={p} value={p}>
+                  {p.toUpperCase()}
+                </option>
+              ))}
+            </Select>
+            <Select
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              aria-label={labels.status}
+              className="h-8 min-w-[8rem] text-xs"
+            >
+              <option value="all">{t.common.all}</option>
+              {statuses.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </Select>
+          </FilterBar>
+        ) : null}
+      </div>
       {cards.length === 0 ? (
         <p className="text-sm text-dockora-muted">{labels.empty}</p>
+      ) : filtered.length === 0 ? (
+        <p className="text-sm text-dockora-muted">{labels.filterNone}</p>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {cards.map((card) => (
-            <Link
-              key={card.key}
-              href={`/containers/${encodeURIComponent(card.containerId)}`}
-              className="block space-y-3 rounded-md border border-dockora-border bg-dockora-surface/80 p-4 transition hover:border-dockora-accent/50 hover:bg-dockora-surface"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <p className="font-mono text-2xl font-bold tabular-nums text-dockora-accent">
-                  {card.hostLabel}
-                </p>
-                <StatusBadge status={containerStatusTone(card.status)} label={card.status} />
-              </div>
-              <p className="truncate text-sm font-medium">{card.containerName}</p>
-              <dl className="grid grid-cols-2 gap-2 font-mono text-[11px] text-dockora-muted">
-                <div>
-                  <dt className="uppercase tracking-wide">{labels.container}</dt>
-                  <dd className="mt-0.5 text-dockora-text">{card.containerPort}</dd>
-                </div>
-                <div>
-                  <dt className="uppercase tracking-wide">{labels.protocol}</dt>
-                  <dd className="mt-0.5 uppercase text-dockora-text">{card.protocol}</dd>
-                </div>
-              </dl>
-            </Link>
-          ))}
+        <div className="max-h-[9.5rem] overflow-auto rounded-md border border-dockora-border bg-dockora-surface/70">
+          <table className="w-full text-left text-xs">
+            <thead className="sticky top-0 z-10 bg-[#0a0a12]/95">
+              <tr className="border-b border-dockora-border text-[10px] font-display font-semibold uppercase tracking-[0.14em] text-dockora-muted">
+                <th className="whitespace-nowrap px-2.5 py-1.5">{labels.host}</th>
+                <th className="whitespace-nowrap px-2.5 py-1.5">{labels.container}</th>
+                <th className="whitespace-nowrap px-2.5 py-1.5">{labels.protocol}</th>
+                <th className="px-2.5 py-1.5">{labels.name}</th>
+                <th className="whitespace-nowrap px-2.5 py-1.5">{labels.status}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((card) => (
+                <tr key={card.key} className="border-b border-dockora-border/50 last:border-0 hover:bg-white/[0.03]">
+                  <td className="px-2.5 py-1">
+                    <Link
+                      href={`/containers/${encodeURIComponent(card.containerId)}`}
+                      className="font-mono text-[13px] font-semibold tabular-nums text-dockora-accent hover:underline"
+                    >
+                      {card.hostLabel}
+                    </Link>
+                  </td>
+                  <td className="px-2.5 py-1 font-mono tabular-nums text-dockora-text">{card.containerPort}</td>
+                  <td className="px-2.5 py-1 font-mono uppercase text-dockora-muted">{card.protocol}</td>
+                  <td className="max-w-[14rem] truncate px-2.5 py-1">
+                    <Link
+                      href={`/containers/${encodeURIComponent(card.containerId)}`}
+                      className="text-dockora-text hover:text-dockora-accent"
+                    >
+                      {card.containerName}
+                    </Link>
+                  </td>
+                  <td className="px-2.5 py-1">
+                    <StatusBadge status={containerStatusTone(card.status)} label={card.status} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </section>
