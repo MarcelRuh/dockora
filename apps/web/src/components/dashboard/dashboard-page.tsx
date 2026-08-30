@@ -1,9 +1,17 @@
 'use client';
 
 import { DashboardView } from '@/components/dashboard/dashboard-view';
+import { NeonParticles } from '@/components/ui/neon-particles';
 import { useDashboard } from '@/hooks/use-dashboard';
 
 export function DashboardPage() {
   const dashboard = useDashboard();
-  return <DashboardView {...dashboard} />;
+  return (
+    <>
+      <div className="pointer-events-none fixed inset-0 z-0 md:left-60">
+        <NeonParticles />
+      </div>
+      <DashboardView {...dashboard} />
+    </>
+  );
 }

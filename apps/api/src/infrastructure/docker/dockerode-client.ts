@@ -56,6 +56,10 @@ export class DockerodeClient implements IDockerClient {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private dfCache: { at: number; data: DockerSystemDf } | null = null;
   private dfInflight: Promise<DockerSystemDf> | null = null;
+  private listCache = new Map<
+    string,
+    { at: number; value: DockerContainerInfo[]; inflight: Promise<DockerContainerInfo[]> | null }
+  >();
 
   constructor(options: DockerodeClientOptions) {
     this.logger = options.logger;
@@ -89,14 +93,33 @@ export class DockerodeClient implements IDockerClient {
   }
 
   async listContainers(all = true): Promise<DockerContainerInfo[]> {
-    const list = await this.docker.listContainers({ all });
+    const key = all ? 'all' : 'running';
+    const now = Date.now();
+    const hit = this.listCache.get(key);
+    if (hit?.value && now - hit.at < 2_500) return hit.value;
+    if (hit?.inflight) return hit.inflight;
 
-    return list.map((c) => mapListContainer(c));
+    const inflight = withTimeout(
+      this.docker.listContainers({ all }),
+      15_000,
+      'Docker listContainers timeout',
+    ).then((list) => {
+      const value = list.map((c) => mapListContainer(c));
+      this.listCache.set(key, { at: Date.now(), value, inflight: null });
+      return value;
+    });
+    this.listCache.set(key, { at: hit?.at ?? 0, value: hit?.value ?? [], inflight });
+    try {
+      return await inflight;
+    } catch (error) {
+      this.listCache.delete(key);
+      throw error;
+    }
   }
 
   async inspectContainer(id: string): Promise<DockerContainerDetails> {
     const container = this.docker.getContainer(id);
-    const info = await container.inspect();
+    const info = await withTimeout(container.inspect(), 10_000, `Docker inspect timeout (${id.slice(0, 12)})`);
     return mapInspectContainer(info);
   }
 
@@ -130,6 +153,11 @@ export class DockerodeClient implements IDockerClient {
         await container.remove({ force: options?.force });
         break;
     }
+    this.invalidateListCache();
+  }
+
+  private invalidateListCache(): void {
+    this.listCache.clear();
   }
 
   async getContainerLogs(
@@ -416,7 +444,11 @@ export class DockerodeClient implements IDockerClient {
     if (this.dfInflight) return this.dfInflight;
     this.dfInflight = (async () => {
       try {
-        const data = (await this.docker.df()) as DockerSystemDf;
+        const data = (await withTimeout(
+          this.docker.df() as Promise<DockerSystemDf>,
+          20_000,
+          'Docker df timeout',
+        )) as DockerSystemDf;
         this.dfCache = { at: Date.now(), data };
         return data;
       } finally {

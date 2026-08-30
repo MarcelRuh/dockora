@@ -219,7 +219,7 @@ export function DataTable({
             {rows.map((cells, i) => (
               <tr
                 key={rowKeys?.[i] ?? i}
-                className="border-b border-dockora-border/60 transition-colors hover:bg-white/[0.03] last:border-0"
+                className="border-b border-dockora-border/60 transition-colors [content-visibility:auto] [contain-intrinsic-size:0_52px] hover:bg-white/[0.03] last:border-0"
               >
                 {cells.map((cell, j) => (
                   <td key={j} className={cellSticky(j, cells.length, false)}>

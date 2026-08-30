@@ -34,6 +34,13 @@ export const containersModule: FastifyPluginAsync = async (app: FastifyInstance)
     searchPaths: app.config.composeSearchPaths,
   });
 
+  app.addHook('onReady', async () => {
+    service.startStatsWarmer();
+  });
+  app.addHook('onClose', async () => {
+    service.stopStatsWarmer();
+  });
+
   app.get<{ Querystring: ContainerFilter }>(
     `${API_PREFIX}/containers`,
     async (request): Promise<ContainerSummary[]> => {

@@ -22,9 +22,9 @@ export async function isAuthEnabled(): Promise<boolean> {
   if (cache && now - cache.at < CACHE_TTL_MS) {
     return cache.value;
   }
-  const current = await settings.getSettings();
-  cache = { value: current.authEnabled, at: now };
-  return current.authEnabled;
+  const current = await settings.getAuthEnabled();
+  cache = { value: current, at: now };
+  return current;
 }
 
 /** Öffentliche Routen – auch wenn Auth aktiv ist. */

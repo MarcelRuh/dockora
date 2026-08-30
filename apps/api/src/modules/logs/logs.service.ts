@@ -29,7 +29,9 @@ export class LogsService {
     const limit = Math.min(Math.max(query.limit ?? 100, 1), 1000);
     const perContainer = Math.max(Math.ceil(limit / 5), 20);
 
-    const containers = await this.deps.docker.listContainers(true);
+    const containers = query.container
+      ? await this.deps.docker.listContainers(true)
+      : await this.deps.docker.listContainers(false);
     let targets = containers;
 
     if (query.container) {

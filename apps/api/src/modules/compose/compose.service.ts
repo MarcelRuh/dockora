@@ -26,6 +26,7 @@ import {
   resolveDiscoveredProject,
 } from './compose-discovery.js';
 import { deleteProjectDirectory } from './safe-project-dir.js';
+import { mapPool } from '../../infrastructure/async/map-pool.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -227,8 +228,8 @@ export class ComposeService {
       const explicitKeys = extractExplicitEnvKeys(sourceDoc.services ?? {});
       const resolvedEnvs = extractServiceEnvMaps(resolvedDoc.services ?? {});
 
-      await Promise.all(
-        Object.entries(explicitKeys).map(async ([service, keys]) => {
+      const jobs = Object.entries(explicitKeys);
+      await mapPool(jobs, 5, async ([service, keys]) => {
           if (keys.size === 0) return;
           const current = currentByService.get(service);
           if (!current) return;
@@ -242,8 +243,7 @@ export class ComposeService {
           } catch {
             // skip if inspect fails
           }
-        }),
-      );
+      });
     } catch {
       // ignore parse issues
     }

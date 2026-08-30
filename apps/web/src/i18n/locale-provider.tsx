@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { DEFAULT_LOCALE, type Locale, LOCALES } from '@dockora/shared';
-import { messages, type Messages } from './messages';
+import { de, type Messages } from './messages-de';
 
 type LocaleContextValue = {
   locale: Locale;
@@ -15,6 +15,7 @@ const STORAGE_KEY = 'dockora-locale';
 
 export function LocaleProvider({ children }: { children: React.ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>(DEFAULT_LOCALE);
+  const [en, setEn] = useState<Messages | null>(null);
 
   useEffect(() => {
     const stored = window.localStorage.getItem(STORAGE_KEY);
@@ -28,15 +29,28 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
     window.localStorage.setItem(STORAGE_KEY, locale);
   }, [locale]);
 
+  useEffect(() => {
+    if (locale === DEFAULT_LOCALE) return;
+    let cancelled = false;
+    void import('./messages-en').then((mod) => {
+      if (!cancelled) setEn(mod.en);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [locale]);
+
   const setLocale = useCallback((next: Locale) => setLocaleState(next), []);
+
+  const t = locale === 'en' && en ? en : de;
 
   const value = useMemo(
     () => ({
       locale,
       setLocale,
-      t: messages[locale] as Messages,
+      t,
     }),
-    [locale, setLocale],
+    [locale, setLocale, t],
   );
 
   return <LocaleContext.Provider value={value}>{children}</LocaleContext.Provider>;

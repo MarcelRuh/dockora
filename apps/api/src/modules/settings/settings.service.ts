@@ -56,6 +56,12 @@ export class PrismaSettingsRepository implements ISettingsRepository {
 export class SettingsService {
   constructor(private readonly repo: ISettingsRepository) {}
 
+  async getAuthEnabled(): Promise<boolean> {
+    const stored = await this.repo.get('authEnabled');
+    if (stored == null || stored === '') return DEFAULTS.authEnabled;
+    return stored === 'true';
+  }
+
   async getSettings(envDefaults?: Partial<AppSettings>): Promise<AppSettings> {
     const stored = await this.repo.getAll();
     const base: AppSettings = {

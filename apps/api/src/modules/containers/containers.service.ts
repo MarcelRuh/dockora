@@ -23,17 +23,35 @@ export interface ContainersServiceDeps {
 
 const STATS_CACHE_TTL_MS = 12_000;
 const STATS_CACHE_MAX = 200;
+const STATS_WARM_MS = 20_000;
 
 export class ContainersService {
   private readonly statsCache = new Map<
     string,
     { expiresAt: number; stats: ContainerStatsSnapshot }
   >();
+  private warmTimer: ReturnType<typeof setInterval> | null = null;
+  private warming = false;
 
   constructor(private readonly deps: ContainersServiceDeps) {}
 
+  startStatsWarmer(): void {
+    if (this.warmTimer) return;
+    this.warmTimer = setInterval(() => void this.warmRunningStats(), STATS_WARM_MS);
+    void this.warmRunningStats();
+  }
+
+  stopStatsWarmer(): void {
+    if (this.warmTimer) {
+      clearInterval(this.warmTimer);
+      this.warmTimer = null;
+    }
+  }
+
   async list(filters: ContainerFilter = {}): Promise<ContainerSummary[]> {
-    const all = await this.deps.docker.listContainers(true);
+    const needStopped =
+      !filters.status || filters.status === 'all' || filters.status === 'exited';
+    const all = await this.deps.docker.listContainers(needStopped);
     const includeSelf =
       filters.includeSelf === true ||
       filters.includeSelf === 'true' ||
@@ -49,6 +67,7 @@ export class ContainersService {
       .map(toSummary);
 
     if (!includeStats) {
+      void this.warmRunningStats();
       return summaries;
     }
 
@@ -72,6 +91,26 @@ export class ContainersService {
     });
 
     return summaries;
+  }
+
+  async warmRunningStats(): Promise<void> {
+    if (this.warming) return;
+    this.warming = true;
+    try {
+      const running = await this.deps.docker.listContainers(false);
+      await mapPool(running, 4, async (container) => {
+        if (container.status !== 'running') return;
+        try {
+          await this.stats(container.id);
+        } catch {
+          // ignore
+        }
+      });
+    } catch {
+      // docker offline
+    } finally {
+      this.warming = false;
+    }
   }
 
   async getDetails(id: string): Promise<ContainerDetails> {

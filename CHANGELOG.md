@@ -5,6 +5,17 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [1.9.7] – 2026-08-30
+
+### Performance
+
+- Shared 2.5s cache for `listContainers` (all callers, single-flight) with invalidation on container actions
+- Auth checks `authEnabled` via a single SQLite key instead of loading all settings
+- Background warmer keeps running-container stats hot; running-only Docker lists for logs/filters
+- `list`/`inspect`/`df` have timeouts; compose env-preview inspects are concurrency-capped
+- Particle canvas only on login and dashboard; English locale is lazy-loaded; one global search on mobile
+- Table rows use `content-visibility` for large lists
+
 ## [1.9.6] – 2026-08-30
 
 ### Performance

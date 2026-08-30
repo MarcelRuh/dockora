@@ -10,7 +10,7 @@ import type { Locale } from '@dockora/shared';
 import { AuthLogoutButton } from '@/components/auth/auth-provider';
 import { NAV_ICONS } from '@/components/ui/nav-icons';
 import { BrandLogo, BrandLogoWide } from '@/components/ui/brand-logo';
-import { NeonAtmosphere, NeonParticles } from '@/components/ui/neon-particles';
+import { NeonAtmosphere } from '@/components/ui/neon-particles';
 
 const NAV_ITEMS = [
   { key: 'dashboard', href: '/', ready: true },
@@ -70,12 +70,12 @@ function NavList({
   );
 }
 
-function LocaleControls({ dense = false }: { dense?: boolean }) {
+function LocaleControls({ dense = false, search = true }: { dense?: boolean; search?: boolean }) {
   const { t, locale, setLocale } = useLocale();
 
   return (
     <div className={cn('flex gap-2', dense ? 'items-center' : 'flex-col')}>
-      <GlobalSearch compact={dense} />
+      {search ? <GlobalSearch compact={dense} /> : null}
       <select
         aria-label={t.locale.label}
         className={cn(
@@ -117,7 +117,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="relative flex h-dvh overflow-hidden">
       <div className="pointer-events-none fixed inset-0 z-0">
-        <NeonParticles />
         <NeonAtmosphere />
       </div>
 
@@ -214,7 +213,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <NavList compact onNavigate={() => setDrawerOpen(false)} />
               </nav>
               <div className="space-y-2 border-t border-dockora-railBorder px-3 py-4">
-                <LocaleControls />
+                <LocaleControls search={false} />
                 <AuthLogoutButton />
               </div>
             </aside>
