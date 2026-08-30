@@ -26,9 +26,10 @@ export interface UpdatesServiceDeps {
 
 export class UpdatesService {
   constructor(private readonly deps: UpdatesServiceDeps) {}
+  private pruneReadAt = 0;
 
   async listCached(): Promise<UpdateCheckResult[]> {
-    await this.pruneStaleCache().catch(() => undefined);
+    await this.pruneStaleCacheThrottled();
     const rows = await prisma.updateCheckCache.findMany({
       orderBy: [{ updateAvailable: 'desc' }, { checkedAt: 'desc' }],
     });
@@ -36,7 +37,7 @@ export class UpdatesService {
   }
 
   async countAvailable(): Promise<number> {
-    await this.pruneStaleCache().catch(() => undefined);
+    await this.pruneStaleCacheThrottled();
     return prisma.updateCheckCache.count({
       where: { updateAvailable: true },
     });
@@ -46,6 +47,9 @@ export class UpdatesService {
     const containers = (await this.deps.docker.listContainers(allContainers)).filter(
       (c) => !isDockoraSelfContainer(c),
     );
+    const registryAuth = this.deps.getRegistryAuth
+      ? await this.deps.getRegistryAuth()
+      : undefined;
     const results: UpdateCheckResult[] = [];
 
     for (let i = 0; i < containers.length; i++) {
@@ -53,7 +57,12 @@ export class UpdatesService {
       // Stagger registry calls – GHCR anonymous/auth quotas are easy to trip in a burst
       if (i > 0) await sleep(750);
       try {
-        const result = await this.checkContainer(container.id, container.name, container.image);
+        const result = await this.checkContainer(
+          container.id,
+          container.name,
+          container.image,
+          registryAuth,
+        );
         results.push(result);
         if (result.error?.toLowerCase().includes('rate limited')) {
           await sleep(5_000);
@@ -79,16 +88,25 @@ export class UpdatesService {
     return results;
   }
 
-  private async resolveAuth(registryHost: string): Promise<RegistryAuth | undefined> {
-    if (!this.deps.getRegistryAuth) return undefined;
-    const creds = await this.deps.getRegistryAuth();
+  private async pruneStaleCacheThrottled(): Promise<void> {
+    if (Date.now() - this.pruneReadAt < 60_000) return;
+    this.pruneReadAt = Date.now();
+    await this.pruneStaleCache().catch(() => undefined);
+  }
+
+  private async resolveAuth(
+    registryHost: string,
+    creds?: { ghcrToken: string; lscrToken: string },
+  ): Promise<RegistryAuth | undefined> {
+    const resolved = creds ?? (this.deps.getRegistryAuth ? await this.deps.getRegistryAuth() : undefined);
+    if (!resolved) return undefined;
     const host = registryHost.toLowerCase();
     if (host.includes('lscr.io')) {
-      const token = creds.lscrToken.trim() || creds.ghcrToken.trim();
+      const token = resolved.lscrToken.trim() || resolved.ghcrToken.trim();
       return token ? { token, username: 'token' } : undefined;
     }
     if (host.includes('ghcr.io')) {
-      const token = creds.ghcrToken.trim();
+      const token = resolved.ghcrToken.trim();
       return token ? { token, username: 'token' } : undefined;
     }
     return undefined;
@@ -140,6 +158,7 @@ export class UpdatesService {
     containerId: string,
     containerName: string,
     image: string,
+    registryCreds?: { ghcrToken: string; lscrToken: string },
   ): Promise<UpdateCheckResult> {
     const parsed = parseImageRef(image);
     const registry = detectRegistry(image);
@@ -156,7 +175,10 @@ export class UpdatesService {
     }
 
     try {
-      remoteDigest = await fetchRemoteDigest(parsed, await this.resolveAuth(parsed.registryHost));
+      remoteDigest = await fetchRemoteDigest(
+        parsed,
+        await this.resolveAuth(parsed.registryHost, registryCreds),
+      );
     } catch (err) {
       const remoteErr = err instanceof Error ? err.message : String(err);
       error = error ? `${error}; Remote: ${remoteErr}` : remoteErr;
@@ -308,7 +330,7 @@ export class UpdatesService {
       let prunedImages = 0;
       let spaceReclaimed = 0;
       try {
-        const pruned = await this.deps.docker.pruneImages(false);
+        const pruned = await this.deps.docker.pruneImages(true);
         prunedImages = pruned.imagesDeleted;
         spaceReclaimed = pruned.spaceReclaimed;
       } catch {
@@ -459,7 +481,7 @@ async function fetchDockerHubDigest(
 ): Promise<string | null> {
   const repoPath = apiRepositoryPath(parsed);
   const tokenUrl = `https://auth.docker.io/token?service=registry.docker.io&scope=repository:${repoPath}:pull`;
-  const tokenRes = await request(tokenUrl);
+  const tokenRes = await request(tokenUrl, { signal: AbortSignal.timeout(10_000) });
   if (tokenRes.statusCode >= 400) {
     throw new Error(`Docker Hub auth failed (${tokenRes.statusCode})`);
   }
@@ -525,7 +547,7 @@ async function fetchManifestDigest(
   const attempt = async (bearer?: string) => {
     const headers: Record<string, string> = { Accept: MANIFEST_ACCEPT };
     if (bearer) headers.Authorization = `Bearer ${bearer}`;
-    return request(url, { headers });
+    return request(url, { headers, signal: AbortSignal.timeout(10_000) });
   };
 
   const resolveBearer = async (
@@ -682,7 +704,7 @@ async function fetchRegistryBearerToken(
       headers.Authorization = `Basic ${basic}`;
     }
     try {
-      const tokenRes = await request(buildUrl(), { headers });
+      const tokenRes = await request(buildUrl(), { headers, signal: AbortSignal.timeout(10_000) });
       if (tokenRes.statusCode >= 400) {
         await tokenRes.body.dump().catch(() => undefined);
         return null;

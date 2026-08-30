@@ -164,5 +164,5 @@ function parseTail(query: { tail?: string }): number {
   const raw = query.tail;
   if (!raw) return 200;
   const n = Number(raw);
-  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 200;
+  return Number.isFinite(n) && n > 0 ? Math.min(Math.floor(n), 5_000) : 200;
 }

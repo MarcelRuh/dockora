@@ -18,7 +18,7 @@ import {
   validateComposeConfig,
 } from '@/lib/api';
 import { formatComposePreviewLines } from '@/lib/compose-preview';
-import { previewComposeInterpolation } from '@/lib/compose-lint';
+import { previewComposeInterpolation } from '@/lib/compose-interpolation';
 import { useLocale } from '@/i18n/locale-provider';
 import { useAuth } from '@/components/auth/auth-provider';
 import { canAdmin, canOperate } from '@/lib/roles';
@@ -84,18 +84,18 @@ export function ComposeDetailPage({ id }: { id: string }) {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchComposeProject(id);
+      const [data, containers] = await Promise.all([
+        fetchComposeProject(id),
+        fetchContainers().catch(() => [] as ContainerSummary[]),
+      ]);
       setProject(data);
       setYaml(data.yaml);
+      setServiceContainers(containers.filter((c) => c.composeProject === data.name));
       const preferred =
         data.envFiles.includes('.env') || data.envFiles.length === 0
           ? '.env'
           : (data.envFiles[0] ?? '.env');
-      await loadEnv(preferred);
-      const containers = await fetchContainers().catch(() => [] as ContainerSummary[]);
-      setServiceContainers(
-        containers.filter((c) => c.composeProject === data.name),
-      );
+      void loadEnv(preferred);
     } catch (err) {
       setError(err instanceof Error ? err.message : t.compose.notFound);
       setProject(null);

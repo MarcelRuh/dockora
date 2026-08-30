@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import 'xterm/css/xterm.css';
 
 function wsBaseUrl(): string {
   if (typeof window === 'undefined') return '';

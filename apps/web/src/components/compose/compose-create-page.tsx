@@ -15,7 +15,7 @@ import { ProgressBar } from '@/components/ui/progress-bar';
 import { ErrorBanner, PageHeader } from '@/components/ui/page-parts';
 import { EnvEditor } from '@/components/compose/env-editor';
 import { CodeEditor } from '@/components/compose/code-editor';
-import { previewComposeInterpolation } from '@/lib/compose-lint';
+import { previewComposeInterpolation } from '@/lib/compose-interpolation';
 
 export const DEFAULT_COMPOSE_YAML = `services:
   web:

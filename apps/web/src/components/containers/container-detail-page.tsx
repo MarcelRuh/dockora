@@ -114,18 +114,28 @@ export function ContainerDetailPage({ id }: { id: string }) {
     if (tab !== 'logs' || !liveLogs) return;
 
     let es: EventSource | null = null;
+    let raf = 0;
+    const pending: string[] = [];
+
+    const flush = () => {
+      raf = 0;
+      if (pending.length === 0) return;
+      const batch = pending.splice(0).join('\n');
+      setLogs((prev) => {
+        const next = prev ? `${prev}\n${batch}` : batch;
+        const lines = next.split('\n');
+        return lines.length > 4000 ? lines.slice(-3000).join('\n') : next;
+      });
+    };
+
     try {
       es = openEventSource(
         `/api/v1/containers/${encodeURIComponent(id)}/logs/stream?tail=${tail}`,
       );
       es.onmessage = (event) => {
         try {
-          const line = JSON.parse(event.data) as string;
-          setLogs((prev) => {
-            const next = prev ? `${prev}\n${line}` : line;
-            const lines = next.split('\n');
-            return lines.length > 4000 ? lines.slice(-3000).join('\n') : next;
-          });
+          pending.push(JSON.parse(event.data) as string);
+          if (!raf) raf = window.requestAnimationFrame(flush);
         } catch {
           // ignore malformed chunks
         }
@@ -139,6 +149,7 @@ export function ContainerDetailPage({ id }: { id: string }) {
     }
 
     return () => {
+      if (raf) window.cancelAnimationFrame(raf);
       es?.close();
     };
   }, [tab, liveLogs, id, tail, loadLogs]);

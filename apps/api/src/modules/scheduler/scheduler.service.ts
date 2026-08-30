@@ -16,6 +16,7 @@ export class SchedulerService {
   private readonly callbacks = new Map<JobType, JobCallback>();
   private readonly tasks = new Map<string, ScheduledTask>();
   private readonly lastErrors = new Map<string, string>();
+  private readonly running = new Set<string>();
   private started = false;
 
   registerCallback(type: JobType, callback: JobCallback): void {
@@ -98,6 +99,11 @@ export class SchedulerService {
       return { ok: false, message: `No callback registered for ${row.type}` };
     }
 
+    if (this.running.has(id)) {
+      return { ok: false, message: 'Job already running' };
+    }
+    this.running.add(id);
+
     try {
       await callback();
       this.lastErrors.delete(id);
@@ -113,6 +119,8 @@ export class SchedulerService {
         ok: false,
         message,
       };
+    } finally {
+      this.running.delete(id);
     }
   }
 

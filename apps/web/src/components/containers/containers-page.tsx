@@ -118,12 +118,13 @@ export function ContainersPage() {
         const data = await fetchContainers(filter);
         setItems((prev) => mergePreservingStats(prev, data));
         setLoading(false);
+        if (!silent) void enrichStats(filter);
       } catch (err) {
         setError(err instanceof Error ? err.message : t.containers.loadError);
         if (!silent) setLoading(false);
       }
     },
-    [filter, t.containers.loadError],
+    [filter, enrichStats, t.containers.loadError],
   );
 
   useEffect(() => {
@@ -131,10 +132,6 @@ export function ContainersPage() {
   }, [load]);
 
   useDockerLiveReload(() => void load({ silent: true }), 60_000);
-
-  useEffect(() => {
-    void enrichStats(filter);
-  }, [enrichStats, filter]);
 
   useEffect(() => {
     const id = window.setInterval(() => {

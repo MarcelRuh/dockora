@@ -219,13 +219,17 @@ export class DockerodeClient implements IDockerClient {
     options?: { tail?: number; timestamps?: boolean; stdout?: boolean; stderr?: boolean },
   ): Promise<string> {
     const container = this.docker.getContainer(id);
-    const buffer = await container.logs({
-      stdout: options?.stdout ?? true,
-      stderr: options?.stderr ?? true,
-      tail: options?.tail,
-      timestamps: options?.timestamps ?? false,
-      follow: false,
-    });
+    const buffer = await withTimeout(
+      container.logs({
+        stdout: options?.stdout ?? true,
+        stderr: options?.stderr ?? true,
+        tail: Math.min(options?.tail ?? 200, 5_000),
+        timestamps: options?.timestamps ?? false,
+        follow: false,
+      }),
+      15_000,
+      `Docker logs timeout (${id.slice(0, 12)})`,
+    );
 
     return demuxDockerOutput(container.modem as DemuxModem, buffer);
   }
@@ -240,7 +244,7 @@ export class DockerodeClient implements IDockerClient {
       stdout: true,
       stderr: true,
       follow: true,
-      tail: options?.tail ?? 100,
+      tail: Math.min(options?.tail ?? 100, 5_000),
     });
 
     const stdout = new Writable({
@@ -536,7 +540,7 @@ export class DockerodeClient implements IDockerClient {
     id: string,
   ): Promise<{ Id: string; RepoDigests?: string[]; RepoTags?: string[] }> {
     const image = this.docker.getImage(id);
-    const info = await image.inspect();
+    const info = await withTimeout(image.inspect(), 10_000, `Docker image inspect timeout (${id.slice(0, 12)})`);
     return {
       Id: info.Id,
       RepoDigests: info.RepoDigests,

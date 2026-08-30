@@ -2,9 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-@import 'xterm/css/xterm.css';
-@import '@xyflow/react/dist/style.css';
-
 /* NeonVerse 3D – adapted from CodePen jrck/XJNgxzV for Dockora ops UI */
 :root {
   --dockora-bg: #0a0a0f;

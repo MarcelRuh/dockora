@@ -5,6 +5,16 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [1.9.9] – 2026-08-30
+
+### Performance
+
+- Scheduler jobs skip overlapping runs; update checks load registry auth once and prune stale cache at most once per minute
+- Image apply prunes only dangling images (not `prune -a`); registry HTTP calls time out after 10s
+- Container log tails are capped at 5000 lines with a 15s Docker timeout
+- xterm/React Flow CSS loads only on terminal/topology pages; compose interpolation no longer pulls `yaml` into detail/create
+- Compose detail fetches project and containers in parallel; container stats wait for the first list paint; live logs flush per animation frame
+
 ## [1.9.8] – 2026-08-30
 
 ### Performance
