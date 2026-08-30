@@ -120,7 +120,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <NeonAtmosphere />
       </div>
 
-      <aside className="relative z-10 hidden h-full w-60 shrink-0 flex-col border-r border-dockora-railBorder bg-dockora-rail/90 text-dockora-railText backdrop-blur-xl md:flex">
+      <aside className="relative z-10 hidden h-full w-60 shrink-0 flex-col border-r border-dockora-railBorder bg-dockora-rail text-dockora-railText md:flex">
         <Link
           href="/"
           className="group block border-b border-dockora-railBorder px-4 py-4 transition-opacity hover:opacity-95"

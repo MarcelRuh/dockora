@@ -5,6 +5,15 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [1.9.10] – 2026-08-30
+
+### Performance
+
+- Sidebar/login logo is a 480px WebP (~11 KB) instead of the 512px PNG
+- Font weights trimmed (Inter 4, Orbitron 1, JetBrains 2); unused `geist` dependency removed
+- Panel/field `backdrop-filter` dropped; sidebar no longer uses `backdrop-blur`
+- Global search cache lives 5 minutes; container log SSE flushes up to 20 lines per frame
+
 ## [1.9.9] – 2026-08-30
 
 ### Performance

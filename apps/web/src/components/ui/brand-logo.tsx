@@ -20,10 +20,11 @@ export function BrandLogo({ className, size = 'md', priority = false }: BrandLog
   return (
     <span className={cn('relative inline-flex shrink-0 overflow-hidden', s.box, className)}>
       <Image
-        src="/logo.png"
+        src="/logo.webp"
         alt="Dockora"
         width={s.px}
         height={s.px}
+        sizes={`${s.px}px`}
         className="h-full w-full object-contain"
         priority={priority}
       />
@@ -36,10 +37,11 @@ export function BrandLogoWide({ className, priority = false }: { className?: str
   return (
     <span className={cn('relative block w-full', className)}>
       <Image
-        src="/logo.png"
+        src="/logo.webp"
         alt="Dockora – Docker Management Suite"
         width={240}
         height={240}
+        sizes="(max-width: 768px) 12rem, 15rem"
         className="h-auto w-full object-contain"
         priority={priority}
       />

@@ -9,19 +9,19 @@ import './globals.css';
 const inter = Inter({
   subsets: ['latin'],
   variable: '--font-sans',
-  weight: ['300', '400', '500', '600', '700'],
+  weight: ['400', '500', '600', '700'],
 });
 
 const orbitron = Orbitron({
   subsets: ['latin'],
   variable: '--font-display',
-  weight: ['500', '700', '800', '900'],
+  weight: ['700'],
 });
 
 const jetbrains = JetBrains_Mono({
   subsets: ['latin'],
   variable: '--font-mono',
-  weight: ['400', '500', '600', '700'],
+  weight: ['400', '600'],
 });
 
 export const metadata: Metadata = {

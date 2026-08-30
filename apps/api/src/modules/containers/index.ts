@@ -63,6 +63,18 @@ export const containersModule: FastifyPluginAsync = async (app: FastifyInstance)
 
       let closed = false;
       let streamHandle: { close: () => void } | null = null;
+      const pending: string[] = [];
+      let flushTimer: ReturnType<typeof setTimeout> | null = null;
+
+      const flushLogs = () => {
+        if (flushTimer) {
+          clearTimeout(flushTimer);
+          flushTimer = null;
+        }
+        if (closed || pending.length === 0) return;
+        const batch = pending.splice(0).join('\n');
+        reply.raw.write(`data: ${JSON.stringify(batch)}\n\n`);
+      };
 
       try {
         streamHandle = await service.streamLogs(
@@ -72,7 +84,12 @@ export const containersModule: FastifyPluginAsync = async (app: FastifyInstance)
             const lines = chunk.split('\n');
             for (const line of lines) {
               if (line.length === 0) continue;
-              reply.raw.write(`data: ${JSON.stringify(line)}\n\n`);
+              pending.push(line);
+            }
+            if (pending.length >= 20) {
+              flushLogs();
+            } else if (!flushTimer) {
+              flushTimer = setTimeout(flushLogs, 50);
             }
           },
           { tail },
@@ -84,6 +101,7 @@ export const containersModule: FastifyPluginAsync = async (app: FastifyInstance)
 
       const cleanup = () => {
         if (closed) return;
+        flushLogs();
         closed = true;
         streamHandle?.close();
       };

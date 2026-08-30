@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 
 type Hit = { href: string; label: string; hint: string };
 
-const SEARCH_CACHE_TTL_MS = 20_000;
+const SEARCH_CACHE_TTL_MS = 5 * 60_000;
 let searchCache: { at: number; locale: string; hits: Hit[] } | null = null;
 
 const NAV_HITS = [
