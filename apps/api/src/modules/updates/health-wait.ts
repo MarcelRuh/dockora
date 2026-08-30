@@ -13,17 +13,7 @@ export async function waitForContainerHealthy(
 
   while (Date.now() < deadline) {
     try {
-      const list = await docker.listContainers(true);
-      const match =
-        list.find((c) => c.id === containerIdOrName || c.id.startsWith(containerIdOrName)) ??
-        list.find((c) => c.name.replace(/^\//, '') === wanted);
-
-      if (!match) {
-        await sleep(POLL_MS);
-        continue;
-      }
-
-      const details = await docker.inspectContainer(match.id);
+      const details = await docker.inspectContainer(wanted);
       if (details.state !== 'running') {
         await sleep(POLL_MS);
         continue;
@@ -31,12 +21,11 @@ export async function waitForContainerHealthy(
 
       const health = details.health;
       if (!health || health === 'none' || health === 'healthy') {
-        return { ok: true, message: `Container healthy (${match.name})` };
+        return { ok: true, message: `Container healthy (${details.name})` };
       }
       if (health === 'unhealthy') {
-        return { ok: false, message: `Container unhealthy (${match.name})` };
+        return { ok: false, message: `Container unhealthy (${details.name})` };
       }
-      // starting — keep polling
     } catch {
       // retry
     }

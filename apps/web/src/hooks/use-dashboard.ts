@@ -66,7 +66,7 @@ export function useDashboard(): UseDashboardResult {
     };
 
     const onVisibility = () => {
-      if (document.visibilityState === 'visible' && !receivedSse) {
+      if (document.visibilityState === 'visible') {
         void refresh();
       }
     };
@@ -92,7 +92,9 @@ export function useDashboard(): UseDashboardResult {
       });
 
       es.onerror = () => {
-        if (closed || receivedSse) return;
+        if (closed) return;
+        if (receivedSse && es?.readyState !== EventSource.CLOSED) return;
+        receivedSse = false;
         es?.close();
         es = null;
         startPolling();

@@ -16,17 +16,24 @@ export class MonitoringService {
     const settings = await this.deps.settings.getSettings();
     const alerts: string[] = [];
 
-    let dockerOnline = false;
-    let containers: MonitoringSnapshot['containers'] = [];
-    let buildCacheBytes: number | null = null;
+    const [pingOk, listResult, resources, buildCacheBytes] = await Promise.all([
+      this.deps.docker.ping().catch(() => false),
+      this.deps.docker.listContainers(true).catch(() => null),
+      this.deps.hostMetrics.getResources('/'),
+      settings.monitoringBuildCacheGbThreshold > 0
+        ? this.deps.docker.getBuildCacheBytes().catch(() => null)
+        : Promise.resolve(null),
+    ]);
 
-    try {
-      dockerOnline = await this.deps.docker.ping();
-      if (dockerOnline) {
-        const list = (await this.deps.docker.listContainers(true)).filter(
-          (c) => !isDockoraSelfUpdater(c),
-        );
-        containers = list.map((c) => {
+    const dockerOnline = listResult !== null;
+    let containers: MonitoringSnapshot['containers'] = [];
+
+    if (listResult === null) {
+      alerts.push(pingOk ? 'Docker unreachable' : 'Docker daemon offline');
+    } else {
+      containers = listResult
+        .filter((c) => !isDockoraSelfUpdater(c))
+        .map((c) => {
           const entry: MonitoringSnapshot['containers'][number] = {
             id: c.id,
             name: c.name,
@@ -44,22 +51,16 @@ export class MonitoringService {
           return entry;
         });
 
-        buildCacheBytes = await this.deps.docker.getBuildCacheBytes();
-        const cacheGb = buildCacheBytes / (1024 ** 3);
+      if (buildCacheBytes !== null) {
+        const cacheGb = buildCacheBytes / 1024 ** 3;
         const cacheLimit = settings.monitoringBuildCacheGbThreshold;
         if (cacheLimit > 0 && cacheGb >= cacheLimit) {
           alerts.push(
             `Docker build cache ${cacheGb.toFixed(1)} GB exceeds ${cacheLimit} GB threshold`,
           );
         }
-      } else {
-        alerts.push('Docker daemon offline');
       }
-    } catch {
-      alerts.push('Docker unreachable');
     }
-
-    const resources = await this.deps.hostMetrics.getResources('/');
 
     const memoryPercent =
       resources.memoryTotalBytes > 0

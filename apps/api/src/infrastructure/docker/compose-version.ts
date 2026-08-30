@@ -11,11 +11,22 @@ const execFileAsync = promisify(execFile);
  * Dockerode deckt Compose nicht ab – CLI bleibt Fallback.
  */
 export class ComposeVersionProvider implements IComposeVersionProvider {
+  private cached: { at: number; value: string | null } | null = null;
+
   constructor(
     private readonly snapPath = process.env.DOCKORA_HOST_PROC_SNAP?.trim() || '/data/host-proc.snap',
   ) {}
 
   async getVersion(): Promise<string | null> {
+    if (this.cached && Date.now() - this.cached.at < 60_000) {
+      return this.cached.value;
+    }
+    const value = await this.resolveVersion();
+    this.cached = { at: Date.now(), value };
+    return value;
+  }
+
+  private async resolveVersion(): Promise<string | null> {
     const fromEnv = process.env.DOCKER_COMPOSE_VERSION?.trim();
     if (fromEnv) return fromEnv;
 

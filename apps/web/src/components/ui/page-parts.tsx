@@ -153,12 +153,14 @@ export function TabBar({
 export function DataTable({
   headers,
   rows,
+  rowKeys,
   empty,
   stickyFirst = false,
   stickyLast = false,
 }: {
   headers: string[];
   rows: React.ReactNode[][];
+  rowKeys?: Array<string | number>;
   empty?: React.ReactNode;
   stickyFirst?: boolean;
   stickyLast?: boolean;
@@ -216,7 +218,7 @@ export function DataTable({
           <tbody>
             {rows.map((cells, i) => (
               <tr
-                key={i}
+                key={rowKeys?.[i] ?? i}
                 className="border-b border-dockora-border/60 transition-colors hover:bg-white/[0.03] last:border-0"
               >
                 {cells.map((cell, j) => (

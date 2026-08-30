@@ -5,6 +5,21 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [1.9.6] – 2026-08-30
+
+### Performance
+
+- Dashboard SSE shares a 4s overview cache (single-flight) so open tabs no longer multiply Docker/Prisma load
+- Compose discovery is cached, scans directories in parallel, and resolves projects by path instead of a full rescan
+- `docker system df` is cached and reused for volume sizes and build-cache bytes
+- Container stats TTL is longer with eviction; log aggregation only targets running containers
+- UI: container filters no longer reload on every keystroke; stats poll less often; network topology is lazy-loaded; particle background is cheaper
+
+### Fixed
+
+- Dashboard falls back to polling if the live stream dies after the first event
+- Docker event reconnect no longer stacks timers; blkio stats accept lowercase `read`/`write`
+
 ## [1.9.5] – 2026-08-28
 
 ### Fixed

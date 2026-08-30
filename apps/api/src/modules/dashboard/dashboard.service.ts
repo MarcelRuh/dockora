@@ -70,10 +70,6 @@ export class DashboardService {
     version: string | null;
   }> {
     try {
-      const online = await this.deps.docker.ping();
-      if (!online) {
-        return { status: 'offline', version: null };
-      }
       const version = await this.deps.docker.getVersion();
       return { status: 'online', version: version.version };
     } catch {

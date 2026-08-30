@@ -46,7 +46,7 @@ export function NeonParticles() {
       canvas.style.height = `${h}px`;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-      const count = Math.min(120, Math.max(40, Math.floor((w * h) / 18000)));
+      const count = Math.min(36, Math.max(16, Math.floor((w * h) / 48000)));
       particles = Array.from({ length: count }, () => createParticle(w, h));
     };
 
@@ -78,18 +78,19 @@ export function NeonParticles() {
         ctx.fill();
       }
 
-      for (let i = 0; i < particles.length; i++) {
-        for (let j = i + 1; j < particles.length; j++) {
+      for (let i = 0; i < particles.length; i += 2) {
+        for (let j = i + 1; j < particles.length; j += 2) {
           const a = particles[i]!;
           const b = particles[j]!;
           const dx = a.x - b.x;
           const dy = a.y - b.y;
-          const dist = Math.hypot(dx, dy);
-          if (dist < 120) {
+          const distSq = dx * dx + dy * dy;
+          if (distSq < 10_000) {
+            const dist = Math.sqrt(distSq);
             ctx.beginPath();
             ctx.moveTo(a.x, a.y);
             ctx.lineTo(b.x, b.y);
-            ctx.strokeStyle = `rgba(131,56,236,${0.12 * (1 - dist / 120)})`;
+            ctx.strokeStyle = `rgba(131,56,236,${0.1 * (1 - dist / 100)})`;
             ctx.lineWidth = 0.5;
             ctx.stroke();
           }

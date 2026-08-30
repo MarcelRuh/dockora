@@ -15,12 +15,18 @@ import type {
   IDockerClient,
 } from '../../domain/ports.js';
 import { formatPorts, mapContainerStatus } from '../../domain/container-utils.js';
+import { withTimeout } from '../async/with-timeout.js';
 
 const MAX_EVENTS = 100;
 const COMPOSE_PROJECT_LABEL = 'com.docker.compose.project';
 const COMPOSE_SERVICE_LABEL = 'com.docker.compose.service';
 const VOLUME_HELPER_IMAGE = 'alpine:3.20';
 const VOLUME_NAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,254}$/;
+
+type DockerSystemDf = {
+  Volumes?: Array<{ Name?: string; UsageData?: { Size?: number; RefCount?: number } }>;
+  BuildCache?: Array<{ Size?: number }>;
+};
 
 export interface DockerodeClientOptions {
   socketPath: string;
@@ -47,7 +53,9 @@ export class DockerodeClient implements IDockerClient {
   private readonly events: DockerEventInfo[] = [];
   private stream: NodeJS.ReadableStream | null = null;
   private listening = false;
-  private buildCacheCache: { at: number; bytes: number } | null = null;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private dfCache: { at: number; data: DockerSystemDf } | null = null;
+  private dfInflight: Promise<DockerSystemDf> | null = null;
 
   constructor(options: DockerodeClientOptions) {
     this.logger = options.logger;
@@ -179,7 +187,11 @@ export class DockerodeClient implements IDockerClient {
 
   async getContainerStats(id: string): Promise<DockerStatsSnapshot> {
     const container = this.docker.getContainer(id);
-    const stats = (await container.stats({ stream: false })) as Dockerode.ContainerStats;
+    const stats = (await withTimeout(
+      container.stats({ stream: false }) as Promise<Dockerode.ContainerStats>,
+      8_000,
+      `Docker stats timeout (${id.slice(0, 12)})`,
+    )) as Dockerode.ContainerStats;
     return mapContainerStats(stats);
   }
 
@@ -239,9 +251,7 @@ export class DockerodeClient implements IDockerClient {
 
     const usage = new Map<string, { size: number; refCount: number }>();
     try {
-      const df = (await this.docker.df()) as {
-        Volumes?: Array<{ Name?: string; UsageData?: { Size?: number; RefCount?: number } }>;
-      };
+      const df = await this.getSystemDf();
       for (const entry of df.Volumes ?? []) {
         if (!entry.Name) continue;
         usage.set(entry.Name, {
@@ -389,21 +399,31 @@ export class DockerodeClient implements IDockerClient {
   }
 
   async getBuildCacheBytes(): Promise<number> {
-    const now = Date.now();
-    if (this.buildCacheCache && now - this.buildCacheCache.at < 60_000) {
-      return this.buildCacheCache.bytes;
-    }
     try {
-      const df = (await this.docker.df()) as {
-        BuildCache?: Array<{ Size?: number }>;
-      };
-      const bytes = (df.BuildCache ?? []).reduce((sum, entry) => sum + (entry.Size ?? 0), 0);
-      this.buildCacheCache = { at: now, bytes };
-      return bytes;
+      const df = await this.getSystemDf();
+      return (df.BuildCache ?? []).reduce((sum, entry) => sum + (entry.Size ?? 0), 0);
     } catch (error) {
       this.logger?.debug({ err: error }, 'docker df (build cache) failed');
-      return this.buildCacheCache?.bytes ?? 0;
+      return 0;
     }
+  }
+
+  private async getSystemDf(): Promise<DockerSystemDf> {
+    const now = Date.now();
+    if (this.dfCache && now - this.dfCache.at < 45_000) {
+      return this.dfCache.data;
+    }
+    if (this.dfInflight) return this.dfInflight;
+    this.dfInflight = (async () => {
+      try {
+        const data = (await this.docker.df()) as DockerSystemDf;
+        this.dfCache = { at: Date.now(), data };
+        return data;
+      } finally {
+        this.dfInflight = null;
+      }
+    })();
+    return this.dfInflight;
   }
 
   async getImageInspect(
@@ -431,6 +451,10 @@ export class DockerodeClient implements IDockerClient {
 
   stopEventListener(): void {
     this.listening = false;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     if (this.stream && 'destroy' in this.stream) {
       (this.stream as NodeJS.ReadableStream & { destroy: () => void }).destroy();
     }
@@ -448,6 +472,9 @@ export class DockerodeClient implements IDockerClient {
 
       stream.on('data', (chunk: Buffer | string) => {
         buffer += chunk.toString();
+        if (buffer.length > 1_048_576) {
+          buffer = buffer.slice(-256_000);
+        }
         const lines = buffer.split('\n');
         buffer = lines.pop() ?? '';
 
@@ -486,7 +513,9 @@ export class DockerodeClient implements IDockerClient {
   private scheduleReconnect(): void {
     this.stream = null;
     if (!this.listening) return;
-    setTimeout(() => {
+    if (this.reconnectTimer) return;
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
       if (this.listening && !this.stream) {
         void this.attachEventStream();
       }
@@ -741,9 +770,10 @@ function mapContainerStats(stats: RawContainerStats): DockerStatsSnapshot {
   let blockReadBytes = 0;
   let blockWriteBytes = 0;
   for (const entry of stats.blkio_stats?.io_service_bytes_recursive ?? []) {
-    if (entry.op === 'Read') {
+    const op = (entry.op ?? '').toLowerCase();
+    if (op === 'read') {
       blockReadBytes += entry.value ?? 0;
-    } else if (entry.op === 'Write') {
+    } else if (op === 'write') {
       blockWriteBytes += entry.value ?? 0;
     }
   }

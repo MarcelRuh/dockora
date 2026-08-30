@@ -122,13 +122,15 @@ describe('DashboardService', () => {
     expect(overview.updatesAvailable).toBe(0);
   });
 
-  it('marks engine offline when ping fails', async () => {
-    const mocks = createMocks({ ping: false });
+  it('marks engine offline when version lookup fails', async () => {
+    const mocks = createMocks();
+    vi.mocked(mocks.docker.getVersion).mockRejectedValue(new Error('offline'));
     const service = new DashboardService(mocks);
     const overview = await service.getOverview();
 
     expect(overview.docker.engineStatus).toBe('offline');
     expect(overview.docker.engineVersion).toBeNull();
+    expect(mocks.docker.ping).not.toHaveBeenCalled();
   });
 
   it('lists unhealthy containers as clickable targets', async () => {

@@ -1,13 +1,19 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
 import type { ContainerSummary } from '@dockora/shared';
 import { fetchContainers } from '@/lib/api';
 import { useLocale } from '@/i18n/locale-provider';
+import { useVisibleInterval } from '@/hooks/use-visible-interval';
 import { Button } from '@/components/ui/form-controls';
 import { ErrorBanner, LoadingState, PageHeader } from '@/components/ui/page-parts';
 import { PortCards } from '@/components/monitoring/port-cards';
-import { NetworkTopology } from '@/components/monitoring/network-topology';
+
+const NetworkTopology = dynamic(
+  () => import('@/components/monitoring/network-topology').then((m) => m.NetworkTopology),
+    { ssr: false, loading: () => <div className="h-64 animate-pulse rounded-md bg-dockora-surface2/60" /> },
+);
 
 export function NetworkPage() {
   const { t } = useLocale();
@@ -28,9 +34,9 @@ export function NetworkPage() {
 
   useEffect(() => {
     void load();
-    const timer = window.setInterval(() => void load(), 15_000);
-    return () => window.clearInterval(timer);
   }, [load]);
+
+  useVisibleInterval(() => void load(), 15_000);
 
   return (
     <div className="space-y-5 animate-in fade-in">

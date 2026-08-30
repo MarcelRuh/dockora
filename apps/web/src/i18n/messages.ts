@@ -197,7 +197,7 @@ export const messages = {
         tx: 'Gesendet',
         read: 'Gelesen',
         write: 'Geschrieben',
-        polling: 'Live (3s)',
+        polling: 'Live',
       },
       logs: {
         tail: 'Zeilen',
@@ -909,7 +909,7 @@ export const messages = {
         tx: 'Sent',
         read: 'Read',
         write: 'Written',
-        polling: 'Live (3s)',
+        polling: 'Live',
       },
       logs: {
         tail: 'Lines',

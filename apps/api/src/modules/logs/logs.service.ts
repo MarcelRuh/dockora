@@ -1,4 +1,5 @@
 import type { LogEntry, LogLevel } from '@dockora/shared';
+import { mapPool } from '../../infrastructure/async/map-pool.js';
 import type { IDockerClient } from '../../domain/ports.js';
 
 export interface LogsQuery {
@@ -13,6 +14,7 @@ export interface LogsServiceDeps {
   docker: IDockerClient;
 }
 
+const MAX_LOG_TARGETS = 12;
 const LEVEL_PATTERNS: Array<{ level: LogLevel; pattern: RegExp }> = [
   { level: 'error', pattern: /\b(error|err|fatal|panic|critical)\b/i },
   { level: 'warn', pattern: /\b(warn|warning)\b/i },
@@ -33,16 +35,18 @@ export class LogsService {
     if (query.container) {
       const needle = query.container.toLowerCase();
       targets = containers.filter(
-        (c) =>
-          c.id.startsWith(needle) ||
-          c.name.toLowerCase().includes(needle),
+        (c) => c.id.startsWith(needle) || c.name.toLowerCase().includes(needle),
       );
+    } else {
+      targets = containers.filter((c) => c.status === 'running');
     }
+
+    targets = targets.slice(0, MAX_LOG_TARGETS);
 
     const entries: LogEntry[] = [];
     const sinceMs = query.since ? Date.parse(query.since) : NaN;
 
-    for (const container of targets) {
+    await mapPool(targets, 4, async (container) => {
       try {
         const raw = await this.deps.docker.getContainerLogs(container.id, {
           tail: perContainer,
@@ -68,7 +72,7 @@ export class LogsService {
       } catch {
         // Container ohne Logs überspringen
       }
-    }
+    });
 
     entries.sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp));
     return entries.slice(0, limit);

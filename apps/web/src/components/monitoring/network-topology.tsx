@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useCallback, useEffect, type MouseEvent } from 'react';
+import { useMemo, useCallback, useEffect, useRef, type MouseEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import type { ContainerSummary } from '@dockora/shared';
 import {
@@ -98,14 +98,24 @@ export function NetworkTopology({
   labels: TopologyLabels;
 }) {
   const router = useRouter();
+  const containersRef = useRef(containers);
+  containersRef.current = containers;
+  const topologyKey = useMemo(
+    () =>
+      containers
+        .map((c) => `${c.id}:${c.status}:${[...c.networks].sort().join(',')}`)
+        .sort()
+        .join('|'),
+    [containers],
+  );
   const graph = useMemo(
     () =>
-      buildTopologyGraph(containers, {
+      buildTopologyGraph(containersRef.current, {
         host: labels.host,
         network: labels.network,
         unattached: labels.unattached,
       }),
-    [containers, labels.host, labels.network, labels.unattached],
+    [topologyKey, labels.host, labels.network, labels.unattached],
   );
   const [nodes, setNodes, onNodesChange] = useNodesState(graph.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(graph.edges);

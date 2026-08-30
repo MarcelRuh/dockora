@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { MonitoringSnapshot } from '@dockora/shared';
 import { fetchMonitoring } from '@/lib/api';
 import { useLocale } from '@/i18n/locale-provider';
+import { useVisibleInterval } from '@/hooks/use-visible-interval';
 import { formatPercent, formatRelativeTime } from '@/lib/format';
 import { containerStatusTone } from '@/lib/status';
 import { Button } from '@/components/ui/form-controls';
@@ -37,9 +38,9 @@ export function MonitoringPage() {
 
   useEffect(() => {
     void load();
-    const timer = window.setInterval(() => void load(), 15_000);
-    return () => window.clearInterval(timer);
   }, [load]);
+
+  useVisibleInterval(() => void load(), 15_000);
 
   const rows =
     data?.containers.map((c) => [

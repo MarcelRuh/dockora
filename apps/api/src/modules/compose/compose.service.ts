@@ -16,13 +16,14 @@ import { isDockoraSelfComposeProject } from '../../domain/dockora-self.js';
 import type { IDockerClient } from '../../domain/ports.js';
 import {
   COMPOSE_FILENAMES,
-  decodeComposeId,
   discoverComposeProjects,
   encodeComposeId,
   extractServiceNames,
   findEnvFiles,
+  invalidateComposeDiscoveryCache,
   readComposeYaml,
   resolveComposeStatus,
+  resolveDiscoveredProject,
 } from './compose-discovery.js';
 import { deleteProjectDirectory } from './safe-project-dir.js';
 
@@ -539,6 +540,7 @@ export class ComposeService {
       }
     }
 
+    invalidateComposeDiscoveryCache();
     return this.getDetails(id);
   }
 
@@ -598,6 +600,7 @@ export class ComposeService {
 
     if (removeFiles) {
       await deleteProjectDirectory(project.path, this.deps.searchPaths);
+      invalidateComposeDiscoveryCache();
       return {
         ok: true,
         message: `Compose project ${project.name} stopped and project folder deleted (${project.path})`,
@@ -611,14 +614,13 @@ export class ComposeService {
   }
 
   private async resolveProject(id: string) {
-    const absolutePath = decodeComposeId(id);
-    const projects = await discoverComposeProjects(
+    const project = await resolveDiscoveredProject(
+      id,
       this.deps.searchPaths,
       this.deps.excludePaths ?? [],
     );
-    const project = projects.find((p) => p.absoluteComposePath === absolutePath);
     if (!project) {
-      throw new ComposeNotFoundError(`Compose project not found: ${absolutePath}`);
+      throw new ComposeNotFoundError('Compose project not found');
     }
     return project;
   }

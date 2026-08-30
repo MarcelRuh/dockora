@@ -24,7 +24,6 @@ export class HostMetricsService implements IHostMetrics {
   private lastCpuSample: CpuSample | null = null;
 
   constructor(
-    private readonly sampleDelayMs = 200,
     private readonly snapPath = process.env.DOCKORA_HOST_PROC_SNAP?.trim() || '/data/host-proc.snap',
     private readonly procRoots: string[] = defaultProcRoots(),
   ) {}
@@ -101,12 +100,12 @@ export class HostMetricsService implements IHostMetrics {
 
   private async measureCpuPercent(): Promise<number | null> {
     if (process.platform === 'linux') {
-      const first = await this.readProcStat();
-      if (!first) return this.loadAvgFallback();
-      await sleep(this.sampleDelayMs);
-      const second = await this.readProcStat();
-      if (!second) return this.loadAvgFallback();
-      return this.cpuPercentFromSamplePair(first, second);
+      const sample = await this.readProcStat();
+      if (!sample) return this.loadAvgFallback();
+      const prev = this.lastCpuSample;
+      this.lastCpuSample = sample;
+      if (!prev) return this.loadAvgFallback();
+      return this.cpuPercentFromSamplePair(prev, sample);
     }
 
     return this.loadAvgFallback();
@@ -276,10 +275,6 @@ async function readCgroupV2Memory(root: string): Promise<MemorySample | null> {
   } catch {
     return null;
   }
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function clamp(value: number, min: number, max: number): number {

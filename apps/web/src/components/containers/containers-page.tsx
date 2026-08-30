@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ContainerFilter, ContainerSummary } from '@dockora/shared';
 import { containerAction, fetchContainers } from '@/lib/api';
 import { useLocale } from '@/i18n/locale-provider';
@@ -24,7 +24,9 @@ import {
   StatusBadge,
 } from '@/components/ui/page-parts';
 
-const STATS_POLL_MS = 15_000;
+const LIST_POLL_MS = 15_000;
+const STATS_POLL_MS = 45_000;
+const FILTER_DEBOUNCE_MS = 350;
 
 function mergePreservingStats(
   previous: ContainerSummary[],
@@ -53,6 +55,8 @@ export function ContainersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<ContainerFilter>({ status: 'all' });
+  const [draftName, setDraftName] = useState('');
+  const [draftImage, setDraftImage] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [pageHost, setPageHost] = useState('localhost');
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -66,6 +70,17 @@ export function ContainersPage() {
   useEffect(() => {
     setPageHost(window.location.hostname);
   }, []);
+
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      setFilter((f) => ({
+        ...f,
+        name: draftName.trim() || undefined,
+        image: draftImage.trim() || undefined,
+      }));
+    }, FILTER_DEBOUNCE_MS);
+    return () => window.clearTimeout(id);
+  }, [draftName, draftImage]);
 
   const enrichStats = useCallback(
     async (listFilter: ContainerFilter) => {
@@ -91,23 +106,24 @@ export function ContainersPage() {
     [],
   );
 
+  const hasItems = useRef(false);
+  hasItems.current = items.length > 0;
+
   const load = useCallback(
     async (opts?: { silent?: boolean }) => {
-      if (!opts?.silent) setLoading(true);
+      const silent = opts?.silent || hasItems.current;
+      if (!silent) setLoading(true);
       setError(null);
       try {
-        // Fast path: list without Docker stats (~instant)
         const data = await fetchContainers(filter);
         setItems((prev) => mergePreservingStats(prev, data));
-        if (!opts?.silent) setLoading(false);
-        // Slow path: CPU/RAM in background (does not block the table)
-        void enrichStats(filter);
+        setLoading(false);
       } catch (err) {
         setError(err instanceof Error ? err.message : t.containers.loadError);
-        if (!opts?.silent) setLoading(false);
+        if (!silent) setLoading(false);
       }
     },
-    [enrichStats, filter, t.containers.loadError],
+    [filter, t.containers.loadError],
   );
 
   useEffect(() => {
@@ -115,12 +131,24 @@ export function ContainersPage() {
   }, [load]);
 
   useEffect(() => {
+    void enrichStats(filter);
+  }, [enrichStats, filter]);
+
+  useEffect(() => {
     const id = window.setInterval(() => {
       if (document.visibilityState !== 'visible') return;
       void load({ silent: true });
-    }, STATS_POLL_MS);
+    }, LIST_POLL_MS);
     return () => window.clearInterval(id);
   }, [load]);
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      void enrichStats(filter);
+    }, STATS_POLL_MS);
+    return () => window.clearInterval(id);
+  }, [enrichStats, filter]);
   const runAction = async (id: string, action: 'start' | 'stop' | 'restart' | 'remove') => {
     if (action === 'remove') {
       setConfirm({ action: 'remove', ids: [id], deleteProjectDir: true });
@@ -339,14 +367,14 @@ export function ContainersPage() {
       <FilterBar>
         <Input
           placeholder={t.containers.filterName}
-          value={filter.name ?? ''}
-          onChange={(e) => setFilter((f) => ({ ...f, name: e.target.value || undefined }))}
+          value={draftName}
+          onChange={(e) => setDraftName(e.target.value)}
           className="max-w-xs"
         />
         <Input
           placeholder={t.containers.filterImage}
-          value={filter.image ?? ''}
-          onChange={(e) => setFilter((f) => ({ ...f, image: e.target.value || undefined }))}
+          value={draftImage}
+          onChange={(e) => setDraftImage(e.target.value)}
           className="max-w-xs"
         />
         <Select
@@ -364,18 +392,29 @@ export function ContainersPage() {
           <option value="exited">{t.common.stopped}</option>
           <option value="paused">paused</option>
         </Select>
-        <Button variant="primary" onClick={() => void load()}>
+        <Button
+          variant="primary"
+          onClick={() => {
+            setFilter((f) => ({
+              ...f,
+              name: draftName.trim() || undefined,
+              image: draftImage.trim() || undefined,
+            }));
+            void load({ silent: true });
+          }}
+        >
           {t.common.filter}
         </Button>
       </FilterBar>
 
       {error ? <ErrorBanner message={error} /> : null}
-      {loading ? <LoadingState message={t.common.loading} /> : null}
+      {loading && items.length === 0 ? <LoadingState message={t.common.loading} /> : null}
 
-      {!loading ? (
+      {!loading || items.length > 0 ? (
         <DataTable
           stickyFirst
           stickyLast
+          rowKeys={items.map((c) => c.id)}
           headers={[
             '',
             t.common.name,
@@ -392,7 +431,7 @@ export function ContainersPage() {
         />
       ) : null}
 
-      {!loading && items.length > 0 ? (
+      {(!loading || items.length > 0) && items.length > 0 ? (
         <p className="font-mono text-xs text-dockora-muted">
           {items.length} container(s) · {t.containers.stats.polling}
           {' · '}

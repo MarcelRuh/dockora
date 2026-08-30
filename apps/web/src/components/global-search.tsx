@@ -8,6 +8,9 @@ import { cn } from '@/lib/utils';
 
 type Hit = { href: string; label: string; hint: string };
 
+const SEARCH_CACHE_TTL_MS = 20_000;
+let searchCache: { at: number; locale: string; hits: Hit[] } | null = null;
+
 const NAV_HITS = [
   { href: '/', key: 'dashboard' },
   { href: '/containers', key: 'containers' },
@@ -24,7 +27,7 @@ const NAV_HITS = [
 ] as const;
 
 export function GlobalSearch({ compact = false }: { compact?: boolean }) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -33,6 +36,15 @@ export function GlobalSearch({ compact = false }: { compact?: boolean }) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const loadHits = useCallback(async () => {
+    const localeKey = locale;
+    if (
+      searchCache &&
+      searchCache.locale === localeKey &&
+      Date.now() - searchCache.at < SEARCH_CACHE_TTL_MS
+    ) {
+      setHits(searchCache.hits);
+      return;
+    }
     setLoading(true);
     try {
       const [containers, projects, images] = await Promise.all([
@@ -66,11 +78,12 @@ export function GlobalSearch({ compact = false }: { compact?: boolean }) {
           hint: t.nav.images,
         });
       }
+      searchCache = { at: Date.now(), locale: localeKey, hits: next };
       setHits(next);
     } finally {
       setLoading(false);
     }
-  }, [t]);
+  }, [t, locale]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

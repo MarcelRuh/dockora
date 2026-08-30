@@ -1,11 +1,13 @@
 import type { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { API_PREFIX, type DashboardOverview } from '@dockora/shared';
+import { createTtlMemo } from '../../infrastructure/cache/ttl-memo.js';
 import { ComposeVersionProvider } from '../../infrastructure/docker/compose-version.js';
 import { prisma } from '../../infrastructure/db/prisma.js';
 import { DockerHostUpdateService } from '../system/docker-host-update.service.js';
 import { DashboardService } from './dashboard.service.js';
 
 const SSE_INTERVAL_MS = 10_000;
+const OVERVIEW_TTL_MS = 4_000;
 
 export const dashboardModule: FastifyPluginAsync = async (app: FastifyInstance) => {
   const dockerHostUpdates = new DockerHostUpdateService();
@@ -30,13 +32,16 @@ export const dashboardModule: FastifyPluginAsync = async (app: FastifyInstance) 
     },
   });
 
-  const getOverview = async (): Promise<DashboardOverview> => {
-    const overview = await service.getOverview();
-    const updatesAvailable = await prisma.updateCheckCache.count({
-      where: { updateAvailable: true },
+  const overviewMemo = createTtlMemo<DashboardOverview>(OVERVIEW_TTL_MS);
+
+  const getOverview = (): Promise<DashboardOverview> =>
+    overviewMemo.get(async () => {
+      const overview = await service.getOverview();
+      const updatesAvailable = await prisma.updateCheckCache.count({
+        where: { updateAvailable: true },
+      });
+      return { ...overview, updatesAvailable };
     });
-    return { ...overview, updatesAvailable };
-  };
 
   app.get(
     `${API_PREFIX}/dashboard`,
@@ -54,17 +59,24 @@ export const dashboardModule: FastifyPluginAsync = async (app: FastifyInstance) 
     reply.raw.write(': dockora-dashboard-stream\n\n');
 
     let closed = false;
+    let sending = false;
 
     const send = async () => {
-      if (closed) return;
+      if (closed || sending) return;
+      sending = true;
       try {
         const overview = await getOverview();
+        if (closed) return;
         reply.raw.write(`event: dashboard\ndata: ${JSON.stringify(overview)}\n\n`);
       } catch (error) {
         request.log.warn({ err: error }, 'SSE dashboard push failed');
-        reply.raw.write(
-          `event: error\ndata: ${JSON.stringify({ message: 'dashboard_update_failed' })}\n\n`,
-        );
+        if (!closed) {
+          reply.raw.write(
+            `event: error\ndata: ${JSON.stringify({ message: 'dashboard_update_failed' })}\n\n`,
+          );
+        }
+      } finally {
+        sending = false;
       }
     };
 

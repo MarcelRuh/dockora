@@ -8,6 +8,7 @@ import type {
 } from '@dockora/shared';
 import { isDockoraSelfContainer } from '../../domain/dockora-self.js';
 import type { DockerContainerDetails, DockerContainerInfo, IDockerClient } from '../../domain/ports.js';
+import { mapPool } from '../../infrastructure/async/map-pool.js';
 import {
   COMPOSE_PROJECT_LABEL,
   COMPOSE_WORKING_DIR_LABEL,
@@ -20,7 +21,8 @@ export interface ContainersServiceDeps {
   searchPaths?: string[];
 }
 
-const STATS_CACHE_TTL_MS = 4_000;
+const STATS_CACHE_TTL_MS = 12_000;
+const STATS_CACHE_MAX = 200;
 
 export class ContainersService {
   private readonly statsCache = new Map<
@@ -50,7 +52,7 @@ export class ContainersService {
       return summaries;
     }
 
-    await mapPool(summaries, 3, async (summary) => {
+    await mapPool(summaries, 4, async (summary) => {
       if (summary.status !== 'running') {
         summary.cpuPercent = null;
         summary.memoryPercent = null;
@@ -150,7 +152,19 @@ export class ContainersService {
     }
     const stats = await this.deps.docker.getContainerStats(id);
     this.statsCache.set(id, { expiresAt: Date.now() + STATS_CACHE_TTL_MS, stats });
+    this.pruneStatsCache();
     return stats;
+  }
+
+  private pruneStatsCache(): void {
+    const now = Date.now();
+    for (const [id, entry] of this.statsCache) {
+      if (entry.expiresAt <= now) this.statsCache.delete(id);
+    }
+    if (this.statsCache.size <= STATS_CACHE_MAX) return;
+    const extra = this.statsCache.size - STATS_CACHE_MAX;
+    const keys = [...this.statsCache.keys()].slice(0, extra);
+    for (const key of keys) this.statsCache.delete(key);
   }
 
   streamLogs(
@@ -216,22 +230,4 @@ function toDetails(c: DockerContainerDetails): ContainerDetails {
     sizeRw: c.sizeRw,
     sizeRootFs: c.sizeRootFs,
   };
-}
-
-/** Run async work with limited parallelism (Docker stats are expensive ~1s each). */
-async function mapPool<T>(
-  items: T[],
-  concurrency: number,
-  worker: (item: T) => Promise<void>,
-): Promise<void> {
-  if (items.length === 0) return;
-  const limit = Math.max(1, Math.min(concurrency, items.length));
-  let index = 0;
-  const runners = Array.from({ length: limit }, async () => {
-    while (index < items.length) {
-      const current = index++;
-      await worker(items[current]!);
-    }
-  });
-  await Promise.all(runners);
 }

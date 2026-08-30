@@ -117,11 +117,13 @@ export const schedulerModule: FastifyPluginAsync = async (app: FastifyInstance) 
 
     // Auto-prune when build-cache alert would fire – don't wait for weekly timer
     const cacheAlert = snapshot.alerts.find((a) => /build cache/i.test(a));
+    let prunedCache = false;
     if (cacheAlert) {
       try {
         const pruned = await app.docker.pruneBuildCache();
         const freedMiB = Math.round(pruned.spaceReclaimed / (1024 * 1024));
         app.log.info({ freedMiB }, 'Auto-pruned build cache after monitoring threshold');
+        prunedCache = true;
         if (freedMiB > 0) {
           await notifications.notify(
             'system',
@@ -138,8 +140,9 @@ export const schedulerModule: FastifyPluginAsync = async (app: FastifyInstance) 
       }
     }
 
-    const freshSnapshot = cacheAlert ? await monitoring.getSnapshot() : snapshot;
-    const fresh = filterAlertsWithCooldown(freshSnapshot.alerts);
+    const fresh = filterAlertsWithCooldown(
+      prunedCache ? snapshot.alerts.filter((a) => !/build cache/i.test(a)) : snapshot.alerts,
+    );
     if (fresh.length > 0) {
       const containerHints = fresh
         .map((a) => {
