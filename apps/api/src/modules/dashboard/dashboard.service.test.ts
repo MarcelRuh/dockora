@@ -75,6 +75,7 @@ function createMocks(overrides?: {
     ]),
     startEventListener: vi.fn(),
     stopEventListener: vi.fn(),
+    subscribeResourceChanges: vi.fn().mockReturnValue(() => undefined),
   };
 
   const hostMetrics: IHostMetrics = {

@@ -14,6 +14,7 @@ import { useLocale } from '@/i18n/locale-provider';
 import { useAuth } from '@/components/auth/auth-provider';
 import { canOperate } from '@/lib/roles';
 import { openEventSource } from '@/lib/sse';
+import { useDockerLiveReload } from '@/hooks/use-docker-live-reload';
 import { containerStatusTone } from '@/lib/status';
 import { formatBytes, formatPercent } from '@/lib/format';
 import { Button, Input } from '@/components/ui/form-controls';
@@ -54,8 +55,8 @@ export function ContainerDetailPage({ id }: { id: string }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const loadContainer = useCallback(async () => {
-    setLoading(true);
+  const loadContainer = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true);
     setError(null);
     try {
       const data = await fetchContainer(id);
@@ -64,13 +65,15 @@ export function ContainerDetailPage({ id }: { id: string }) {
       setError(err instanceof Error ? err.message : t.containers.notFound);
       setContainer(null);
     } finally {
-      setLoading(false);
+      if (!opts?.silent) setLoading(false);
     }
   }, [id, t.containers.notFound]);
 
   useEffect(() => {
     void loadContainer();
   }, [loadContainer]);
+
+  useDockerLiveReload(() => void loadContainer({ silent: true }), 60_000);
 
   useEffect(() => {
     if (tab !== 'stats') return;
@@ -86,7 +89,7 @@ export function ContainerDetailPage({ id }: { id: string }) {
     };
 
     void poll();
-    const timer = window.setInterval(() => void poll(), 3000);
+    const timer = window.setInterval(() => void poll(), 8000);
     return () => {
       active = false;
       window.clearInterval(timer);

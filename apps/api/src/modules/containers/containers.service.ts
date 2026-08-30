@@ -24,6 +24,7 @@ export interface ContainersServiceDeps {
 const STATS_CACHE_TTL_MS = 12_000;
 const STATS_CACHE_MAX = 200;
 const STATS_WARM_MS = 20_000;
+const STATS_DEMAND_MS = 60_000;
 
 export class ContainersService {
   private readonly statsCache = new Map<
@@ -32,13 +33,16 @@ export class ContainersService {
   >();
   private warmTimer: ReturnType<typeof setInterval> | null = null;
   private warming = false;
+  private statsDemandUntil = 0;
 
   constructor(private readonly deps: ContainersServiceDeps) {}
 
   startStatsWarmer(): void {
     if (this.warmTimer) return;
-    this.warmTimer = setInterval(() => void this.warmRunningStats(), STATS_WARM_MS);
-    void this.warmRunningStats();
+    this.warmTimer = setInterval(() => {
+      if (Date.now() > this.statsDemandUntil) return;
+      void this.warmRunningStats();
+    }, STATS_WARM_MS);
   }
 
   stopStatsWarmer(): void {
@@ -67,9 +71,10 @@ export class ContainersService {
       .map(toSummary);
 
     if (!includeStats) {
-      void this.warmRunningStats();
       return summaries;
     }
+
+    this.noteStatsDemand();
 
     await mapPool(summaries, 4, async (summary) => {
       if (summary.status !== 'running') {
@@ -91,6 +96,10 @@ export class ContainersService {
     });
 
     return summaries;
+  }
+
+  private noteStatsDemand(): void {
+    this.statsDemandUntil = Date.now() + STATS_DEMAND_MS;
   }
 
   async warmRunningStats(): Promise<void> {
@@ -185,6 +194,7 @@ export class ContainersService {
   }
 
   async stats(id: string): Promise<ContainerStatsSnapshot> {
+    this.noteStatsDemand();
     const cached = this.statsCache.get(id);
     if (cached && cached.expiresAt > Date.now()) {
       return cached.stats;

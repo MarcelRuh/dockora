@@ -3,8 +3,8 @@ import { withAuthQuery } from './sse';
 
 describe('withAuthQuery', () => {
   it('keeps same-origin URLs free of the JWT', () => {
-    expect(withAuthQuery('/api/v1/dashboard/stream', { token: 'secret.jwt', crossOrigin: false })).toBe(
-      '/api/v1/dashboard/stream',
+    expect(withAuthQuery('/api/v1/events/stream', { token: 'secret.jwt', crossOrigin: false })).toBe(
+      '/api/v1/events/stream',
     );
   });
 

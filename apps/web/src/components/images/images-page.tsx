@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ImageSummary } from '@dockora/shared';
 import { fetchImages, pruneImages, pullImage, removeImage } from '@/lib/api';
 import { useLocale } from '@/i18n/locale-provider';
+import { useDockerLiveReload } from '@/hooks/use-docker-live-reload';
 import { useAuth } from '@/components/auth/auth-provider';
 import { canAdmin, canOperate } from '@/lib/roles';
 import { formatBytes, formatRelativeTime } from '@/lib/format';
@@ -38,8 +39,8 @@ export function ImagesPage() {
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
   const [query, setQuery] = useState('');
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true);
     setError(null);
     try {
       setItems(await fetchImages());
@@ -53,6 +54,8 @@ export function ImagesPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useDockerLiveReload(() => void load({ silent: true }), 60_000);
 
   const handlePull = async (e: React.FormEvent) => {
     e.preventDefault();

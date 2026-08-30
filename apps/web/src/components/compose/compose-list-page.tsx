@@ -13,6 +13,7 @@ import {
 import { formatComposePreviewLines } from '@/lib/compose-preview';
 import { useLocale } from '@/i18n/locale-provider';
 import { useAuth } from '@/components/auth/auth-provider';
+import { useDockerLiveReload } from '@/hooks/use-docker-live-reload';
 import { canAdmin, canOperate } from '@/lib/roles';
 import { composeStatusTone } from '@/lib/status';
 import { resolveContainerIconUrl } from '@/lib/container-icon';
@@ -55,8 +56,8 @@ export function ComposeListPage() {
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [query, setQuery] = useState('');
 
-  const load = useCallback(async (opts?: { clearError?: boolean }) => {
-    setLoading(true);
+  const load = useCallback(async (opts?: { clearError?: boolean; silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true);
     if (opts?.clearError) setError(null);
     try {
       const [projects, containers] = await Promise.all([
@@ -90,6 +91,8 @@ export function ComposeListPage() {
   useEffect(() => {
     void load({ clearError: true });
   }, [load]);
+
+  useDockerLiveReload(() => void load({ silent: true }), 60_000);
 
   const run = async (id: string, action: 'up' | 'down' | 'restart' | 'pull' | 'build') => {
     setBusy(id);

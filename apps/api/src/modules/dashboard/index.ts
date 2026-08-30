@@ -34,6 +34,10 @@ export const dashboardModule: FastifyPluginAsync = async (app: FastifyInstance) 
 
   const overviewMemo = createTtlMemo<DashboardOverview>(OVERVIEW_TTL_MS);
 
+  app.docker.subscribeResourceChanges(() => {
+    overviewMemo.clear();
+  });
+
   const getOverview = (): Promise<DashboardOverview> =>
     overviewMemo.get(async () => {
       const overview = await service.getOverview();
@@ -60,10 +64,16 @@ export const dashboardModule: FastifyPluginAsync = async (app: FastifyInstance) 
 
     let closed = false;
     let sending = false;
+    let dirty = false;
 
     const send = async () => {
-      if (closed || sending) return;
+      if (closed) return;
+      if (sending) {
+        dirty = true;
+        return;
+      }
       sending = true;
+      dirty = false;
       try {
         const overview = await getOverview();
         if (closed) return;
@@ -77,16 +87,21 @@ export const dashboardModule: FastifyPluginAsync = async (app: FastifyInstance) 
         }
       } finally {
         sending = false;
+        if (dirty && !closed) void send();
       }
     };
 
     await send();
     const timer = setInterval(() => void send(), SSE_INTERVAL_MS);
+    const unsub = app.docker.subscribeResourceChanges(() => {
+      void send();
+    });
 
     const cleanup = () => {
       if (closed) return;
       closed = true;
       clearInterval(timer);
+      unsub();
     };
 
     request.raw.on('close', cleanup);

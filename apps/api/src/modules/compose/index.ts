@@ -14,6 +14,7 @@ import {
   ComposeValidationError,
 } from './compose.service.js';
 import { UnsafeProjectPathError } from './safe-project-dir.js';
+import { invalidateComposeDiscoveryCache } from './compose-discovery.js';
 import { destructiveRateLimit } from '../../presentation/http/destructive-rate-limit.js';
 import {
   enrichPortConflictMessage,
@@ -43,6 +44,10 @@ export const composeModule: FastifyPluginAsync = async (app: FastifyInstance) =>
   });
 
   await service.ensureSearchRoots();
+
+  app.docker.subscribeResourceChanges((event) => {
+    if (event.type === 'container') invalidateComposeDiscoveryCache();
+  });
 
   app.get(`${API_PREFIX}/compose`, async (): Promise<ComposeProjectSummary[]> => {
     try {

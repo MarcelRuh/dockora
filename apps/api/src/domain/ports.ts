@@ -26,6 +26,8 @@ export interface DockerContainerInfo {
   labels: Record<string, string>;
   ports: string[];
   networks: string[];
+  /** Named Docker volumes mounted into the container (from `Mounts`). */
+  volumeMounts?: string[];
   composeProject?: string;
   /** Label com.docker.compose.service */
   composeService?: string;
@@ -130,6 +132,13 @@ export interface IDockerClient {
   getRecentEvents(limit?: number): DockerEventInfo[];
   startEventListener(): void;
   stopEventListener(): void;
+  /** Live Docker resource changes (container/image/volume), minus exec/attach noise. */
+  subscribeResourceChanges(listener: (event: DockerResourceChange) => void): () => void;
+}
+
+export interface DockerResourceChange {
+  type: string;
+  action: string;
 }
 
 export interface HostResources {

@@ -8,6 +8,7 @@ import type {
   DockerContainerInfo,
   DockerEventInfo,
   DockerImageInfo,
+  DockerResourceChange,
   DockerStatsSnapshot,
   DockerVersionInfo,
   DockerVolumeBrowseEntry,
@@ -16,6 +17,10 @@ import type {
 } from '../../domain/ports.js';
 import { formatPorts, mapContainerStatus } from '../../domain/container-utils.js';
 import { withTimeout } from '../async/with-timeout.js';
+import {
+  isLiveContainerStatus,
+  isNoisyDockerAction,
+} from './resource-events.js';
 
 const MAX_EVENTS = 100;
 const COMPOSE_PROJECT_LABEL = 'com.docker.compose.project';
@@ -60,6 +65,14 @@ export class DockerodeClient implements IDockerClient {
     string,
     { at: number; value: DockerContainerInfo[]; inflight: Promise<DockerContainerInfo[]> | null }
   >();
+  private imageCache: {
+    at: number;
+    value: DockerImageInfo[];
+    inflight: Promise<DockerImageInfo[]> | null;
+  } | null = null;
+  private versionCache: { at: number; value: DockerVersionInfo } | null = null;
+  private versionInflight: Promise<DockerVersionInfo> | null = null;
+  private resourceListeners = new Set<(event: DockerResourceChange) => void>();
 
   constructor(options: DockerodeClientOptions) {
     this.logger = options.logger;
@@ -82,17 +95,50 @@ export class DockerodeClient implements IDockerClient {
   }
 
   async getVersion(): Promise<DockerVersionInfo> {
-    const info = await this.docker.version();
-    return {
-      version: info.Version ?? 'unknown',
-      apiVersion: info.ApiVersion ?? 'unknown',
-      platformName: info.Platform?.Name,
-      os: info.Os,
-      arch: info.Arch,
-    };
+    const now = Date.now();
+    if (this.versionCache && now - this.versionCache.at < 60_000) {
+      return this.versionCache.value;
+    }
+    if (this.versionInflight) return this.versionInflight;
+
+    this.versionInflight = withTimeout(
+      this.docker.version(),
+      10_000,
+      'Docker version timeout',
+    ).then((info) => {
+      const value: DockerVersionInfo = {
+        version: info.Version ?? 'unknown',
+        apiVersion: info.ApiVersion ?? 'unknown',
+        platformName: info.Platform?.Name,
+        os: info.Os,
+        arch: info.Arch,
+      };
+      this.versionCache = { at: Date.now(), value };
+      return value;
+    });
+    try {
+      return await this.versionInflight;
+    } catch (error) {
+      this.versionCache = null;
+      throw error;
+    } finally {
+      this.versionInflight = null;
+    }
   }
 
   async listContainers(all = true): Promise<DockerContainerInfo[]> {
+    if (!all) {
+      const allHit = this.listCache.get('all');
+      const now = Date.now();
+      if (allHit?.value && now - allHit.at < 2_500) {
+        return allHit.value.filter((c) => isLiveContainerStatus(c.status));
+      }
+      if (allHit?.inflight) {
+        const list = await allHit.inflight;
+        return list.filter((c) => isLiveContainerStatus(c.status));
+      }
+    }
+
     const key = all ? 'all' : 'running';
     const now = Date.now();
     const hit = this.listCache.get(key);
@@ -105,7 +151,15 @@ export class DockerodeClient implements IDockerClient {
       'Docker listContainers timeout',
     ).then((list) => {
       const value = list.map((c) => mapListContainer(c));
-      this.listCache.set(key, { at: Date.now(), value, inflight: null });
+      const at = Date.now();
+      this.listCache.set(key, { at, value, inflight: null });
+      if (all) {
+        this.listCache.set('running', {
+          at,
+          value: value.filter((c) => isLiveContainerStatus(c.status)),
+          inflight: null,
+        });
+      }
       return value;
     });
     this.listCache.set(key, { at: hit?.at ?? 0, value: hit?.value ?? [], inflight });
@@ -224,8 +278,25 @@ export class DockerodeClient implements IDockerClient {
   }
 
   async listImages(): Promise<DockerImageInfo[]> {
-    const images = await this.docker.listImages();
-    return images.map((img) => mapImageInfo(img));
+    const now = Date.now();
+    const hit = this.imageCache;
+    if (hit?.value && now - hit.at < 5_000) return hit.value;
+    if (hit?.inflight) return hit.inflight;
+
+    const inflight = withTimeout(this.docker.listImages(), 20_000, 'Docker listImages timeout').then(
+      (images) => {
+        const value = images.map((img) => mapImageInfo(img));
+        this.imageCache = { at: Date.now(), value, inflight: null };
+        return value;
+      },
+    );
+    this.imageCache = { at: hit?.at ?? 0, value: hit?.value ?? [], inflight };
+    try {
+      return await inflight;
+    } catch (error) {
+      this.imageCache = null;
+      throw error;
+    }
   }
 
   async pullImage(image: string): Promise<void> {
@@ -244,16 +315,19 @@ export class DockerodeClient implements IDockerClient {
         });
       });
     });
+    this.imageCache = null;
   }
 
   async tagImage(source: string, target: string): Promise<void> {
     const { repo, tag } = splitRepoTag(target);
     await this.docker.getImage(source).tag({ repo, tag });
+    this.imageCache = null;
   }
 
   async removeImage(id: string, force = false): Promise<void> {
     const image = this.docker.getImage(id);
     await image.remove({ force });
+    this.imageCache = null;
   }
 
   async pruneImages(
@@ -265,6 +339,7 @@ export class DockerodeClient implements IDockerClient {
       ? { dangling: ['true'] }
       : { dangling: ['false'] };
     const result = await this.docker.pruneImages({ filters });
+    this.imageCache = null;
     return {
       imagesDeleted: result.ImagesDeleted?.length ?? 0,
       spaceReclaimed: result.SpaceReclaimed ?? 0,
@@ -274,7 +349,7 @@ export class DockerodeClient implements IDockerClient {
   async listVolumes(): Promise<DockerVolumeInfo[]> {
     const [volRes, containers] = await Promise.all([
       this.docker.listVolumes(),
-      this.docker.listContainers({ all: true }),
+      this.listContainers(true),
     ]);
 
     const usage = new Map<string, { size: number; refCount: number }>();
@@ -293,12 +368,11 @@ export class DockerodeClient implements IDockerClient {
 
     const usedBy = new Map<string, string[]>();
     for (const row of containers) {
-      const cname = (row.Names?.[0] ?? row.Id.slice(0, 12)).replace(/^\//, '');
-      for (const mount of row.Mounts ?? []) {
-        if (mount.Type !== 'volume' || !mount.Name) continue;
-        const list = usedBy.get(mount.Name) ?? [];
+      const cname = row.name;
+      for (const mountName of row.volumeMounts ?? []) {
+        const list = usedBy.get(mountName) ?? [];
         if (!list.includes(cname)) list.push(cname);
-        usedBy.set(mount.Name, list);
+        usedBy.set(mountName, list);
       }
     }
 
@@ -496,7 +570,7 @@ export class DockerodeClient implements IDockerClient {
   private async attachEventStream(): Promise<void> {
     try {
       const stream = (await this.docker.getEvents({
-        filters: { type: ['container'] },
+        filters: { type: ['container', 'image', 'volume'] },
       })) as NodeJS.ReadableStream;
 
       this.stream = stream;
@@ -520,6 +594,7 @@ export class DockerodeClient implements IDockerClient {
               if (this.events.length > this.maxEvents) {
                 this.events.length = this.maxEvents;
               }
+              this.handleResourceEvent(mapped.type, mapped.action);
             }
           } catch (error) {
             this.logger?.debug({ err: error, line }, 'Failed to parse Docker event');
@@ -552,6 +627,34 @@ export class DockerodeClient implements IDockerClient {
         void this.attachEventStream();
       }
     }, 5_000);
+  }
+
+  subscribeResourceChanges(listener: (event: DockerResourceChange) => void): () => void {
+    this.resourceListeners.add(listener);
+    return () => {
+      this.resourceListeners.delete(listener);
+    };
+  }
+
+  private handleResourceEvent(type: string, action: string): void {
+    if (isNoisyDockerAction(action)) return;
+    if (type === 'container' || type === 'network' || type === 'volume') {
+      this.invalidateListCache();
+    }
+    if (type === 'image' || type === 'container') {
+      this.imageCache = null;
+    }
+    if (type === 'volume') {
+      this.dfCache = null;
+    }
+    const event: DockerResourceChange = { type, action };
+    for (const listener of this.resourceListeners) {
+      try {
+        listener(event);
+      } catch {
+        // ignore subscriber errors
+      }
+    }
   }
 }
 
@@ -662,6 +765,10 @@ export class OfflineDockerClient implements IDockerClient {
   stopEventListener(): void {
     // no-op
   }
+
+  subscribeResourceChanges(_listener: (event: DockerResourceChange) => void): () => void {
+    return () => undefined;
+  }
 }
 
 /** Factory: prüft Socket-Existenz, liefert Client (auch wenn Daemon offline). */
@@ -718,6 +825,9 @@ function mapListContainer(c: ListContainerRow): DockerContainerInfo {
     labels: c.Labels ?? {},
     ports: formatPorts(c.Ports),
     networks: Object.keys(c.NetworkSettings?.Networks ?? {}),
+    volumeMounts: (c.Mounts ?? [])
+      .filter((m) => m.Type === 'volume' && Boolean(m.Name))
+      .map((m) => m.Name as string),
     composeProject: c.Labels?.[COMPOSE_PROJECT_LABEL],
     composeService: c.Labels?.[COMPOSE_SERVICE_LABEL],
   };
@@ -742,6 +852,9 @@ function mapInspectContainer(info: InspectContainerInfo): DockerContainerDetails
     labels: info.Config?.Labels ?? {},
     ports: formatInspectPorts(info.NetworkSettings?.Ports),
     networks: Object.keys(info.NetworkSettings?.Networks ?? {}),
+    volumeMounts: (info.Mounts ?? [])
+      .filter((m) => m.Type === 'volume' && Boolean(m.Name))
+      .map((m) => m.Name as string),
     composeProject: info.Config?.Labels?.[COMPOSE_PROJECT_LABEL],
     composeService: info.Config?.Labels?.[COMPOSE_SERVICE_LABEL],
     env: info.Config?.Env ?? [],
@@ -832,13 +945,14 @@ function mapDockerEvent(raw: DockerRawEvent): DockerEventInfo | null {
       ? new Date(raw.time * 1000).toISOString()
       : new Date().toISOString();
 
+  const kind = raw.Type ?? 'container';
   const name = containerName ?? containerId?.slice(0, 12) ?? 'unknown';
 
   return {
     id: `${containerId ?? 'evt'}-${raw.timeNano ?? raw.time ?? Date.now()}-${action}`,
-    type: raw.Type ?? 'container',
+    type: kind,
     action,
-    message: `Container ${name}: ${action}`,
+    message: `${kind} ${name}: ${action}`,
     timestamp: ts,
     containerId,
     containerName,

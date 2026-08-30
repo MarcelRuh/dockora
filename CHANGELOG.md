@@ -5,6 +5,16 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [1.9.8] – 2026-08-30
+
+### Performance
+
+- Stats warmer runs only while the UI recently asked for stats (no idle Docker-stats churn)
+- `listVolumes` reuses the container-list cache; `listImages` and `getVersion` are cached with timeouts
+- Running-only lists are derived from a fresh `all` cache instead of a second Docker call
+- Docker events invalidate caches and push a compact SSE so list pages refresh instead of polling every 15s
+- Log filters are debounced; dashboard SSE flushes on container/image/volume changes
+
 ## [1.9.7] – 2026-08-30
 
 ### Performance

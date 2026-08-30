@@ -6,6 +6,7 @@ import type { ContainerFilter, ContainerSummary } from '@dockora/shared';
 import { containerAction, fetchContainers } from '@/lib/api';
 import { useLocale } from '@/i18n/locale-provider';
 import { useAuth } from '@/components/auth/auth-provider';
+import { useDockerLiveReload } from '@/hooks/use-docker-live-reload';
 import { canAdmin, canOperate } from '@/lib/roles';
 import { containerStatusTone } from '@/lib/status';
 import { formatBytes, formatPercent, formatRelativeTime } from '@/lib/format';
@@ -24,7 +25,6 @@ import {
   StatusBadge,
 } from '@/components/ui/page-parts';
 
-const LIST_POLL_MS = 15_000;
 const STATS_POLL_MS = 45_000;
 const FILTER_DEBOUNCE_MS = 350;
 
@@ -130,17 +130,11 @@ export function ContainersPage() {
     void load();
   }, [load]);
 
+  useDockerLiveReload(() => void load({ silent: true }), 60_000);
+
   useEffect(() => {
     void enrichStats(filter);
   }, [enrichStats, filter]);
-
-  useEffect(() => {
-    const id = window.setInterval(() => {
-      if (document.visibilityState !== 'visible') return;
-      void load({ silent: true });
-    }, LIST_POLL_MS);
-    return () => window.clearInterval(id);
-  }, [load]);
 
   useEffect(() => {
     const id = window.setInterval(() => {

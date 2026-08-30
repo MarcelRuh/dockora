@@ -10,6 +10,7 @@ import {
 } from '@/lib/api';
 import { useLocale } from '@/i18n/locale-provider';
 import { useAuth } from '@/components/auth/auth-provider';
+import { useDockerLiveReload } from '@/hooks/use-docker-live-reload';
 import { canAdmin } from '@/lib/roles';
 import { formatBytes, formatRelativeTime } from '@/lib/format';
 import { Button, FilterBar, Input } from '@/components/ui/form-controls';
@@ -45,8 +46,8 @@ export function VolumesPage() {
   const [browseEntries, setBrowseEntries] = useState<VolumeBrowseEntry[] | null>(null);
   const [browseBusy, setBrowseBusy] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true);
     setError(null);
     try {
       setItems(await fetchVolumes());
@@ -60,6 +61,8 @@ export function VolumesPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useDockerLiveReload(() => void load({ silent: true }), 60_000);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();

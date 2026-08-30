@@ -4,6 +4,7 @@ import { systemModule } from './system/index.js';
 import { openApiModule } from './openapi/index.js';
 import { authModule } from './auth/index.js';
 import { dashboardModule } from './dashboard/index.js';
+import { eventsModule } from './events/index.js';
 import { containersModule } from './containers/index.js';
 import { composeModule } from './compose/index.js';
 import { imagesModule } from './images/index.js';
@@ -26,6 +27,7 @@ export async function registerModules(app: FastifyInstance): Promise<void> {
   await app.register(systemModule);
   await app.register(auditModule);
   await app.register(dashboardModule);
+  await app.register(eventsModule);
   await app.register(containersModule);
   await app.register(composeModule);
   await app.register(imagesModule);

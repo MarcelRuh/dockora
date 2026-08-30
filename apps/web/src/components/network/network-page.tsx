@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import type { ContainerSummary } from '@dockora/shared';
 import { fetchContainers } from '@/lib/api';
 import { useLocale } from '@/i18n/locale-provider';
-import { useVisibleInterval } from '@/hooks/use-visible-interval';
+import { useDockerLiveReload } from '@/hooks/use-docker-live-reload';
 import { Button } from '@/components/ui/form-controls';
 import { ErrorBanner, LoadingState, PageHeader } from '@/components/ui/page-parts';
 import { PortCards } from '@/components/monitoring/port-cards';
@@ -36,7 +36,7 @@ export function NetworkPage() {
     void load();
   }, [load]);
 
-  useVisibleInterval(() => void load(), 15_000);
+  useDockerLiveReload(() => void load(), 60_000);
 
   return (
     <div className="space-y-5 animate-in fade-in">

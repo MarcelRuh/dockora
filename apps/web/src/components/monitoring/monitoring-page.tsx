@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { MonitoringSnapshot } from '@dockora/shared';
 import { fetchMonitoring } from '@/lib/api';
 import { useLocale } from '@/i18n/locale-provider';
-import { useVisibleInterval } from '@/hooks/use-visible-interval';
+import { useDockerLiveReload } from '@/hooks/use-docker-live-reload';
 import { formatPercent, formatRelativeTime } from '@/lib/format';
 import { containerStatusTone } from '@/lib/status';
 import { Button } from '@/components/ui/form-controls';
@@ -40,7 +40,7 @@ export function MonitoringPage() {
     void load();
   }, [load]);
 
-  useVisibleInterval(() => void load(), 15_000);
+  useDockerLiveReload(() => void load(), 30_000);
 
   const rows =
     data?.containers.map((c) => [
