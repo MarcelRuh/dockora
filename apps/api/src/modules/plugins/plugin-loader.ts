@@ -4,6 +4,7 @@ import { pathToFileURL } from 'node:url';
 import type { FastifyBaseLogger } from 'fastify';
 import type { DockoraPlugin } from '../../domain/ports.js';
 import type { PluginRegistry } from './index.js';
+import { loadPluginInWorker } from './plugin-isolate.js';
 
 export interface DiscoveredPlugin {
   name: string;
@@ -165,9 +166,9 @@ export async function loadPluginsFromDir(
     }
     try {
       const plugin = await withTimeout(
-        importPlugin(entry.indexPath, pluginDir),
-        DEFAULT_REGISTER_TIMEOUT_MS,
-        `Plugin "${entry.dirName}" import timed out after ${DEFAULT_REGISTER_TIMEOUT_MS}ms`,
+        loadPluginInWorker(entry.indexPath, pluginDir),
+        DEFAULT_REGISTER_TIMEOUT_MS * 2,
+        `Plugin "${entry.dirName}" isolate timed out after ${DEFAULT_REGISTER_TIMEOUT_MS * 2}ms`,
       );
       if (!plugin) {
         log.warn({ dir: entry.dirName }, 'Skipping plugin – invalid DockoraPlugin export');

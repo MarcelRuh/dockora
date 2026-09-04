@@ -5,6 +5,7 @@ import { ComposeVersionProvider } from '../../infrastructure/docker/compose-vers
 import { prisma } from '../../infrastructure/db/prisma.js';
 import { DockerHostUpdateService } from '../system/docker-host-update.service.js';
 import { DashboardService } from './dashboard.service.js';
+import { lifetimeStatsService } from './lifetime.service.js';
 
 const SSE_INTERVAL_MS = 10_000;
 const OVERVIEW_TTL_MS = 4_000;
@@ -30,12 +31,14 @@ export const dashboardModule: FastifyPluginAsync = async (app: FastifyInstance) 
         read: n.read,
       }));
     },
+    getLifetime: () => lifetimeStatsService.getSnapshot().catch(() => null),
   });
 
   const overviewMemo = createTtlMemo<DashboardOverview>(OVERVIEW_TTL_MS);
 
-  app.docker.subscribeResourceChanges(() => {
+  app.docker.subscribeResourceChanges((event) => {
     overviewMemo.clear();
+    void lifetimeStatsService.recordContainerEvent(event);
   });
 
   const getOverview = (): Promise<DashboardOverview> =>

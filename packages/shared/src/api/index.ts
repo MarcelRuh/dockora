@@ -57,6 +57,7 @@ export interface DashboardOverview {
   recentEvents: DashboardEvent[];
   notifications: DashboardNotification[];
   updatesAvailable: number;
+  lifetime: LifetimeStatsSnapshot | null;
 }
 
 export interface DashboardEvent {
@@ -75,6 +76,24 @@ export interface DashboardNotification {
   message: string;
   timestamp: string;
   read: boolean;
+}
+
+/** Aggregated host/container stats since Dockora first recorded a sample. */
+export interface LifetimeStatsSnapshot {
+  trackingSince: string;
+  samplesCount: number;
+  peakCpuPercent: number;
+  peakMemoryPercent: number;
+  peakDiskPercent: number;
+  avgCpuPercent: number;
+  avgMemoryPercent: number;
+  avgDiskPercent: number;
+  containerStarts: number;
+  containerStops: number;
+  containerDies: number;
+  containerRestarts: number;
+  maxContainersSeen: number;
+  lastSampleAt: string | null;
 }
 
 export interface ContainerSummary {
@@ -239,6 +258,10 @@ export interface AppSettings {
   /** LinuxServer / lscr.io Token (optional; falls leer wird ghcrToken genutzt) */
   lscrToken: string;
   backupRetentionDays: number;
+  /** Days to keep in-app notifications (SQLite). */
+  notificationRetentionDays: number;
+  /** Days to keep audit log rows (SQLite). */
+  auditRetentionDays: number;
   backupFormat: BackupFormat;
   backupSchedule: SchedulePreset | 'off';
   monitoringCpuThreshold: number;

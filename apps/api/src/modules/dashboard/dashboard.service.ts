@@ -23,13 +23,14 @@ export interface DashboardServiceDeps {
   composeVersion: IComposeVersionProvider;
   listNotifications?: () => Promise<DashboardNotification[]>;
   dockerLatest?: () => Promise<DashboardDockerLatest>;
+  getLifetime?: () => Promise<DashboardOverview['lifetime']>;
 }
 
 export class DashboardService {
   constructor(private readonly deps: DashboardServiceDeps) {}
 
   async getOverview(): Promise<DashboardOverview> {
-    const [engine, containersResult, resources, composeVersion, notifications, latest] =
+    const [engine, containersResult, resources, composeVersion, notifications, latest, lifetime] =
       await Promise.all([
         this.resolveEngine(),
         this.resolveContainers(),
@@ -37,6 +38,7 @@ export class DashboardService {
         this.deps.composeVersion.getVersion(),
         this.deps.listNotifications?.() ?? Promise.resolve([]),
         this.deps.dockerLatest?.() ?? Promise.resolve({ engine: null, compose: null }),
+        this.deps.getLifetime?.() ?? Promise.resolve(null),
       ]);
 
     return {
@@ -62,6 +64,7 @@ export class DashboardService {
       recentEvents: this.mapEvents(),
       notifications,
       updatesAvailable: 0,
+      lifetime,
     };
   }
 

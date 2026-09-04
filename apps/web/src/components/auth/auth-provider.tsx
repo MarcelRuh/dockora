@@ -71,11 +71,21 @@ function LoginForm({ onSuccess }: { onSuccess: (user: AuthUser) => void }) {
 
   return (
     <div className="relative min-h-screen overflow-hidden">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[200] focus:bg-dockora-surface focus:px-3 focus:py-2 focus:text-sm focus:text-dockora-text"
+      >
+        {t.common.skipToContent}
+      </a>
       <div className="pointer-events-none absolute inset-0 z-0">
         <NeonParticles />
         <NeonAtmosphere />
       </div>
-      <div className="relative z-10 mx-auto flex min-h-screen max-w-md flex-col justify-center space-y-6 px-4">
+      <div
+        id="main-content"
+        tabIndex={-1}
+        className="relative z-10 mx-auto flex min-h-screen max-w-md flex-col justify-center space-y-6 px-4"
+      >
         <div className="space-y-2 text-center">
           <div className="mx-auto w-48">
             <BrandLogoWide priority />
@@ -91,8 +101,11 @@ function LoginForm({ onSuccess }: { onSuccess: (user: AuthUser) => void }) {
             className="dockora-panel space-y-4 p-6 shadow-neon"
           >
             <div>
-              <label className="mb-1 block text-sm text-dockora-muted">{t.auth.email}</label>
+              <label htmlFor="login-email" className="mb-1 block text-sm text-dockora-muted">
+                {t.auth.email}
+              </label>
               <Input
+                id="login-email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -101,8 +114,11 @@ function LoginForm({ onSuccess }: { onSuccess: (user: AuthUser) => void }) {
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm text-dockora-muted">{t.auth.password}</label>
+              <label htmlFor="login-password" className="mb-1 block text-sm text-dockora-muted">
+                {t.auth.password}
+              </label>
               <Input
+                id="login-password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}

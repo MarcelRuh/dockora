@@ -15,6 +15,8 @@ describe('resource-events', () => {
 
   it('strips health_status suffixes', () => {
     expect(dockerActionName('health_status:healthy')).toBe('health_status');
+    expect(dockerActionName('exec_start:foo')).toBe('exec_start');
+    expect(dockerActionName('start')).toBe('start');
   });
 
   it('keeps paused/restarting in the live subset', () => {

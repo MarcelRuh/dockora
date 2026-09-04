@@ -2,6 +2,7 @@ import type { DashboardNotification } from '@dockora/shared';
 import type { NotificationEvent } from '@dockora/shared';
 import { prisma } from '../../infrastructure/db/prisma.js';
 import type { SettingsService } from '../settings/settings.service.js';
+import { pruneDataRetention } from '../settings/data-retention.js';
 import { sendDiscordEmbed, type DiscordField } from './discord.js';
 
 export interface NotificationsServiceDeps {
@@ -66,6 +67,10 @@ export class NotificationsService {
     });
 
     const settings = await this.deps.settings.getSettings();
+    void pruneDataRetention({
+      notificationDays: settings.notificationRetentionDays,
+      auditDays: settings.auditRetentionDays,
+    }).catch(() => undefined);
     if (
       settings.discordEnabled &&
       settings.discordWebhookUrl &&

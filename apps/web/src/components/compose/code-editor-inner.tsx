@@ -147,7 +147,7 @@ export function CodeEditorInner({
             message: issue.message,
           };
         });
-      }),
+      }, { delay: 250 }),
       indentationMarkers({
         highlightActiveBlock: true,
         hideFirstIndent: true,

@@ -4,6 +4,7 @@ import fp from 'fastify-plugin';
 import fjwt from '@fastify/jwt';
 import {
   API_PREFIX,
+  MIN_PASSWORD_LENGTH,
   type AuthLoginResponse,
   type AuthTotpConfirmResponse,
   type AuthTotpSetupResponse,
@@ -408,8 +409,10 @@ const authPlugin: FastifyPluginAsync = async (app: FastifyInstance) => {
     Body: { email: string; password: string; displayName?: string; role?: UserRole };
   }>(`${API_PREFIX}/auth/users`, { preHandler: [app.requireRole('admin')] }, async (request) => {
     const { email, password, displayName, role } = request.body ?? {};
-    if (!email || !password || password.length < 8) {
-      throw app.httpErrors.badRequest('Valid email and password (min 8) required');
+    if (!email || !password || password.length < MIN_PASSWORD_LENGTH) {
+      throw app.httpErrors.badRequest(
+        `Valid email and password (min ${MIN_PASSWORD_LENGTH}) required`,
+      );
     }
     const passwordHash = await bcrypt.hash(password, 12);
     const user = await prisma.user.create({
@@ -444,8 +447,8 @@ const authPlugin: FastifyPluginAsync = async (app: FastifyInstance) => {
       if (role && !['admin', 'operator', 'viewer'].includes(role)) {
         throw app.httpErrors.badRequest('Invalid role');
       }
-      if (password != null && password.length < 8) {
-        throw app.httpErrors.badRequest('Password must be at least 8 characters');
+      if (password != null && password.length < MIN_PASSWORD_LENGTH) {
+        throw app.httpErrors.badRequest(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
       }
 
       const existing = await prisma.user.findUnique({ where: { id: request.params.id } });

@@ -413,6 +413,24 @@ export function SettingsPageView() {
                     disabled={!isAdmin}
                   />
                 </Field>
+                <Field label={t.settings.fields.notificationRetentionDays}>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={settings.notificationRetentionDays}
+                    onChange={(e) => patch('notificationRetentionDays', Number(e.target.value))}
+                    disabled={!isAdmin}
+                  />
+                </Field>
+                <Field label={t.settings.fields.auditRetentionDays}>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={settings.auditRetentionDays}
+                    onChange={(e) => patch('auditRetentionDays', Number(e.target.value))}
+                    disabled={!isAdmin}
+                  />
+                </Field>
                 <Field label={t.settings.fields.backupFormat}>
                   <Select
                     value={settings.backupFormat}

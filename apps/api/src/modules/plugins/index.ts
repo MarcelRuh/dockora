@@ -5,12 +5,12 @@ import { actorIdFromRequest, auditService } from '../audit/audit.service.js';
 import { prisma } from '../../infrastructure/db/prisma.js';
 import {
   discoverPlugins,
-  importPlugin,
   loadPluginsFromDir,
   registerPluginSandboxed,
   unregisterPluginSandboxed,
   withTimeout,
 } from './plugin-loader.js';
+import { loadPluginInWorker } from './plugin-isolate.js';
 
 const DISABLED_KEY = 'plugins.disabled';
 
@@ -130,9 +130,9 @@ export const pluginsModule: FastifyPluginAsync = async (app: FastifyInstance) =>
           throw app.httpErrors.notFound(`Plugin not found: ${dirName}`);
         }
         const plugin = await withTimeout(
-          importPlugin(entry.indexPath, app.config.pluginDir),
-          5_000,
-          `Plugin "${dirName}" import timed out`,
+          loadPluginInWorker(entry.indexPath, app.config.pluginDir),
+          10_000,
+          `Plugin "${dirName}" isolate timed out`,
         );
         if (!plugin) {
           throw app.httpErrors.badRequest('Invalid plugin export');

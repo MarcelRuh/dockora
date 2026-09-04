@@ -121,6 +121,7 @@ describe('DashboardService', () => {
     expect(overview.resources.cpuPercent).toBe(12.5);
     expect(overview.recentEvents).toHaveLength(1);
     expect(overview.updatesAvailable).toBe(0);
+    expect(overview.lifetime).toBeNull();
   });
 
   it('marks engine offline when version lookup fails', async () => {

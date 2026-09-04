@@ -20,6 +20,8 @@ const DEFAULTS: AppSettings = {
   ghcrToken: '',
   lscrToken: '',
   backupRetentionDays: 14,
+  notificationRetentionDays: 30,
+  auditRetentionDays: 90,
   backupFormat: 'tar.gz',
   backupSchedule: 'daily',
   monitoringCpuThreshold: 90,
@@ -92,7 +94,18 @@ export class SettingsService {
         : base.autoUpdateImages,
       ghcrToken: stored.ghcrToken ?? base.ghcrToken,
       lscrToken: stored.lscrToken ?? base.lscrToken,
-      backupRetentionDays: num(stored.backupRetentionDays, base.backupRetentionDays),
+      backupRetentionDays: clampDays(
+        num(stored.backupRetentionDays, base.backupRetentionDays),
+        base.backupRetentionDays,
+      ),
+      notificationRetentionDays: clampDays(
+        num(stored.notificationRetentionDays, base.notificationRetentionDays),
+        base.notificationRetentionDays,
+      ),
+      auditRetentionDays: clampDays(
+        num(stored.auditRetentionDays, base.auditRetentionDays),
+        base.auditRetentionDays,
+      ),
       backupFormat: (stored.backupFormat as BackupFormat) ?? base.backupFormat,
       backupSchedule: (stored.backupSchedule as AppSettings['backupSchedule']) ?? base.backupSchedule,
       monitoringCpuThreshold: num(stored.monitoringCpuThreshold, base.monitoringCpuThreshold),
@@ -141,6 +154,12 @@ function num(raw: string | undefined, fallback: number): number {
   if (!raw) return fallback;
   const n = Number(raw);
   return Number.isFinite(n) ? n : fallback;
+}
+
+/** Retention days: 1–3650. */
+export function clampDays(value: number, fallback: number): number {
+  if (!Number.isFinite(value)) return fallback;
+  return Math.min(3650, Math.max(1, Math.round(value)));
 }
 
 /** Persist default login-on if the operator never saved the toggle. */

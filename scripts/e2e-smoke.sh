@@ -100,6 +100,10 @@ curl -fsS "${AUTH_HEADER[@]}" "$API/api/v1/plugins" | grep -q '"plugins"' || {
   echo "plugins endpoint failed"; exit 1;
 }
 
+echo "==> Dashboard"
+DASHBOARD=$(curl -fsS "${AUTH_HEADER[@]}" "$API/api/v1/dashboard")
+echo "$DASHBOARD" | grep -q '"lifetime"' || { echo "dashboard missing lifetime"; exit 1; }
+
 echo "==> Settings (webhook must be masked if set)"
 SETTINGS=$(curl -fsS "${AUTH_HEADER[@]}" "$API/api/v1/settings")
 if echo "$SETTINGS" | grep -Eq 'discord\.com/api/webhooks'; then

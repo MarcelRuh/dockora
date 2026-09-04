@@ -70,9 +70,9 @@ Client → Fastify (Helmet, CORS, Rate-Limit)
 
 ## Plugin-System
 
-`DockoraPlugin` Interface in `domain/ports.ts` – Registry folgt im Plugins-Modul.
+`DockoraPlugin` in `domain/ports.ts`. Drop-in-Ordner unter `PLUGIN_DIR/<name>/index.js` werden in einem Worker-Thread importiert und `register()` dort ausgeführt (Timeout + Terminate). Die Registry im API-Prozess hält nur den eingefrorenen Contract.
 
 ## Datenbank
 
-Prisma + SQLite. Schema enthält vorerst: `User`, `Setting`, `Notification`, `AuditLog`.  
-Migration auf PostgreSQL durch Provider-Wechsel in `schema.prisma` möglich.
+Prisma + SQLite. Schema: `User`, `Setting`, `Notification`, `AuditLog`, `BackupRecord`, `ScheduledJob`, `UpdateCheckCache`, `LifetimeStats`.  
+Notification- und Audit-Zeilen werden per Aufbewahrungsfrist (Settings) und Zeilen-Cap bereinigt.

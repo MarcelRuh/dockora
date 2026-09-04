@@ -10,7 +10,6 @@ import type { Locale } from '@dockora/shared';
 import { AuthLogoutButton } from '@/components/auth/auth-provider';
 import { NAV_ICONS } from '@/components/ui/nav-icons';
 import { BrandLogo, BrandLogoWide } from '@/components/ui/brand-logo';
-import { NeonAtmosphere } from '@/components/ui/neon-particles';
 
 const NAV_ITEMS = [
   { key: 'dashboard', href: '/', ready: true },
@@ -53,7 +52,12 @@ function NavList({
         return (
           <li key={item.key}>
             {item.ready ? (
-              <Link href={item.href} className={className} onClick={onNavigate}>
+              <Link
+                href={item.href}
+                className={className}
+                onClick={onNavigate}
+                aria-current={active ? 'page' : undefined}
+              >
                 <Icon className="h-4 w-4 opacity-90" />
                 <span>{t.nav[item.key]}</span>
               </Link>
@@ -116,9 +120,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="relative flex h-dvh overflow-hidden">
-      <div className="pointer-events-none fixed inset-0 z-0">
-        <NeonAtmosphere />
-      </div>
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[200] focus:bg-dockora-surface focus:px-3 focus:py-2 focus:text-sm focus:text-dockora-text"
+      >
+        {t.common.skipToContent}
+      </a>
 
       <aside className="relative z-10 hidden h-full w-60 shrink-0 flex-col border-r border-dockora-railBorder bg-dockora-rail text-dockora-railText md:flex">
         <Link
@@ -140,7 +147,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       <div className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="z-40 flex items-center justify-between gap-3 border-b border-dockora-border bg-dockora-bg/80 px-4 py-3 backdrop-blur-xl md:hidden">
+        <header className="z-40 flex items-center justify-between gap-3 border-b border-dockora-border bg-dockora-bg px-4 py-3 md:hidden">
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -161,7 +168,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <LocaleControls dense />
         </header>
 
-        <nav className="flex items-center gap-2 border-b border-dockora-border bg-dockora-surface/60 px-3 py-2 backdrop-blur-md md:hidden">
+        <nav className="flex items-center gap-2 border-b border-dockora-border bg-dockora-surface px-3 py-2 md:hidden">
           <button
             type="button"
             onClick={() => setDrawerOpen(true)}
@@ -189,7 +196,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="fixed inset-0 z-50 md:hidden" role="presentation">
             <button
               type="button"
-              className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+              className="absolute inset-0 bg-black/70"
               aria-label={t.common.close}
               onClick={() => setDrawerOpen(false)}
             />
@@ -221,6 +228,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         ) : null}
 
         <main
+          id="main-content"
+          tabIndex={-1}
           className={cn(
             'mx-auto w-full max-w-shell min-h-0 flex-1 overflow-y-auto px-4 sm:px-6 xl:px-8',
             pathname === '/' ? 'py-5 sm:py-6' : 'py-8 sm:py-10',

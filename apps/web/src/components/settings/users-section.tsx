@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { AuthUser, UserRole } from '@dockora/shared';
+import { MIN_PASSWORD_LENGTH } from '@dockora/shared';
 import {
   createAuthUser,
   deleteAuthUser,
@@ -93,7 +94,7 @@ export function UsersSection() {
       const patch: { displayName?: string | null; password?: string } = {
         displayName: editDisplayName.trim() || null,
       };
-      if (editPassword.trim().length >= 8) {
+      if (editPassword.trim().length >= MIN_PASSWORD_LENGTH) {
         patch.password = editPassword.trim();
       } else if (editPassword.trim().length > 0) {
         setError(t.settings.users.passwordTooShort);
@@ -186,7 +187,7 @@ export function UsersSection() {
           placeholder={t.settings.users.password}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          minLength={8}
+          minLength={MIN_PASSWORD_LENGTH}
           required
         />
         <Input
@@ -246,7 +247,7 @@ export function UsersSection() {
             placeholder={t.settings.users.newPasswordOptional}
             value={editPassword}
             onChange={(e) => setEditPassword(e.target.value)}
-            minLength={8}
+            minLength={MIN_PASSWORD_LENGTH}
           />
         </div>
       </ConfirmDialog>

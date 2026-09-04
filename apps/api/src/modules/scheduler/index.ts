@@ -15,6 +15,8 @@ import { MonitoringService } from '../monitoring/monitoring.service.js';
 import { ComposeService } from '../compose/compose.service.js';
 import { filterAlertsWithCooldown } from '../monitoring/alert-cooldown.js';
 import { SchedulerService } from './scheduler.service.js';
+import { lifetimeStatsService } from '../dashboard/lifetime.service.js';
+import { pruneDataRetention } from '../settings/data-retention.js';
 
 export const schedulerModule: FastifyPluginAsync = async (app: FastifyInstance) => {
   const settings = new SettingsService(new PrismaSettingsRepository());
@@ -77,6 +79,23 @@ export const schedulerModule: FastifyPluginAsync = async (app: FastifyInstance) 
   });
 
   scheduler.registerCallback('cleanup', async () => {
+    try {
+      const current = await settings.getSettings();
+      const pruned = await pruneDataRetention({
+        notificationDays: current.notificationRetentionDays,
+        auditDays: current.auditRetentionDays,
+        force: true,
+      });
+      if (pruned.notificationsDeleted + pruned.auditDeleted > 0) {
+        app.log.info(pruned, 'Data retention prune');
+      }
+    } catch (error) {
+      app.log.warn(
+        { err: error instanceof Error ? error.message : String(error) },
+        'Data retention prune failed',
+      );
+    }
+
     const { deleted } = await backups.cleanup();
     if (deleted > 0) {
       await notifications.notify(
@@ -114,6 +133,19 @@ export const schedulerModule: FastifyPluginAsync = async (app: FastifyInstance) 
 
   scheduler.registerCallback('healthcheck', async () => {
     const snapshot = await monitoring.getSnapshot();
+    try {
+      await lifetimeStatsService.recordSample({
+        cpuPercent: snapshot.host.cpuPercent,
+        memoryPercent: snapshot.host.memoryPercent,
+        diskPercent: snapshot.host.diskPercent,
+        containerCount: snapshot.containers.length,
+      });
+    } catch (error) {
+      app.log.warn(
+        { err: error instanceof Error ? error.message : String(error) },
+        'Lifetime stats sample failed',
+      );
+    }
 
     // Auto-prune when build-cache alert would fire – don't wait for weekly timer
     const cacheAlert = snapshot.alerts.find((a) => /build cache/i.test(a));

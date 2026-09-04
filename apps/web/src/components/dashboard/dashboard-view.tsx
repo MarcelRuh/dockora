@@ -54,6 +54,7 @@ export function DashboardView({
         <div className="space-y-5">
           <EngineStrip overview={data} onUpdated={() => void refresh()} />
           <ContainerStrip overview={data} labels={t.dashboard} />
+          <LifetimeStrip overview={data} labels={t.dashboard.lifetime} locale={loc} />
           <LiveResources overview={data} labels={t.dashboard} locale={loc} />
           <AsideColumn
             notifications={data.notifications}
@@ -148,6 +149,64 @@ function ContainerStrip({
           </ul>
         </div>
       ) : null}
+    </section>
+  );
+}
+
+function LifetimeStrip({
+  overview,
+  labels,
+  locale,
+}: {
+  overview: DashboardOverview;
+  labels: {
+    title: string;
+    since: string;
+    peakCpu: string;
+    peakMemory: string;
+    peakDisk: string;
+    avgCpu: string;
+    starts: string;
+    maxContainers: string;
+    samples: string;
+  };
+  locale: string;
+}) {
+  const life = overview.lifetime;
+  if (!life || (life.samplesCount === 0 && life.containerStarts === 0)) return null;
+
+  const since = new Date(life.trackingSince).toLocaleDateString(locale, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+  const items = [
+    { label: labels.peakCpu, value: `${life.peakCpuPercent.toFixed(1)}%` },
+    { label: labels.avgCpu, value: `${life.avgCpuPercent.toFixed(1)}%` },
+    { label: labels.peakMemory, value: `${life.peakMemoryPercent.toFixed(1)}%` },
+    { label: labels.peakDisk, value: `${life.peakDiskPercent.toFixed(1)}%` },
+    { label: labels.starts, value: String(life.containerStarts) },
+    { label: labels.maxContainers, value: String(life.maxContainersSeen) },
+  ];
+
+  return (
+    <section className="dockora-panel space-y-3 px-4 py-3" aria-label={labels.title}>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-xs font-medium uppercase tracking-wide text-dockora-muted">
+          {labels.title}
+        </h2>
+        <p className="font-mono text-[11px] text-dockora-muted">
+          {labels.since} {since} · {labels.samples.replace('{count}', String(life.samplesCount))}
+        </p>
+      </div>
+      <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        {items.map((item) => (
+          <div key={item.label}>
+            <dt className="text-[10px] uppercase tracking-wide text-dockora-muted">{item.label}</dt>
+            <dd className="mt-0.5 font-mono text-lg tabular-nums text-dockora-text">{item.value}</dd>
+          </div>
+        ))}
+      </dl>
     </section>
   );
 }

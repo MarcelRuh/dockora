@@ -107,7 +107,28 @@ jobs:
           SMOKE_PASSWORD: dockora-admin-change-me
         run: bash scripts/e2e-smoke.sh
 
+      - name: Playwright login
+        env:
+          DOCKORA_API_URL: http://127.0.0.1:3001
+          PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
+        run: |
+          pnpm --filter @dockora/web exec playwright install --with-deps chromium
+          pnpm --filter @dockora/web start > /tmp/dockora-web.log 2>&1 &
+          echo $! > /tmp/dockora-web.pid
+          for i in $(seq 1 45); do
+            if curl -fsS http://127.0.0.1:3000 >/dev/null; then
+              echo "Web up"
+              break
+            fi
+            sleep 1
+            if [[ "$i" -eq 45 ]]; then
+              echo "Web failed to start"; cat /tmp/dockora-web.log; exit 1
+            fi
+          done
+          pnpm --filter @dockora/web exec playwright test
+
       - name: Stop API
         if: always()
         run: |
           if [[ -f /tmp/dockora-api.pid ]]; then kill "$(cat /tmp/dockora-api.pid)" || true; fi
+          if [[ -f /tmp/dockora-web.pid ]]; then kill "$(cat /tmp/dockora-web.pid)" || true; fi

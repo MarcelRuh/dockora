@@ -5,6 +5,27 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.0] – 2026-09-04
+
+### Added
+
+- Notification and audit log retention (defaults 30 / 90 days, plus row caps)
+- Lifetime host/container stats on the dashboard (peaks, averages, start counts)
+- Plugin `register()` runs in a worker thread with timeout + terminate
+- Same-origin `/api/icon` proxy for jsDelivr/selfh.st service icons
+- Playwright login smoke in CI; skip-link and table `scope="col"` for keyboard users
+
+### Changed
+
+- User passwords must be at least 12 characters (aligned with bootstrap policy)
+- CodeMirror compose/env lint waits 250ms after typing
+- Neon atmosphere only on login and dashboard; mobile chrome no longer uses backdrop-blur
+
+### Removed
+
+- Stale `_planned.ts` module placeholder
+- Unused `public/logo.png` (UI already uses `logo.webp`)
+
 ## [1.9.10] – 2026-08-30
 
 ### Performance

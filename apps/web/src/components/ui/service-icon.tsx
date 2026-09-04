@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
+import { proxiedIconUrl } from '@/lib/icon-proxy';
 
 export function ServiceIcon({
   url,
@@ -16,8 +17,9 @@ export function ServiceIcon({
 }) {
   const [failed, setFailed] = useState(false);
   const dim = size === 'sm' ? 'h-5 w-5' : size === 'lg' ? 'h-10 w-10' : 'h-7 w-7';
+  const src = proxiedIconUrl(url);
 
-  if (!url || failed) {
+  if (!src || failed) {
     return (
       <span
         aria-hidden
@@ -36,7 +38,7 @@ export function ServiceIcon({
   return (
     // eslint-disable-next-line @next/next/no-img-element -- arbitrary CDN icons from Compose labels
     <img
-      src={url}
+      src={src}
       alt=""
       title={alt}
       width={size === 'sm' ? 20 : size === 'lg' ? 40 : 28}

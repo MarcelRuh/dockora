@@ -209,7 +209,11 @@ export function DataTable({
           <thead>
             <tr className="border-b border-dockora-border bg-[#0a0a12]/80">
               {headers.map((h, j) => (
-                <th key={`${j}-${h}`} className={cellSticky(j, headers.length, true)}>
+                <th
+                  key={`${j}-${h}`}
+                  scope="col"
+                  className={cellSticky(j, headers.length, true)}
+                >
                   {h}
                 </th>
               ))}
