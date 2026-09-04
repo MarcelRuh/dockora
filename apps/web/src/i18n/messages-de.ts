@@ -13,7 +13,7 @@ export const de = {
       backups: 'Backups',
       logs: 'Logs',
       terminal: 'Terminal',
-      selfUpdate: 'Self-Update',
+      selfUpdate: 'Dockora',
       settings: 'Einstellungen',
     },
     common: {

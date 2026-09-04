@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.2] – 2026-09-04
+
+### Changed
+
+- Sidebar item for app updates is labeled **Dockora** (not Self-Update)
+
 ## [2.0.1] – 2026-09-04
 
 ### Changed

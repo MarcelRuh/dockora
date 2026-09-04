@@ -83,7 +83,7 @@ gh auth refresh -h github.com -s read:packages,write:packages
 
 ### In-app (Compose installs via `install.sh`)
 
-1. Open **Settings → Updates → Dockora Self-Update** (admin)
+1. Open **Dockora** in the sidebar (admin)
 2. Compare local vs GitHub revision, click **Jetzt aktualisieren**
 3. A one-shot updater syncs the install dir (keeps `.env` / `data/`) and runs `docker compose up -d --build`
 
