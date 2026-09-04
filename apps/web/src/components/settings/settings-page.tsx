@@ -21,7 +21,6 @@ import {
 import { SchedulerSection } from '@/components/settings/scheduler-section';
 import { UsersSection } from '@/components/settings/users-section';
 import { AuditSection } from '@/components/settings/audit-section';
-import { SelfUpdateSection } from '@/components/settings/self-update-section';
 import { PluginsSection } from '@/components/settings/plugins-section';
 import { TotpSection } from '@/components/settings/totp-section';
 
@@ -338,7 +337,6 @@ export function SettingsPageView() {
                   </Field>
                 </div>
               </SettingsPanel>
-              {isAdmin ? <SelfUpdateSection /> : null}
             </div>
           ) : null}
 

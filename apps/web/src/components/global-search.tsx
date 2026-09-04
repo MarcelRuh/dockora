@@ -23,6 +23,7 @@ const NAV_HITS = [
   { href: '/backups', key: 'backups' },
   { href: '/logs', key: 'logs' },
   { href: '/terminal', key: 'terminal' },
+  { href: '/self-update', key: 'selfUpdate' },
   { href: '/settings', key: 'settings' },
 ] as const;
 

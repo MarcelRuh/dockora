@@ -5,7 +5,7 @@ import { applySelfUpdate, fetchSelfUpdateStatus } from '@/lib/api';
 import { useLocale } from '@/i18n/locale-provider';
 import { Button } from '@/components/ui/form-controls';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { ErrorBanner, Section, SuccessBanner } from '@/components/ui/page-parts';
+import { ErrorBanner, SuccessBanner } from '@/components/ui/page-parts';
 import { ProgressBar } from '@/components/ui/progress-bar';
 
 type SelfStatus = Awaited<ReturnType<typeof fetchSelfUpdateStatus>>;
@@ -122,8 +122,7 @@ export function SelfUpdateSection() {
   const percent = progress?.percent ?? (showProgress ? 2 : 0);
 
   return (
-    <Section title={t.settings.selfUpdate.title}>
-      <p className="mb-3 text-sm text-dockora-muted">{t.settings.selfUpdate.hint}</p>
+    <div className="space-y-3">
       {error ? <ErrorBanner message={error} /> : null}
       {success ? <SuccessBanner message={success} /> : null}
       {status ? (
@@ -228,6 +227,6 @@ export function SelfUpdateSection() {
           </div>
         ) : null}
       </ConfirmDialog>
-    </Section>
+    </div>
   );
 }

@@ -15,6 +15,7 @@ export const en = {
       backups: 'Backups',
       logs: 'Logs',
       terminal: 'Terminal',
+      selfUpdate: 'Self-Update',
       settings: 'Settings',
     },
     common: {

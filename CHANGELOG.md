@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.1] – 2026-09-04
+
+### Changed
+
+- Dockora self-update is a sidebar item (`/self-update`) with an update-available marker, not buried under Settings
+
 ## [2.0.0] – 2026-09-04
 
 ### Added

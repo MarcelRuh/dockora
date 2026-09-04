@@ -121,6 +121,17 @@ export function IconLogs(props: IconProps) {
   );
 }
 
+export function IconSelfUpdate(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M12 3v11" />
+      <path d="m8 10 4 4 4-4" />
+      <path d="M5 18h14" />
+      <path d="M7 21h10" />
+    </svg>
+  );
+}
+
 export function IconSettings(props: IconProps) {
   return (
     <svg {...base(props)}>
@@ -152,5 +163,6 @@ export const NAV_ICONS = {
   backups: IconBackups,
   logs: IconLogs,
   terminal: IconTerminal,
+  selfUpdate: IconSelfUpdate,
   settings: IconSettings,
 } as const;

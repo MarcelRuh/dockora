@@ -7,9 +7,11 @@ import { useLocale } from '@/i18n/locale-provider';
 import { GlobalSearch } from '@/components/global-search';
 import { cn } from '@/lib/utils';
 import type { Locale } from '@dockora/shared';
-import { AuthLogoutButton } from '@/components/auth/auth-provider';
+import { AuthLogoutButton, useAuth } from '@/components/auth/auth-provider';
 import { NAV_ICONS } from '@/components/ui/nav-icons';
 import { BrandLogo, BrandLogoWide } from '@/components/ui/brand-logo';
+import { fetchSelfUpdateStatus } from '@/lib/api';
+import { canAdmin } from '@/lib/roles';
 
 const NAV_ITEMS = [
   { key: 'dashboard', href: '/', ready: true },
@@ -23,8 +25,43 @@ const NAV_ITEMS = [
   { key: 'backups', href: '/backups', ready: true },
   { key: 'logs', href: '/logs', ready: true },
   { key: 'terminal', href: '/terminal', ready: true },
+  { key: 'selfUpdate', href: '/self-update', ready: true },
   { key: 'settings', href: '/settings', ready: true },
 ] as const;
+
+let selfUpdateCache: { at: number; available: boolean } | null = null;
+const SELF_UPDATE_CACHE_MS = 60_000;
+
+function useSelfUpdateAvailable() {
+  const { authEnabled, user } = useAuth();
+  const [available, setAvailable] = useState(
+    () => selfUpdateCache?.available ?? false,
+  );
+
+  useEffect(() => {
+    if (!canAdmin(user?.role, authEnabled)) {
+      setAvailable(false);
+      return;
+    }
+    if (selfUpdateCache && Date.now() - selfUpdateCache.at < SELF_UPDATE_CACHE_MS) {
+      setAvailable(selfUpdateCache.available);
+      return;
+    }
+    let cancelled = false;
+    void fetchSelfUpdateStatus()
+      .then((status) => {
+        const next = Boolean(status.updateAvailable);
+        selfUpdateCache = { at: Date.now(), available: next };
+        if (!cancelled) setAvailable(next);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [authEnabled, user?.role]);
+
+  return available;
+}
 
 function NavList({
   onNavigate,
@@ -35,6 +72,7 @@ function NavList({
 }) {
   const { t } = useLocale();
   const pathname = usePathname();
+  const selfUpdateAvailable = useSelfUpdateAvailable();
 
   return (
     <ul className={cn('space-y-0.5', compact && 'space-y-0')}>
@@ -57,9 +95,23 @@ function NavList({
                 className={className}
                 onClick={onNavigate}
                 aria-current={active ? 'page' : undefined}
+                aria-label={
+                  item.key === 'selfUpdate' && selfUpdateAvailable
+                    ? `${t.nav.selfUpdate} – ${t.settings.selfUpdate.apply}`
+                    : undefined
+                }
               >
                 <Icon className="h-4 w-4 opacity-90" />
-                <span>{t.nav[item.key]}</span>
+                <span className="flex min-w-0 items-center gap-2">
+                  {t.nav[item.key]}
+                  {item.key === 'selfUpdate' && selfUpdateAvailable ? (
+                    <span
+                      className="h-1.5 w-1.5 shrink-0 rounded-full bg-dockora-pink shadow-[0_0_8px_rgba(255,0,110,0.9)]"
+                      title={t.settings.selfUpdate.apply}
+                      aria-hidden
+                    />
+                  ) : null}
+                </span>
               </Link>
             ) : (
               <span className={className}>

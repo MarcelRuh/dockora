@@ -25,4 +25,4 @@
 
 ## Web-Routen
 
-`/`, `/containers`, `/containers/[id]`, `/compose`, `/compose/new`, `/compose/[id]`, `/images`, `/volumes`, `/updates`, `/monitoring`, `/network`, `/backups`, `/logs`, `/terminal`, `/settings`
+`/`, `/containers`, `/containers/[id]`, `/compose`, `/compose/new`, `/compose/[id]`, `/images`, `/volumes`, `/updates`, `/self-update`, `/monitoring`, `/network`, `/backups`, `/logs`, `/terminal`, `/settings`

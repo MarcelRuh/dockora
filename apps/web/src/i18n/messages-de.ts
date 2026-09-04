@@ -13,6 +13,7 @@ export const de = {
       backups: 'Backups',
       logs: 'Logs',
       terminal: 'Terminal',
+      selfUpdate: 'Self-Update',
       settings: 'Einstellungen',
     },
     common: {
