@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
-import { proxiedIconUrl } from '@/lib/icon-proxy';
 
 export function ServiceIcon({
   url,
@@ -17,7 +16,7 @@ export function ServiceIcon({
 }) {
   const [failed, setFailed] = useState(false);
   const dim = size === 'sm' ? 'h-5 w-5' : size === 'lg' ? 'h-10 w-10' : 'h-7 w-7';
-  const src = proxiedIconUrl(url);
+  const src = typeof url === 'string' && /^https?:\/\//i.test(url.trim()) ? url.trim() : null;
 
   if (!src || failed) {
     return (

@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.3] – 2026-09-05
+
+### Fixed
+
+- Container/Compose service icons load in the browser again (the 2.0 same-origin CDN proxy hid them when the web container could not reach jsDelivr)
+
 ## [2.0.2] – 2026-09-04
 
 ### Changed
@@ -24,7 +30,6 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 - Notification and audit log retention (defaults 30 / 90 days, plus row caps)
 - Lifetime host/container stats on the dashboard (peaks, averages, start counts)
 - Plugin `register()` runs in a worker thread with timeout + terminate
-- Same-origin `/api/icon` proxy for jsDelivr/selfh.st service icons
 - Playwright login smoke in CI; skip-link and table `scope="col"` for keyboard users
 
 ### Changed
