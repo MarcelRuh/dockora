@@ -14,7 +14,7 @@ const SIZES = {
   lg: { box: 'h-[7.5rem] w-[7.5rem]', px: 120 },
 } as const;
 
-/** Official Dockora mark (whale + wordmark artwork). */
+/** Square Dockora mark (whale + containers). */
 export function BrandLogo({ className, size = 'md', priority = false }: BrandLogoProps) {
   const s = SIZES[size];
   return (
@@ -32,16 +32,16 @@ export function BrandLogo({ className, size = 'md', priority = false }: BrandLog
   );
 }
 
-/** Wide brand lockup for the sidebar header. */
+/** Wide brand lockup for the sidebar header and login. */
 export function BrandLogoWide({ className, priority = false }: { className?: string; priority?: boolean }) {
   return (
     <span className={cn('relative block w-full', className)}>
       <Image
-        src="/logo.webp"
-        alt="Dockora – Docker Management Suite"
-        width={240}
-        height={240}
-        sizes="(max-width: 768px) 12rem, 15rem"
+        src="/logo-wide.webp"
+        alt="Dockora – Docker Management"
+        width={960}
+        height={290}
+        sizes="(max-width: 768px) 16rem, 15rem"
         className="h-auto w-full object-contain"
         priority={priority}
       />

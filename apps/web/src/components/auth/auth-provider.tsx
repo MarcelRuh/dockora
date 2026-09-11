@@ -87,7 +87,7 @@ function LoginForm({ onSuccess }: { onSuccess: (user: AuthUser) => void }) {
         className="relative z-10 mx-auto flex min-h-screen max-w-md flex-col justify-center space-y-6 px-4"
       >
         <div className="space-y-2 text-center">
-          <div className="mx-auto w-48">
+          <div className="mx-auto w-72">
             <BrandLogoWide priority />
           </div>
           <h1 className="sr-only">{t.auth.title}</h1>

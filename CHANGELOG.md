@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.4] – 2026-09-11
+
+### Changed
+
+- New Dockora mark and wordmark in the same lockup style as Cloudora (sidebar, login, favicons)
+
 ## [2.0.3] – 2026-09-05
 
 ### Fixed
