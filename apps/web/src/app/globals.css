@@ -176,6 +176,17 @@ body {
   filter: drop-shadow(0 0 18px rgba(131, 56, 236, 0.45));
 }
 
+.dockora-logo-tagline {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  background: linear-gradient(90deg, var(--dockora-pink), var(--dockora-blue));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
 .dockora-nav-active {
   color: #ffffff !important;
   background: rgba(255, 0, 110, 0.1);

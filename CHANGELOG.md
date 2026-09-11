@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.6] – 2026-09-11
+
+### Changed
+
+- Brand lockup uses the hex icon plus real HTML/CSS wordmark (DOCKORA + Docker Management Suite), not a single raster image
+
 ## [2.0.5] – 2026-09-11
 
 ### Changed

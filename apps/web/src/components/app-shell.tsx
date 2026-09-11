@@ -259,7 +259,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               aria-label={t.common.menu}
             >
               <div className="flex items-center justify-between gap-3 border-b border-dockora-railBorder px-3 py-3">
-                <BrandLogo size="md" />
+                <BrandLogoWide size="sm" />
                 <button
                   type="button"
                   className="dockora-field px-2 py-1 font-mono text-xs uppercase"
