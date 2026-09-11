@@ -5,11 +5,11 @@
 [![CI](https://github.com/MarcelRuh/dockora/actions/workflows/ci.yml/badge.svg)](https://github.com/MarcelRuh/dockora/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
-> Status: **v2.0.8** – self-hosted Docker management with in-app updates and GHCR images.
+> Status: **v2.0.9** – self-hosted Docker management with in-app updates and GHCR images.
 
 ## One-line install (wget)
 
-Requires Docker + Compose V2. Installs to `/opt/dockora` by default and generates strong secrets.
+Als root. Installiert Docker Engine + Compose V2, falls noch nicht vorhanden, dann Dockora nach `/opt/dockora` (starke Secrets werden generiert).
 
 ```bash
 wget -qO- https://raw.githubusercontent.com/MarcelRuh/dockora/main/scripts/install.sh | bash
@@ -64,7 +64,7 @@ Preserves `.env` and `data/`, syncs from GitHub, then runs `docker compose up -d
 ### Fast install via GHCR images
 
 ```bash
-wget -qO- https://raw.githubusercontent.com/MarcelRuh/dockora/main/scripts/install.sh | DOCKORA_USE_IMAGES=1 DOCKORA_IMAGE_TAG=2.0.8 bash
+wget -qO- https://raw.githubusercontent.com/MarcelRuh/dockora/main/scripts/install.sh | DOCKORA_USE_IMAGES=1 DOCKORA_IMAGE_TAG=2.0.9 bash
 ```
 
 Or manually:

@@ -1,5 +1,7 @@
 # Deploying Dockora
 
+The wget installer (`scripts/install.sh`) installs Docker Engine + Compose V2 if they are missing (`DOCKORA_SKIP_DOCKER=1` to skip). Run it as root.
+
 ## Quick production (Docker Compose)
 
 ```bash

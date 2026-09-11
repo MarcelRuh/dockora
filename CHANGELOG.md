@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.9] – 2026-09-11
+
+### Added
+
+- `install.sh` installs Docker Engine + Compose V2 via get.docker.com when they are missing (opt out with `DOCKORA_SKIP_DOCKER=1`)
+
 ## [2.0.8] – 2026-09-11
 
 ### Security

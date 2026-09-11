@@ -8,6 +8,7 @@
 # Options (env):
 #   DOCKORA_DIR=/opt/dockora          Installationsverzeichnis
 #   DOCKORA_BRANCH=main              Git-Branch
+#   DOCKORA_SKIP_DOCKER=1            Docker nicht automatisch installieren
 #   DOCKORA_SKIP_START=1             Nur klonen/konfigurieren, nicht starten
 #   DOCKORA_PROXY=1                  nginx Same-Origin-Proxy-Profil mitstarten
 #   DOCKORA_TLS=1                    Caddy HTTPS (Let’s Encrypt oder interne CA)
@@ -43,6 +44,93 @@ need_cmd() {
   fi
 }
 
+have_docker_cli() { command -v docker >/dev/null 2>&1; }
+have_compose() { have_docker_cli && docker compose version >/dev/null 2>&1; }
+docker_daemon_up() { have_docker_cli && docker info >/dev/null 2>&1; }
+
+start_docker_daemon() {
+  if command -v systemctl >/dev/null 2>&1 && [[ -d /run/systemd/system ]]; then
+    systemctl enable --now docker >/dev/null 2>&1 || systemctl start docker >/dev/null 2>&1 || true
+  elif command -v service >/dev/null 2>&1; then
+    service docker start >/dev/null 2>&1 || true
+  fi
+}
+
+wait_for_docker() {
+  local n=0
+  while (( n < 40 )); do
+    if docker_daemon_up; then
+      return 0
+    fi
+    sleep 1
+    n=$((n + 1))
+  done
+  return 1
+}
+
+install_docker_engine() {
+  local script
+  script="$(mktemp)"
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL https://get.docker.com -o "$script"
+  elif command -v wget >/dev/null 2>&1; then
+    wget -qO "$script" https://get.docker.com
+  else
+    red "Need curl or wget to download Docker (get.docker.com)"
+    exit 1
+  fi
+  sh "$script"
+  rm -f "$script"
+}
+
+ensure_docker() {
+  if have_compose && docker_daemon_up; then
+    info "Docker Engine + Compose V2 already available"
+    return 0
+  fi
+
+  if [[ "${DOCKORA_SKIP_DOCKER:-0}" == "1" ]]; then
+    red "Docker Engine + Compose V2 are required (DOCKORA_SKIP_DOCKER=1)"
+    exit 1
+  fi
+
+  if have_docker_cli && ! docker_daemon_up && [[ "$(id -u)" -eq 0 ]]; then
+    info "Starting Docker daemon"
+    start_docker_daemon
+    if wait_for_docker && have_compose; then
+      info "Docker daemon is up"
+      return 0
+    fi
+  fi
+
+  if [[ "$(id -u)" -ne 0 ]]; then
+    red "Docker Engine + Compose V2 are required."
+    red "Re-run as root so the installer can install Docker, or install it first:"
+    echo "  wget -qO- https://get.docker.com | sh"
+    exit 1
+  fi
+
+  if ! have_docker_cli || ! have_compose; then
+    info "Installing Docker Engine + Compose V2 (get.docker.com)"
+    install_docker_engine
+  fi
+
+  start_docker_daemon
+  if [[ -n "${SUDO_USER:-}" && "$SUDO_USER" != "root" ]]; then
+    usermod -aG docker "$SUDO_USER" 2>/dev/null || true
+  fi
+
+  if ! wait_for_docker; then
+    red "Docker was installed but the daemon did not become ready"
+    exit 1
+  fi
+  if ! have_compose; then
+    red "docker compose plugin is still missing after Docker install"
+    exit 1
+  fi
+  green "Docker Engine + Compose V2 ready"
+}
+
 rand_hex() {
   if command -v openssl >/dev/null 2>&1; then
     openssl rand -hex 32
@@ -54,11 +142,7 @@ rand_hex() {
 info "Dockora installer"
 info "Target: ${INSTALL_DIR} (branch ${BRANCH})"
 
-need_cmd docker
-if ! docker compose version >/dev/null 2>&1; then
-  red "docker compose plugin is required (Docker Compose V2)"
-  exit 1
-fi
+ensure_docker
 
 if command -v git >/dev/null 2>&1; then
   CLONE_OK=1
