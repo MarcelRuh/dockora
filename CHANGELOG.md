@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.7] – 2026-09-11
+
+### Changed
+
+- Brand tagline (Docker Management Suite) is muted gray, matching Cloudora/Sambora
+
 ## [2.0.6] – 2026-09-11
 
 ### Changed
