@@ -10,6 +10,7 @@ import {
 } from '@dockora/shared';
 import { withDockerError } from '../../domain/docker-errors.js';
 import { actorIdFromRequest, auditService } from '../audit/audit.service.js';
+import { rolesForContainerAction } from '../auth/role-policy.js';
 import { destructiveRateLimit } from '../../presentation/http/destructive-rate-limit.js';
 import { ContainersService } from './containers.service.js';
 
@@ -137,9 +138,7 @@ export const containersModule: FastifyPluginAsync = async (app: FastifyInstance)
       ...destructiveRateLimit,
       preHandler: [
         async (request) => {
-          if (request.params.action === 'remove' || request.params.action === 'kill') {
-            await app.requireRole('admin')(request);
-          }
+          await app.requireRole(...rolesForContainerAction(request.params.action))(request);
         },
       ],
     },

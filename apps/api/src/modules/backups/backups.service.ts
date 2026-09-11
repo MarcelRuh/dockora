@@ -5,7 +5,17 @@ import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { TarArchive, ZipArchive } from 'archiver';
-import { COMPOSE_FILENAMES, type BackupFormat, type BackupInfo } from '@dockora/shared';
+import {
+  COMPOSE_FILENAMES,
+  DEFAULT_COMPOSE_SEARCH_PATHS,
+  type BackupFormat,
+  type BackupInfo,
+} from '@dockora/shared';
+import {
+  assertSafeArchiveEntries,
+  isAllowedRestoreFileTarget,
+  isSafeVolumeName,
+} from './backup-safety.js';
 import { prisma } from '../../infrastructure/db/prisma.js';
 import type { SettingsService } from '../settings/settings.service.js';
 import type { IDockerClient } from '../../domain/ports.js';
@@ -64,6 +74,7 @@ export interface RestoreResult {
   appliedSettings: boolean;
   appliedVolumes: number;
   backedUpFiles: string[];
+  skippedFiles?: number;
   preview?: {
     composeFiles: string[];
     envFiles: string[];
@@ -242,13 +253,23 @@ export class BackupsService {
     }
 
     const manifest = await readManifest(extractDir);
+    const settings = await this.deps.settings.getSettings();
+    const searchPaths =
+      settings.composeSearchPaths.length > 0
+        ? settings.composeSearchPaths
+        : [...DEFAULT_COMPOSE_SEARCH_PATHS];
     const backedUpFiles: string[] = [];
     let appliedFiles = 0;
     let appliedSettings = false;
     let appliedVolumes = 0;
+    let skippedFiles = 0;
 
     for (const entry of manifest.files) {
       const src = path.join(extractDir, entry.archivePath);
+      if (!isSafeArchiveMemberPath(src, extractDir)) {
+        skippedFiles += 1;
+        continue;
+      }
       try {
         await fsp.access(src);
       } catch {
@@ -268,6 +289,10 @@ export class BackupsService {
 
       if (entry.kind === 'volume') {
         if (!applyVolumes) continue;
+        if (!isSafeVolumeName(entry.sourcePath)) {
+          skippedFiles += 1;
+          continue;
+        }
         if (!this.deps.docker) {
           throw new Error('Docker client fehlt für Volume-Restore');
         }
@@ -279,7 +304,11 @@ export class BackupsService {
       if (!applyFiles) continue;
 
       const target = entry.sourcePath;
-      if (!path.isAbsolute(target)) {
+      if (
+        (entry.kind !== 'compose' && entry.kind !== 'env') ||
+        !isAllowedRestoreFileTarget(entry.kind, target, searchPaths)
+      ) {
+        skippedFiles += 1;
         continue;
       }
 
@@ -296,14 +325,16 @@ export class BackupsService {
       appliedFiles += 1;
     }
 
+    const skippedNote = skippedFiles > 0 ? ` ${skippedFiles} Eintrag/Einträge übersprungen.` : '';
     return {
       ok: true,
-      message: `Restore angewendet: ${appliedFiles} Datei(en)${appliedSettings ? ', Settings' : ''}${appliedVolumes ? `, ${appliedVolumes} Volume(s)` : ''}.`,
+      message: `Restore angewendet: ${appliedFiles} Datei(en)${appliedSettings ? ', Settings' : ''}${appliedVolumes ? `, ${appliedVolumes} Volume(s)` : ''}.${skippedNote}`,
       extractedTo: extractDir,
       appliedFiles,
       appliedSettings,
       appliedVolumes,
       backedUpFiles,
+      skippedFiles,
     };
   }
 
@@ -466,11 +497,59 @@ async function createArchive(
   });
 }
 
+function isSafeArchiveMemberPath(memberPath: string, destDir: string): boolean {
+  const dest = path.resolve(destDir);
+  const resolved = path.resolve(memberPath);
+  return resolved === dest || resolved.startsWith(`${dest}${path.sep}`);
+}
+
+async function listArchiveEntries(format: BackupFormat, archivePath: string): Promise<string[]> {
+  if (format === 'zip') {
+    try {
+      const { stdout } = await execFileAsync('unzip', ['-Z1', archivePath]);
+      return splitArchiveNames(stdout);
+    } catch {
+      const { stdout } = await execFileAsync('unzip', ['-l', archivePath]);
+      return parseUnzipDashL(stdout);
+    }
+  }
+
+  const args = format === 'tar.gz' ? ['-tzf', archivePath] : ['-tf', archivePath];
+  const { stdout } = await execFileAsync('tar', args);
+  return splitArchiveNames(stdout);
+}
+
+function splitArchiveNames(stdout: string): string[] {
+  return stdout
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+/** Parse `unzip -l` when zipinfo (`-Z1`) is unavailable. */
+function parseUnzipDashL(stdout: string): string[] {
+  const names: string[] = [];
+  let inTable = false;
+  for (const line of stdout.split('\n')) {
+    if (/^-{5,}/.test(line.trim())) {
+      inTable = !inTable;
+      continue;
+    }
+    if (!inTable) continue;
+    const name = line.replace(/^\s*\d+\s+\S+\s+\S+\s+/, '').trim();
+    if (name) names.push(name);
+  }
+  return names;
+}
+
 async function extractArchive(
   format: BackupFormat,
   archivePath: string,
   destDir: string,
 ): Promise<void> {
+  const entries = await listArchiveEntries(format, archivePath);
+  assertSafeArchiveEntries(entries, destDir);
+
   if (format === 'zip') {
     await execFileAsync('unzip', ['-o', archivePath, '-d', destDir]);
     return;

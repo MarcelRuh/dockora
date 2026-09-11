@@ -242,9 +242,11 @@ export function UpdatesPage() {
         subtitle={t.updates.subtitle}
         actions={
           <>
-            <Button variant="primary" disabled={checking} onClick={() => void handleCheck()}>
-              {checking ? t.updates.checking : t.updates.check}
-            </Button>
+            {canOps ? (
+              <Button variant="primary" disabled={checking} onClick={() => void handleCheck()}>
+                {checking ? t.updates.checking : t.updates.check}
+              </Button>
+            ) : null}
             {canOps && availableCount > 0 ? (
               <Button
                 disabled={Boolean(busy)}

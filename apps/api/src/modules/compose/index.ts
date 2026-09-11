@@ -8,6 +8,7 @@ import {
   type ComposeProjectSummary,
 } from '@dockora/shared';
 import { actorIdFromRequest, auditService } from '../audit/audit.service.js';
+import { OPERATOR_ROLES, rolesForComposeAction } from '../auth/role-policy.js';
 import {
   ComposeNotFoundError,
   ComposeService,
@@ -70,7 +71,10 @@ export const composeModule: FastifyPluginAsync = async (app: FastifyInstance) =>
       envContent?: string;
       start?: boolean;
     };
-  }>(`${API_PREFIX}/compose`, { ...destructiveRateLimit }, async (request): Promise<ComposeProjectDetails> => {
+  }>(
+    `${API_PREFIX}/compose`,
+    { ...destructiveRateLimit, preHandler: [app.requireRole(...OPERATOR_ROLES)] },
+    async (request): Promise<ComposeProjectDetails> => {
     const body = request.body ?? ({} as never);
     if (!body.name || !body.basePath || !body.yaml) {
       throw app.httpErrors.badRequest('name, basePath and yaml are required');
@@ -134,6 +138,7 @@ export const composeModule: FastifyPluginAsync = async (app: FastifyInstance) =>
 
   app.put<{ Params: { id: string }; Body: { content: string } }>(
     `${API_PREFIX}/compose/:id/yaml`,
+    { preHandler: [app.requireRole(...OPERATOR_ROLES)] },
     async (request): Promise<ComposeProjectDetails> => {
       if (!request.body?.content || typeof request.body.content !== 'string') {
         throw app.httpErrors.badRequest('Request body must include content: string');
@@ -160,7 +165,10 @@ export const composeModule: FastifyPluginAsync = async (app: FastifyInstance) =>
   app.put<{
     Params: { id: string };
     Body: { content: string; fileName?: string };
-  }>(`${API_PREFIX}/compose/:id/env`, async (request) => {
+  }>(
+    `${API_PREFIX}/compose/:id/env`,
+    { preHandler: [app.requireRole(...OPERATOR_ROLES)] },
+    async (request) => {
     if (typeof request.body?.content !== 'string') {
       throw app.httpErrors.badRequest('Request body must include content: string');
     }
@@ -177,6 +185,7 @@ export const composeModule: FastifyPluginAsync = async (app: FastifyInstance) =>
 
   app.post<{ Params: { id: string } }>(
     `${API_PREFIX}/compose/:id/backup`,
+    { preHandler: [app.requireRole(...OPERATOR_ROLES)] },
     async (request): Promise<BackupInfo> => {
       try {
         return await service.backup(request.params.id);
@@ -224,12 +233,7 @@ export const composeModule: FastifyPluginAsync = async (app: FastifyInstance) =>
       ...destructiveRateLimit,
       preHandler: [
         async (request) => {
-          const action = request.params.action as ComposeAction;
-          if (action === 'down') {
-            await app.requireRole('admin')(request);
-          } else if (action === 'recreate') {
-            await app.requireRole('admin', 'operator')(request);
-          }
+          await app.requireRole(...rolesForComposeAction(request.params.action))(request);
         },
       ],
     },

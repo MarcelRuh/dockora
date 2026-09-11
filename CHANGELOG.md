@@ -5,6 +5,25 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.8] – 2026-09-11
+
+### Security
+
+- API mutations now match UI roles: viewers are read-only; operators get lifecycle actions; admin stays on delete/restore/settings
+- Backup restore only writes Compose/Env files under configured search paths, rejects zip/tar slip, and skips unsafe volume names
+
+### Added
+
+- Unit tests for the role matrix, backup path guards, restore skip/apply, and retention cleanup
+- Viewer 403 checks in `scripts/e2e-smoke.sh`
+
+### Fixed
+
+- Favicon/PWA icons are the declared square sizes (16/32/192/512)
+- Duplicate `DOCKER_GID` in `.env.example`; self-update hint points to Sidebar → Dockora
+- `SECURITY.md` support matrix lists 2.x
+- Confirm dialog traps Tab focus and restores focus on close
+
 ## [2.0.7] – 2026-09-11
 
 ### Changed

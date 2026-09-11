@@ -7,6 +7,7 @@ import {
 } from '../settings/settings.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { UpdatesService } from './updates.service.js';
+import { OPERATOR_ROLES } from '../auth/role-policy.js';
 import { notifyUpdatesAvailable, notifyUpdatesInstalled } from './notify-updates.js';
 
 export const updatesModule: FastifyPluginAsync = async (app: FastifyInstance) => {
@@ -37,7 +38,10 @@ export const updatesModule: FastifyPluginAsync = async (app: FastifyInstance) =>
     return { count };
   });
 
-  app.post(`${API_PREFIX}/updates/check`, async (): Promise<UpdateCheckResult[]> => {
+  app.post(
+    `${API_PREFIX}/updates/check`,
+    { preHandler: [app.requireRole(...OPERATOR_ROLES)] },
+    async (): Promise<UpdateCheckResult[]> => {
     const results = await service.checkAll(true);
     // Same Discord/in-app signal as the scheduled update_check job
     await notifyUpdatesAvailable(notifications, results);
@@ -46,7 +50,7 @@ export const updatesModule: FastifyPluginAsync = async (app: FastifyInstance) =>
 
   app.post<{ Params: { containerId: string } }>(
     `${API_PREFIX}/updates/:containerId/pull`,
-    { preHandler: [app.requireRole('admin', 'operator')] },
+    { preHandler: [app.requireRole(...OPERATOR_ROLES)] },
     async (request) => {
       const before = (await service.listCached()).find(
         (r) => r.containerId === request.params.containerId,

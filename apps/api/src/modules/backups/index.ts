@@ -6,6 +6,7 @@ import {
 } from '../settings/settings.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { actorIdFromRequest, auditService } from '../audit/audit.service.js';
+import { ADMIN_ROLES } from '../auth/role-policy.js';
 import { destructiveRateLimit } from '../../presentation/http/destructive-rate-limit.js';
 import { BackupsService } from './backups.service.js';
 
@@ -26,7 +27,10 @@ export const backupsModule: FastifyPluginAsync = async (app: FastifyInstance) =>
 
   app.post<{
     Body: { format?: BackupFormat; includeVolumes?: boolean };
-  }>(`${API_PREFIX}/backups`, { ...destructiveRateLimit }, async (request): Promise<BackupInfo> => {
+  }>(
+    `${API_PREFIX}/backups`,
+    { ...destructiveRateLimit, preHandler: [app.requireRole(...ADMIN_ROLES)] },
+    async (request): Promise<BackupInfo> => {
     try {
       const backup = await service.create(request.body ?? {});
       await notifications.notify(
@@ -48,13 +52,16 @@ export const backupsModule: FastifyPluginAsync = async (app: FastifyInstance) =>
     }
   });
 
-  app.post(`${API_PREFIX}/backups/cleanup`, { ...destructiveRateLimit }, async () => {
+  app.post(
+    `${API_PREFIX}/backups/cleanup`,
+    { ...destructiveRateLimit, preHandler: [app.requireRole(...ADMIN_ROLES)] },
+    async () => {
     return service.cleanup();
   });
 
   app.delete<{ Params: { id: string } }>(
     `${API_PREFIX}/backups/:id`,
-    { ...destructiveRateLimit, preHandler: [app.requireRole('admin')] },
+    { ...destructiveRateLimit, preHandler: [app.requireRole(...ADMIN_ROLES)] },
     async (request, reply) => {
       await service.delete(request.params.id);
       void auditService.record({
@@ -77,7 +84,7 @@ export const backupsModule: FastifyPluginAsync = async (app: FastifyInstance) =>
     };
   }>(
     `${API_PREFIX}/backups/:id/restore`,
-    { ...destructiveRateLimit, preHandler: [app.requireRole('admin')] },
+    { ...destructiveRateLimit, preHandler: [app.requireRole(...ADMIN_ROLES)] },
     async (request) => {
       try {
         const result = await service.restore(request.params.id, request.body ?? {});

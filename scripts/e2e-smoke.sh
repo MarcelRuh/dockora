@@ -71,6 +71,49 @@ if [[ "$AUTH_ENABLED" == "true" ]]; then
     echo "FAIL: expected 401 for bad login, got $CODE"
     exit 1
   fi
+
+  echo "==> Viewer must receive 403 on mutations"
+  VIEWER_EMAIL="smoke-viewer-$(date +%s)@dockora.local"
+  VIEWER_PASS="smoke-viewer-12"
+  VIEWER_CREATE=$(curl -fsS "${AUTH_HEADER[@]}" -X POST "$API/api/v1/auth/users" \
+    -H 'content-type: application/json' \
+    -d "{\"email\":\"$VIEWER_EMAIL\",\"password\":\"$VIEWER_PASS\",\"role\":\"viewer\"}")
+  VIEWER_ID=$(echo "$VIEWER_CREATE" | sed -n 's/.*"id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
+  if [[ -z "$VIEWER_ID" ]]; then
+    echo "FAIL: could not create viewer user: $(echo "$VIEWER_CREATE" | cut -c1-160)"
+    exit 1
+  fi
+  VIEWER_LOGIN=$(curl -fsS -X POST "$API/api/v1/auth/login" \
+    -H 'content-type: application/json' \
+    -d "{\"email\":\"$VIEWER_EMAIL\",\"password\":\"$VIEWER_PASS\"}")
+  VIEWER_TOKEN=$(echo "$VIEWER_LOGIN" | sed -n 's/.*"token"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
+  if [[ -z "$VIEWER_TOKEN" ]]; then
+    echo "FAIL: viewer login failed"
+    curl -fsS "${AUTH_HEADER[@]}" -X DELETE "$API/api/v1/auth/users/$VIEWER_ID" >/dev/null || true
+    exit 1
+  fi
+  expect_viewer_403() {
+    local method=$1 path=$2
+    local code
+    code=$(curl -sS -o /dev/null -w '%{http_code}' -X "$method" \
+      -H "authorization: Bearer $VIEWER_TOKEN" \
+      -H 'content-type: application/json' \
+      -d '{}' \
+      "$API$path" || true)
+    if [[ "$code" != "403" ]]; then
+      echo "FAIL: viewer $method $path expected 403, got $code"
+      curl -fsS "${AUTH_HEADER[@]}" -X DELETE "$API/api/v1/auth/users/$VIEWER_ID" >/dev/null || true
+      exit 1
+    fi
+  }
+  expect_viewer_403 POST '/api/v1/containers/smoke-id/stop'
+  expect_viewer_403 POST '/api/v1/compose/smoke-id/up'
+  expect_viewer_403 PUT '/api/v1/compose/smoke-id/yaml'
+  expect_viewer_403 POST '/api/v1/images/pull'
+  expect_viewer_403 POST '/api/v1/backups'
+  curl -fsS "${AUTH_HEADER[@]}" -X DELETE "$API/api/v1/auth/users/$VIEWER_ID" >/dev/null || {
+    echo "WARN: could not delete smoke viewer $VIEWER_ID"
+  }
 fi
 
 echo "==> Containers list"

@@ -4,6 +4,7 @@ import {
   PrismaSettingsRepository,
   SettingsService,
 } from '../settings/settings.service.js';
+import { ADMIN_ROLES } from '../auth/role-policy.js';
 import { NotificationsService } from './notifications.service.js';
 
 export const notificationsModule: FastifyPluginAsync = async (app: FastifyInstance) => {
@@ -28,7 +29,10 @@ export const notificationsModule: FastifyPluginAsync = async (app: FastifyInstan
     return service.markAllRead();
   });
 
-  app.post(`${API_PREFIX}/notifications/test`, async () => {
+  app.post(
+    `${API_PREFIX}/notifications/test`,
+    { preHandler: [app.requireRole(...ADMIN_ROLES)] },
+    async () => {
     return service.testDiscord();
   });
 };

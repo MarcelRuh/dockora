@@ -110,5 +110,6 @@ export interface BackupRestoreResult extends ActionResult {
   appliedSettings: boolean;
   appliedVolumes: number;
   backedUpFiles: string[];
+  skippedFiles?: number;
   preview?: BackupRestorePreview;
 }
