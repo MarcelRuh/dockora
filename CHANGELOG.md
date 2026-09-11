@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.5] – 2026-09-11
+
+### Changed
+
+- Logo lockup matches the Sambora family style (hex mark + DOCKORA wordmark + DOCKER MANAGEMENT SUITE)
+
 ## [2.0.4] – 2026-09-11
 
 ### Changed
