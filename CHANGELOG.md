@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.10] – 2026-09-22
+
+### Added
+
+- Compose stack: remove one service in one step (stop and delete its container, drop it from the Compose file, keep the rest of the stack). The last service deletes the project.
+
 ## [2.0.9] – 2026-09-11
 
 ### Added

@@ -613,6 +613,70 @@ export class ComposeService {
     };
   }
 
+  /**
+   * Entfernt einen einzelnen Service: Container weg, Eintrag aus der Compose-Datei,
+   * übrige Services bleiben. Beim letzten Service wird das Projekt gelöscht.
+   */
+  async removeService(
+    id: string,
+    serviceName: string,
+    options: { removeVolumes?: boolean } = {},
+  ): Promise<ActionResult & { removedProject: boolean }> {
+    const project = await this.resolveProject(id);
+    const original = await readComposeYaml(project.absoluteComposePath);
+    const removed = removeComposeService(original, serviceName);
+    const removeVolumes = options.removeVolumes === true;
+
+    if (removed.remaining.length === 0) {
+      const result = await this.remove(id, { removeFiles: true, removeVolumes });
+      return { ...result, removedProject: true };
+    }
+
+    const rmArgs = await withEnvFile(project, [
+      '--project-directory',
+      project.path,
+      '-f',
+      project.absoluteComposePath,
+      'rm',
+      '-sf',
+    ]);
+    if (removeVolumes) rmArgs.push('-v');
+    rmArgs.push(serviceName.trim());
+
+    try {
+      await execCompose(rmArgs, { cwd: project.path });
+    } catch (error) {
+      const message = composeCliMessage(error);
+      if (!/no such|not found|no container|no service/i.test(message)) {
+        throw error;
+      }
+    }
+
+    await writeFile(project.absoluteComposePath, removed.yaml, 'utf8');
+    try {
+      const upArgs = await withEnvFile(project, [
+        '--project-directory',
+        project.path,
+        '-f',
+        project.absoluteComposePath,
+        'up',
+        '-d',
+        '--remove-orphans',
+      ]);
+      await execCompose(upArgs, { cwd: project.path });
+    } catch (error) {
+      await writeFile(project.absoluteComposePath, original, 'utf8').catch(() => undefined);
+      throw error;
+    }
+
+    invalidateComposeDiscoveryCache();
+    return {
+      ok: true,
+      removedProject: false,
+      message: `Service ${serviceName.trim()} removed from ${project.name}`,
+    };
+  }
+
   private async resolveProject(id: string) {
     const project = await resolveDiscoveredProject(
       id,
@@ -718,6 +782,12 @@ async function execCompose(
   });
 }
 
+function composeCliMessage(error: unknown): string {
+  if (!(error instanceof Error)) return String(error);
+  const stderr = (error as { stderr?: string }).stderr?.trim();
+  return stderr || error.message;
+}
+
 function hintMissingEnv(message: string, hadEnvAttempt: boolean): string {
   if (/empty section between colons|variable is not set/i.test(message)) {
     const tip = hadEnvAttempt
@@ -736,6 +806,54 @@ function assertAllowedEnvFile(fileName: string): string {
     );
   }
   return base;
+}
+
+function nodeKey(node: unknown): string | null {
+  if (YAML.isScalar(node)) return String(node.value);
+  if (typeof node === 'string' || typeof node === 'number') return String(node);
+  return null;
+}
+
+/**
+ * Entfernt einen Service und Referenzen in depends_on anderer Services.
+ * Die restliche Datei (Kommentare, Reihenfolge) bleibt über die Document-API erhalten.
+ */
+export function removeComposeService(
+  yamlContent: string,
+  serviceName: string,
+): { yaml: string; remaining: string[] } {
+  const name = serviceName.trim();
+  const doc = YAML.parseDocument(yamlContent);
+  const services = doc.get('services');
+  if (!YAML.isMap(services)) {
+    throw new ComposeValidationError('Compose YAML has no services map');
+  }
+  if (services.get(name) == null) {
+    throw new ComposeValidationError(`Service "${name}" not found in compose YAML`);
+  }
+  services.delete(name);
+
+  for (const item of services.items) {
+    const svc = item.value;
+    if (!YAML.isMap(svc)) continue;
+    const depends = svc.get('depends_on', true);
+    if (YAML.isSeq(depends)) {
+      const kept = depends.items.filter((entry) => nodeKey(entry) !== name);
+      if (kept.length === 0) {
+        svc.delete('depends_on');
+      } else if (kept.length !== depends.items.length) {
+        depends.items.splice(0, depends.items.length, ...kept);
+      }
+    } else if (YAML.isMap(depends)) {
+      if (depends.has(name)) depends.delete(name);
+      if (depends.items.length === 0) svc.delete('depends_on');
+    }
+  }
+
+  const remaining = services.items
+    .map((item) => nodeKey(item.key))
+    .filter((key): key is string => Boolean(key));
+  return { yaml: String(doc), remaining };
 }
 
 /** Setzt services.<name>.image auf imageRef (YAML-Document-API). */

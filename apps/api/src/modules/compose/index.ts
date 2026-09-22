@@ -8,7 +8,7 @@ import {
   type ComposeProjectSummary,
 } from '@dockora/shared';
 import { actorIdFromRequest, auditService } from '../audit/audit.service.js';
-import { OPERATOR_ROLES, rolesForComposeAction } from '../auth/role-policy.js';
+import { ADMIN_ROLES, OPERATOR_ROLES, rolesForComposeAction } from '../auth/role-policy.js';
 import {
   ComposeNotFoundError,
   ComposeService,
@@ -189,6 +189,35 @@ export const composeModule: FastifyPluginAsync = async (app: FastifyInstance) =>
     async (request): Promise<BackupInfo> => {
       try {
         return await service.backup(request.params.id);
+      } catch (error) {
+        return await throwComposeError(app, error);
+      }
+    },
+  );
+
+  app.post<{
+    Params: { id: string; service: string };
+    Body: { removeVolumes?: boolean };
+  }>(
+    `${API_PREFIX}/compose/:id/services/:service/remove`,
+    { ...destructiveRateLimit, preHandler: [app.requireRole(...ADMIN_ROLES)] },
+    async (request): Promise<ActionResult & { removedProject: boolean }> => {
+      try {
+        const result = await service.removeService(request.params.id, request.params.service, {
+          removeVolumes: request.body?.removeVolumes === true,
+        });
+        void auditService.record({
+          action: 'compose.service.remove',
+          actorId: actorIdFromRequest(request),
+          resource: 'compose',
+          resourceId: request.params.id,
+          metadata: {
+            service: request.params.service,
+            removeVolumes: request.body?.removeVolumes === true,
+            removedProject: result.removedProject,
+          },
+        });
+        return result;
       } catch (error) {
         return await throwComposeError(app, error);
       }

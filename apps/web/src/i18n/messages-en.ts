@@ -327,6 +327,21 @@ export const en = {
       bulkDelete: 'Delete',
       serviceRestartConfirm: 'Restart service "{name}"?',
       serviceRecreateConfirm: 'Redeploy service "{name}"?',
+      removeService: 'Remove',
+      serviceRemoveConfirm:
+        'Remove service "{name}" from the stack? Its container is stopped and deleted and will not come back.',
+      serviceRemoveLastConfirm:
+        '"{name}" is the last service. The container and the whole project folder will be deleted.',
+      serviceRemoveConsequences: [
+        'Only this container is removed; the other services keep running.',
+        'The service is deleted from the Compose file.',
+        'The next Up will not recreate it.',
+      ],
+      serviceRemoveLastConsequences: [
+        'The container is stopped and deleted.',
+        'The project folder (compose.yaml, .env, local files) is removed.',
+      ],
+      serviceRemoveVolumes: 'Also delete this service’s volumes',
       envModeFields: 'Fields',
       envModeRaw: 'Raw',
       envKey: 'Key',

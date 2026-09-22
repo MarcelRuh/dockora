@@ -269,6 +269,17 @@ export async function deleteComposeProject(
   );
 }
 
+export async function removeComposeService(
+  id: string,
+  service: string,
+  options?: { removeVolumes?: boolean },
+): Promise<ActionResult & { removedProject: boolean }> {
+  return request(`/compose/${encodeURIComponent(id)}/services/${encodeURIComponent(service)}/remove`, {
+    method: 'POST',
+    body: JSON.stringify({ removeVolumes: options?.removeVolumes === true }),
+  });
+}
+
 // Images
 export async function fetchImages(): Promise<ImageSummary[]> {
   return request<ImageSummary[]>('/images');

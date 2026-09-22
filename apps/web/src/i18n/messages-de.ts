@@ -326,6 +326,21 @@ export const de = {
       bulkDelete: 'Löschen',
       serviceRestartConfirm: 'Service „{name}“ neu starten?',
       serviceRecreateConfirm: 'Service „{name}“ neu ausrollen?',
+      removeService: 'Entfernen',
+      serviceRemoveConfirm:
+        'Service „{name}“ aus dem Stack entfernen? Der Container wird gestoppt und gelöscht und kommt nicht wieder.',
+      serviceRemoveLastConfirm:
+        '„{name}“ ist der letzte Service. Container und der ganze Projektordner werden gelöscht.',
+      serviceRemoveConsequences: [
+        'Nur dieser Container wird entfernt, die anderen Services bleiben.',
+        'Der Service verschwindet aus der Compose-Datei.',
+        'Beim nächsten Up wird er nicht neu angelegt.',
+      ],
+      serviceRemoveLastConsequences: [
+        'Der Container wird gestoppt und gelöscht.',
+        'Der Projektordner (compose.yaml, .env, lokale Dateien) wird entfernt.',
+      ],
+      serviceRemoveVolumes: 'Volumes dieses Services mitlöschen',
       envModeFields: 'Felder',
       envModeRaw: 'Rohtext',
       envKey: 'Schlüssel',

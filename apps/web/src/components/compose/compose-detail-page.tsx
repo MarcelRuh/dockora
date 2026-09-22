@@ -13,6 +13,7 @@ import {
   fetchComposeProject,
   fetchContainers,
   previewComposeChanges,
+  removeComposeService,
   saveComposeEnv,
   saveComposeYaml,
   validateComposeConfig,
@@ -41,7 +42,7 @@ import {
   SuccessBanner,
 } from '@/components/ui/page-parts';
 
-type ConfirmKind = 'up' | 'down' | 'restart' | 'recreate' | 'delete';
+type ConfirmKind = 'up' | 'down' | 'restart' | 'recreate' | 'delete' | 'removeService';
 type ConfirmState = {
   kind: ConfirmKind;
   consequences: string[];
@@ -220,10 +221,16 @@ export function ComposeDetailPage({ id }: { id: string }) {
         consequences = [...consequences, ...t.compose.recreateConsequences];
       }
       if (kind === 'delete') consequences = [...consequences, ...t.compose.deleteConsequences];
+      if (kind === 'removeService') {
+        const last = project.services.length <= 1;
+        consequences = last
+          ? [...t.compose.serviceRemoveLastConsequences]
+          : [...t.compose.serviceRemoveConsequences];
+      }
       setConfirm({
         kind,
         consequences,
-        removeVolumes: kind === 'delete' ? false : undefined,
+        removeVolumes: kind === 'delete' || kind === 'removeService' ? false : undefined,
         service,
       });
     } finally {
@@ -241,6 +248,18 @@ export function ComposeDetailPage({ id }: { id: string }) {
       if (kind === 'delete') {
         await deleteComposeProject(id, { removeFiles: true, removeVolumes: Boolean(removeVolumes) });
         router.push('/compose');
+        return;
+      }
+      if (kind === 'removeService') {
+        if (!service) return;
+        const result = await removeComposeService(id, service, {
+          removeVolumes: Boolean(removeVolumes),
+        });
+        if (result.removedProject) {
+          router.push('/compose');
+          return;
+        }
+        await load();
         return;
       }
       await composeAction(id, kind, service);
@@ -438,10 +457,12 @@ export function ComposeDetailPage({ id }: { id: string }) {
             yaml={yaml}
             containers={serviceContainers}
             canOps={canOps}
+            canDelete={isAdmin}
             busy={busy}
             labels={t.compose}
             onRestart={(service) => void openConfirm('restart', service)}
             onRecreate={(service) => void openConfirm('recreate', service)}
+            onRemove={(service) => void openConfirm('removeService', service)}
             onLogs={(service) => void handleLogs(service)}
             onSaveIcon={(service, url) => void handleSaveIcon(service, url)}
           />
@@ -459,7 +480,7 @@ export function ComposeDetailPage({ id }: { id: string }) {
       <ConfirmDialog
         open={Boolean(confirm)}
         title={
-          confirm?.kind === 'delete'
+          confirm?.kind === 'delete' || confirm?.kind === 'removeService'
             ? t.common.delete
             : confirm?.kind === 'down'
               ? t.compose.down
@@ -472,6 +493,11 @@ export function ComposeDetailPage({ id }: { id: string }) {
         description={
           confirm?.kind === 'delete'
             ? t.compose.deleteConfirm.replace('{name}', project.name)
+            : confirm?.kind === 'removeService'
+              ? (project.services.length <= 1
+                  ? t.compose.serviceRemoveLastConfirm
+                  : t.compose.serviceRemoveConfirm
+                ).replace('{name}', confirm.service ?? '')
             : confirm?.kind === 'down'
               ? t.compose.downConfirm.replace('{name}', project.name)
               : confirm?.kind === 'restart'
@@ -489,12 +515,12 @@ export function ComposeDetailPage({ id }: { id: string }) {
         consequences={confirm?.consequences}
         confirmLabel={t.common.confirm}
         cancelLabel={t.common.cancel}
-        danger={confirm?.kind === 'delete' || confirm?.kind === 'down'}
+        danger={confirm?.kind === 'delete' || confirm?.kind === 'removeService' || confirm?.kind === 'down'}
         busy={busy || confirmBusy}
         onCancel={() => setConfirm(null)}
         onConfirm={() => void executeConfirm()}
       >
-        {confirm?.kind === 'delete' ? (
+        {confirm?.kind === 'delete' || confirm?.kind === 'removeService' ? (
           <label className="flex cursor-pointer items-start gap-2 text-sm text-dockora-muted">
             <input
               type="checkbox"
@@ -504,7 +530,11 @@ export function ComposeDetailPage({ id }: { id: string }) {
                 setConfirm((c) => (c ? { ...c, removeVolumes: e.target.checked } : c))
               }
             />
-            <span>{t.compose.deleteVolumesConfirm}</span>
+            <span>
+              {confirm.kind === 'removeService' && project.services.length > 1
+                ? t.compose.serviceRemoveVolumes
+                : t.compose.deleteVolumesConfirm}
+            </span>
           </label>
         ) : null}
       </ConfirmDialog>
@@ -517,10 +547,12 @@ function ServiceIconList({
   yaml,
   containers,
   canOps,
+  canDelete,
   busy,
   labels,
   onRestart,
   onRecreate,
+  onRemove,
   onLogs,
   onSaveIcon,
 }: {
@@ -528,10 +560,12 @@ function ServiceIconList({
   yaml: string;
   containers: ContainerSummary[];
   canOps: boolean;
+  canDelete: boolean;
   busy: boolean;
   labels: {
     restart: string;
     recreate: string;
+    removeService: string;
     logs: string;
     iconUrl: string;
     iconSlug: string;
@@ -542,6 +576,7 @@ function ServiceIconList({
   };
   onRestart: (service: string) => void;
   onRecreate: (service: string) => void;
+  onRemove: (service: string) => void;
   onLogs: (service: string) => void;
   onSaveIcon: (service: string, url: string) => void;
 }) {
@@ -563,10 +598,12 @@ function ServiceIconList({
             containerId={fromContainer?.id}
             unhealthy={unhealthy}
             canOps={canOps}
+            canDelete={canDelete}
             busy={busy}
             labels={labels}
             onRestart={onRestart}
             onRecreate={onRecreate}
+            onRemove={onRemove}
             onLogs={onLogs}
             onSaveIcon={onSaveIcon}
           />
@@ -582,10 +619,12 @@ function ServiceCard({
   containerId,
   unhealthy,
   canOps,
+  canDelete,
   busy,
   labels,
   onRestart,
   onRecreate,
+  onRemove,
   onLogs,
   onSaveIcon,
 }: {
@@ -594,10 +633,12 @@ function ServiceCard({
   containerId?: string;
   unhealthy: boolean;
   canOps: boolean;
+  canDelete: boolean;
   busy: boolean;
   labels: {
     restart: string;
     recreate: string;
+    removeService: string;
     logs: string;
     iconUrl: string;
     iconSlug: string;
@@ -608,6 +649,7 @@ function ServiceCard({
   };
   onRestart: (service: string) => void;
   onRecreate: (service: string) => void;
+  onRemove: (service: string) => void;
   onLogs: (service: string) => void;
   onSaveIcon: (service: string, url: string) => void;
 }) {
@@ -654,6 +696,11 @@ function ServiceCard({
           <Button size="sm" disabled={busy} onClick={() => onRecreate(service)}>
             {labels.recreate}
           </Button>
+          {canDelete ? (
+            <Button size="sm" variant="danger" disabled={busy} onClick={() => onRemove(service)}>
+              {labels.removeService}
+            </Button>
+          ) : null}
           <Button size="sm" disabled={busy} onClick={() => onLogs(service)}>
             {labels.logs}
           </Button>
