@@ -186,6 +186,39 @@ export const composeModule: FastifyPluginAsync = async (app: FastifyInstance) =>
     }
   });
 
+  app.post<{
+    Params: { id: string };
+    Body: { name?: string; image?: string; ports?: string[]; start?: boolean };
+  }>(
+    `${API_PREFIX}/compose/:id/services`,
+    { ...destructiveRateLimit, preHandler: [app.requireRole(...OPERATOR_ROLES)] },
+    async (request): Promise<ComposeProjectDetails> => {
+      const name = request.body?.name?.trim() ?? '';
+      const image = request.body?.image?.trim() ?? '';
+      if (!name || !image) {
+        throw app.httpErrors.badRequest('name and image are required');
+      }
+      try {
+        const updated = await service.addService(request.params.id, {
+          name,
+          image,
+          ports: Array.isArray(request.body?.ports) ? request.body.ports : [],
+          start: request.body?.start !== false,
+        });
+        void auditService.record({
+          action: 'compose.service.add',
+          actorId: actorIdFromRequest(request),
+          resource: 'compose',
+          resourceId: request.params.id,
+          metadata: { service: name, image, start: request.body?.start !== false },
+        });
+        return updated;
+      } catch (error) {
+        return await throwComposeError(app, error);
+      }
+    },
+  );
+
   app.post<{ Params: { id: string } }>(
     `${API_PREFIX}/compose/:id/backup`,
     { preHandler: [app.requireRole(...OPERATOR_ROLES)] },

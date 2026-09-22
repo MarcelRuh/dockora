@@ -688,6 +688,30 @@ export class ComposeService {
     };
   }
 
+  /** Fügt einen Service in die Compose-Datei ein und startet ihn optional. */
+  async addService(
+    id: string,
+    input: { name: string; image: string; ports?: string[]; start?: boolean },
+  ): Promise<ComposeProjectDetails> {
+    const project = await this.resolveProject(id);
+    const original = await readComposeYaml(project.absoluteComposePath);
+    const next = addComposeService(original, input);
+    await writeFile(project.absoluteComposePath, next, 'utf8');
+    invalidateComposeDiscoveryCache();
+
+    if (input.start !== false) {
+      try {
+        await this.runAction(id, 'up', input.name.trim());
+      } catch (error) {
+        throw new ComposeValidationError(
+          `Service wurde in die Compose-Datei geschrieben, Start fehlgeschlagen: ${composeCliMessage(error)}`,
+        );
+      }
+    }
+
+    return this.getDetails(id);
+  }
+
   async findId(workingDir: string, projectName?: string): Promise<string | null> {
     const projects = await this.list();
     const dir = path.resolve(workingDir);
@@ -722,6 +746,48 @@ export class ComposeValidationError extends Error {
 }
 
 const COMPOSE_SERVICE_NAME = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$/;
+const COMPOSE_PORT = /^\d{1,5}:\d{1,5}(?:\/(?:tcp|udp))?$/;
+
+export function addComposeService(
+  yamlContent: string,
+  input: { name: string; image: string; ports?: string[] },
+): string {
+  const name = input.name.trim();
+  if (!COMPOSE_SERVICE_NAME.test(name)) {
+    throw new ComposeValidationError(`Invalid compose service name: ${input.name}`);
+  }
+  const image = input.image.trim();
+  if (!image || /\s/.test(image)) {
+    throw new ComposeValidationError('Image is required');
+  }
+  const ports = (input.ports ?? []).map((port) => port.trim()).filter(Boolean);
+  for (const port of ports) {
+    if (!COMPOSE_PORT.test(port)) {
+      throw new ComposeValidationError(`Invalid port mapping: ${port}`);
+    }
+  }
+
+  const doc = YAML.parseDocument(yamlContent);
+  let services = doc.get('services');
+  if (services == null) {
+    doc.set('services', doc.createNode({}));
+    services = doc.get('services');
+  }
+  if (!YAML.isMap(services)) {
+    throw new ComposeValidationError('Compose YAML has no services map');
+  }
+  if (services.has(name)) {
+    throw new ComposeValidationError(`Service "${name}" already exists`);
+  }
+
+  const body: Record<string, unknown> = {
+    image,
+    restart: 'unless-stopped',
+  };
+  if (ports.length > 0) body.ports = ports;
+  services.set(name, doc.createNode(body));
+  return String(doc);
+}
 
 export function assertComposeService(
   yaml: string,

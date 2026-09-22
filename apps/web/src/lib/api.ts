@@ -280,6 +280,16 @@ export async function removeComposeService(
   });
 }
 
+export async function addComposeService(
+  id: string,
+  input: { name: string; image: string; ports?: string[]; start?: boolean },
+): Promise<import('@dockora/shared').ComposeProjectDetails> {
+  return request(`/compose/${encodeURIComponent(id)}/services`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
 // Images
 export async function fetchImages(): Promise<ImageSummary[]> {
   return request<ImageSummary[]>('/images');

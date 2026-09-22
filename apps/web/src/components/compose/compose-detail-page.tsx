@@ -14,6 +14,7 @@ import {
   fetchContainers,
   previewComposeChanges,
   removeComposeService,
+  addComposeService,
   saveComposeEnv,
   saveComposeYaml,
   validateComposeConfig,
@@ -26,7 +27,7 @@ import { canAdmin, canOperate } from '@/lib/roles';
 import { composeStatusTone } from '@/lib/status';
 import { resolveContainerIconUrl, extractComposeServiceIcons } from '@/lib/container-icon';
 import { cn } from '@/lib/utils';
-import { Button, Input, Select } from '@/components/ui/form-controls';
+import { Button, Input, Label, Select } from '@/components/ui/form-controls';
 import { CodeEditor } from '@/components/compose/code-editor';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ServiceIcon } from '@/components/ui/service-icon';
@@ -70,6 +71,11 @@ export function ComposeDetailPage({ id }: { id: string }) {
   const [busy, setBusy] = useState(false);
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [addName, setAddName] = useState('');
+  const [addImage, setAddImage] = useState('');
+  const [addPorts, setAddPorts] = useState('');
+  const [addStart, setAddStart] = useState(true);
 
   const loadEnv = useCallback(
     async (fileName: string) => {
@@ -196,6 +202,43 @@ export function ComposeDetailPage({ id }: { id: string }) {
       setSuccess(`${t.compose.backup}: ${backup.name}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : t.common.failed);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleAddService = async () => {
+    const name = addName.trim();
+    const image = addImage.trim();
+    if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$/.test(name)) {
+      setError(t.compose.addServiceInvalidName);
+      return;
+    }
+    if (!image || /\s/.test(image)) {
+      setError(t.compose.addServiceImageRequired);
+      return;
+    }
+    const ports = addPorts
+      .split(/[\n,]/)
+      .map((port) => port.trim())
+      .filter(Boolean);
+    setBusy(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const updated = await addComposeService(id, { name, image, ports, start: addStart });
+      setProject(updated);
+      setYaml(updated.yaml);
+      setAddOpen(false);
+      setAddName('');
+      setAddImage('');
+      setAddPorts('');
+      setSuccess(t.compose.addServiceOk.replace('{name}', name));
+      const containers = await fetchContainers().catch(() => [] as ContainerSummary[]);
+      setServiceContainers(containers.filter((c) => c.composeProject === updated.name));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t.common.failed);
+      await load().catch(() => undefined);
     } finally {
       setBusy(false);
     }
@@ -450,6 +493,71 @@ export function ComposeDetailPage({ id }: { id: string }) {
       </Section>
 
       <Section title={t.compose.services}>
+        {canOps ? (
+          <div className="mb-3 space-y-3">
+            <Button disabled={busy} onClick={() => setAddOpen((open) => !open)}>
+              {t.compose.addService}
+            </Button>
+            {addOpen ? (
+              <form
+                className="dockora-panel space-y-3 p-4"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void handleAddService();
+                }}
+              >
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Label>
+                    {t.compose.addServiceName}
+                    <Input
+                      value={addName}
+                      onChange={(e) => setAddName(e.target.value)}
+                      disabled={busy}
+                      spellCheck={false}
+                      className="mt-1 font-mono"
+                      placeholder="web"
+                    />
+                  </Label>
+                  <Label>
+                    {t.compose.addServiceImage}
+                    <Input
+                      value={addImage}
+                      onChange={(e) => setAddImage(e.target.value)}
+                      disabled={busy}
+                      spellCheck={false}
+                      className="mt-1 font-mono"
+                      placeholder="nginx:alpine"
+                    />
+                  </Label>
+                </div>
+                <Label>
+                  {t.compose.addServicePorts}
+                  <Input
+                    value={addPorts}
+                    onChange={(e) => setAddPorts(e.target.value)}
+                    disabled={busy}
+                    spellCheck={false}
+                    className="mt-1 font-mono"
+                    placeholder="8080:80"
+                  />
+                </Label>
+                <label className="flex cursor-pointer items-center gap-2 text-sm text-dockora-muted">
+                  <input
+                    type="checkbox"
+                    className="h-3.5 w-3.5 accent-dockora-pink"
+                    checked={addStart}
+                    onChange={(e) => setAddStart(e.target.checked)}
+                    disabled={busy}
+                  />
+                  {t.compose.addServiceStart}
+                </label>
+                <Button type="submit" variant="primary" disabled={busy || !addName.trim() || !addImage.trim()}>
+                  {t.compose.addServiceSubmit}
+                </Button>
+              </form>
+            ) : null}
+          </div>
+        ) : null}
         {project.services.length === 0 ? (
           <p className="text-sm text-dockora-muted">—</p>
         ) : (

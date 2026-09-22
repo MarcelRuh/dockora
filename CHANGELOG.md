@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.12] – 2026-09-22
+
+### Added
+
+- Add a service to an existing Compose stack from the stack page (name, image, ports) without editing the YAML by hand
+
 ## [2.0.11] – 2026-09-22
 
 ### Added
