@@ -25,6 +25,8 @@ import {
 const COMPOSE_ACTIONS = new Set<ComposeAction>([
   'up',
   'down',
+  'start',
+  'stop',
   'restart',
   'pull',
   'build',
@@ -45,6 +47,7 @@ export const composeModule: FastifyPluginAsync = async (app: FastifyInstance) =>
   });
 
   await service.ensureSearchRoots();
+  app.decorate('composeService', service);
 
   app.docker.subscribeResourceChanges((event) => {
     if (event.type === 'container') invalidateComposeDiscoveryCache();
@@ -317,7 +320,7 @@ async function enrichIfPortConflict(
   }
 }
 
-async function throwComposeError(app: FastifyInstance, error: unknown): Promise<never> {
+export async function throwComposeError(app: FastifyInstance, error: unknown): Promise<never> {
   if (error instanceof ComposeNotFoundError) {
     throw app.httpErrors.notFound(error.message);
   }
@@ -366,4 +369,10 @@ function summarizeComposeCliError(raw: string): string {
   if (errorLine) return errorLine.length > 500 ? `${errorLine.slice(0, 500)}…` : errorLine;
   if (raw.length > 600) return `${raw.slice(-600)}`;
   return raw;
+}
+
+declare module 'fastify' {
+  interface FastifyInstance {
+    composeService: ComposeService;
+  }
 }

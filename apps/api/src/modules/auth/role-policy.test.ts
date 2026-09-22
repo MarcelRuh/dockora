@@ -30,7 +30,7 @@ describe('role policy', () => {
     expect(rolesForContainerAction('explode')).toEqual(ADMIN_ROLES);
   });
 
-  it.each(['up', 'restart', 'pull', 'build', 'recreate'] as const)(
+  it.each(['up', 'start', 'stop', 'restart', 'pull', 'build', 'recreate'] as const)(
     'compose %s requires operator+',
     (action) => {
       expect(rolesForComposeAction(action)).toEqual(OPERATOR_ROLES);

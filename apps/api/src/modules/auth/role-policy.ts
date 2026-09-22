@@ -16,7 +16,7 @@ const CONTAINER_OPERATOR_ACTIONS = new Set([
 
 const CONTAINER_ADMIN_ACTIONS = new Set(['kill', 'remove']);
 
-const COMPOSE_OPERATOR_ACTIONS = new Set(['up', 'restart', 'pull', 'build', 'recreate']);
+const COMPOSE_OPERATOR_ACTIONS = new Set(['up', 'start', 'stop', 'restart', 'pull', 'build', 'recreate']);
 const COMPOSE_ADMIN_ACTIONS = new Set(['down']);
 
 /**

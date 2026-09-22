@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import type { ContainerDetails, ContainerStatsSnapshot } from '@dockora/shared';
 import {
@@ -12,12 +13,13 @@ import {
 } from '@/lib/api';
 import { useLocale } from '@/i18n/locale-provider';
 import { useAuth } from '@/components/auth/auth-provider';
-import { canOperate } from '@/lib/roles';
+import { canAdmin, canOperate } from '@/lib/roles';
 import { openEventSource } from '@/lib/sse';
 import { useDockerLiveReload } from '@/hooks/use-docker-live-reload';
 import { containerStatusTone } from '@/lib/status';
 import { formatBytes, formatPercent } from '@/lib/format';
 import { Button, Input } from '@/components/ui/form-controls';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   AccentPanel,
   ErrorBanner,
@@ -44,6 +46,8 @@ export function ContainerDetailPage({ id }: { id: string }) {
   const { t, locale } = useLocale();
   const { authEnabled, user } = useAuth();
   const canOps = canOperate(user?.role, authEnabled);
+  const isAdmin = canAdmin(user?.role, authEnabled);
+  const router = useRouter();
   const loc = locale === 'de' ? 'de-DE' : 'en-US';
   const [tab, setTab] = useState<Tab>('overview');
   const [container, setContainer] = useState<ContainerDetails | null>(null);
@@ -54,6 +58,8 @@ export function ContainerDetailPage({ id }: { id: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [removeOpen, setRemoveOpen] = useState(false);
+  const [removeVolumes, setRemoveVolumes] = useState(false);
 
   const loadContainer = useCallback(async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setLoading(true);
@@ -166,6 +172,22 @@ export function ContainerDetailPage({ id }: { id: string }) {
     }
   };
 
+  const runRemove = async () => {
+    setRemoveOpen(false);
+    setBusy(true);
+    try {
+      await containerAction(id, 'remove', {
+        force: true,
+        deleteProjectDir: false,
+        removeVolumes,
+      });
+      router.push('/containers');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t.common.failed);
+      setBusy(false);
+    }
+  };
+
   const tabs = [
     { id: 'overview', label: t.containers.tabs.overview },
     { id: 'stats', label: t.containers.tabs.stats },
@@ -223,6 +245,18 @@ export function ContainerDetailPage({ id }: { id: string }) {
             {canOps ? (
               <Button disabled={busy} onClick={() => void runAction('restart')}>
                 {t.containers.restart}
+              </Button>
+            ) : null}
+            {isAdmin ? (
+              <Button
+                variant="danger"
+                disabled={busy}
+                onClick={() => {
+                  setRemoveVolumes(false);
+                  setRemoveOpen(true);
+                }}
+              >
+                {t.containers.remove}
               </Button>
             ) : null}
           </>
@@ -393,6 +427,31 @@ export function ContainerDetailPage({ id }: { id: string }) {
           )}
         </Section>
       ) : null}
+
+      <ConfirmDialog
+        open={removeOpen}
+        title={t.containers.remove}
+        description={t.containers.removeConfirm}
+        consequences={[...t.containers.removeConsequences]}
+        confirmLabel={t.common.confirm}
+        cancelLabel={t.common.cancel}
+        danger
+        busy={busy}
+        onCancel={() => setRemoveOpen(false)}
+        onConfirm={() => void runRemove()}
+      >
+        {container?.labels['com.docker.compose.service'] ? (
+          <label className="flex cursor-pointer items-start gap-2 text-sm text-dockora-muted">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-3.5 w-3.5 accent-dockora-pink"
+              checked={removeVolumes}
+              onChange={(e) => setRemoveVolumes(e.target.checked)}
+            />
+            <span>{t.containers.removeVolumesConfirm}</span>
+          </label>
+        ) : null}
+      </ConfirmDialog>
     </div>
   );
 }

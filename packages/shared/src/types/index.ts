@@ -23,6 +23,8 @@ export type ComposeProjectStatus = 'running' | 'partial' | 'stopped' | 'unknown'
 export type ComposeAction =
   | 'up'
   | 'down'
+  | 'start'
+  | 'stop'
   | 'restart'
   | 'pull'
   | 'build'

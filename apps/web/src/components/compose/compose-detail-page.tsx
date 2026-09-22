@@ -42,7 +42,7 @@ import {
   SuccessBanner,
 } from '@/components/ui/page-parts';
 
-type ConfirmKind = 'up' | 'down' | 'restart' | 'recreate' | 'delete' | 'removeService';
+type ConfirmKind = 'up' | 'down' | 'start' | 'stop' | 'restart' | 'recreate' | 'delete' | 'removeService';
 type ConfirmState = {
   kind: ConfirmKind;
   consequences: string[];
@@ -227,6 +227,7 @@ export function ComposeDetailPage({ id }: { id: string }) {
           ? [...t.compose.serviceRemoveLastConsequences]
           : [...t.compose.serviceRemoveConsequences];
       }
+      if (kind === 'stop') consequences = [...t.compose.serviceStopConsequences];
       setConfirm({
         kind,
         consequences,
@@ -461,6 +462,8 @@ export function ComposeDetailPage({ id }: { id: string }) {
             busy={busy}
             labels={t.compose}
             onRestart={(service) => void openConfirm('restart', service)}
+            onStop={(service) => void openConfirm('stop', service)}
+            onStart={(service) => void openConfirm('start', service)}
             onRecreate={(service) => void openConfirm('recreate', service)}
             onRemove={(service) => void openConfirm('removeService', service)}
             onLogs={(service) => void handleLogs(service)}
@@ -484,6 +487,10 @@ export function ComposeDetailPage({ id }: { id: string }) {
             ? t.common.delete
             : confirm?.kind === 'down'
               ? t.compose.down
+              : confirm?.kind === 'stop'
+                ? t.compose.stop
+                : confirm?.kind === 'start'
+                  ? t.compose.start
               : confirm?.kind === 'restart'
                 ? t.compose.restart
                 : confirm?.kind === 'recreate'
@@ -500,6 +507,10 @@ export function ComposeDetailPage({ id }: { id: string }) {
                 ).replace('{name}', confirm.service ?? '')
             : confirm?.kind === 'down'
               ? t.compose.downConfirm.replace('{name}', project.name)
+              : confirm?.kind === 'stop'
+                ? t.compose.serviceStopConfirm.replace('{name}', confirm.service ?? project.name)
+                : confirm?.kind === 'start'
+                  ? t.compose.serviceStartConfirm.replace('{name}', confirm.service ?? project.name)
               : confirm?.kind === 'restart'
                 ? (confirm.service
                     ? t.compose.serviceRestartConfirm
@@ -551,6 +562,8 @@ function ServiceIconList({
   busy,
   labels,
   onRestart,
+  onStop,
+  onStart,
   onRecreate,
   onRemove,
   onLogs,
@@ -564,6 +577,8 @@ function ServiceIconList({
   busy: boolean;
   labels: {
     restart: string;
+    stop: string;
+    start: string;
     recreate: string;
     removeService: string;
     logs: string;
@@ -575,6 +590,8 @@ function ServiceIconList({
     unhealthy: string;
   };
   onRestart: (service: string) => void;
+  onStop: (service: string) => void;
+  onStart: (service: string) => void;
   onRecreate: (service: string) => void;
   onRemove: (service: string) => void;
   onLogs: (service: string) => void;
@@ -590,18 +607,25 @@ function ServiceIconList({
         const icon =
           resolveContainerIconUrl(fromContainer?.labels) ?? yamlIcons[service] ?? null;
         const unhealthy = fromContainer?.health === 'unhealthy';
+        const running =
+          fromContainer?.status === 'running' ||
+          fromContainer?.status === 'restarting' ||
+          fromContainer?.status === 'paused';
         return (
           <ServiceCard
             key={service}
             service={service}
             icon={icon}
             containerId={fromContainer?.id}
+            running={running}
             unhealthy={unhealthy}
             canOps={canOps}
             canDelete={canDelete}
             busy={busy}
             labels={labels}
             onRestart={onRestart}
+            onStop={onStop}
+            onStart={onStart}
             onRecreate={onRecreate}
             onRemove={onRemove}
             onLogs={onLogs}
@@ -617,12 +641,15 @@ function ServiceCard({
   service,
   icon,
   containerId,
+  running,
   unhealthy,
   canOps,
   canDelete,
   busy,
   labels,
   onRestart,
+  onStop,
+  onStart,
   onRecreate,
   onRemove,
   onLogs,
@@ -631,12 +658,15 @@ function ServiceCard({
   service: string;
   icon: string | null;
   containerId?: string;
+  running: boolean;
   unhealthy: boolean;
   canOps: boolean;
   canDelete: boolean;
   busy: boolean;
   labels: {
     restart: string;
+    stop: string;
+    start: string;
     recreate: string;
     removeService: string;
     logs: string;
@@ -648,6 +678,8 @@ function ServiceCard({
     unhealthy: string;
   };
   onRestart: (service: string) => void;
+  onStop: (service: string) => void;
+  onStart: (service: string) => void;
   onRecreate: (service: string) => void;
   onRemove: (service: string) => void;
   onLogs: (service: string) => void;
@@ -690,6 +722,15 @@ function ServiceCard({
       </div>
       {canOps ? (
         <div className="flex flex-wrap gap-1.5">
+          {running ? (
+            <Button size="sm" disabled={busy} onClick={() => onStop(service)}>
+              {labels.stop}
+            </Button>
+          ) : (
+            <Button size="sm" variant="primary" disabled={busy} onClick={() => onStart(service)}>
+              {labels.start}
+            </Button>
+          )}
           <Button size="sm" disabled={busy} onClick={() => onRestart(service)}>
             {labels.restart}
           </Button>

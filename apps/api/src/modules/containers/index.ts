@@ -11,8 +11,10 @@ import {
 import { withDockerError } from '../../domain/docker-errors.js';
 import { actorIdFromRequest, auditService } from '../audit/audit.service.js';
 import { rolesForContainerAction } from '../auth/role-policy.js';
+import { throwComposeError } from '../compose/index.js';
 import { destructiveRateLimit } from '../../presentation/http/destructive-rate-limit.js';
 import { ContainersService } from './containers.service.js';
+import { delegateComposeContainerAction } from './compose-bridge.js';
 
 const CONTAINER_ACTIONS = new Set<ContainerAction>([
   'start',
@@ -131,7 +133,7 @@ export const containersModule: FastifyPluginAsync = async (app: FastifyInstance)
 
   app.post<{
     Params: { id: string; action: string };
-    Body: { force?: boolean; deleteProjectDir?: boolean };
+    Body: { force?: boolean; deleteProjectDir?: boolean; removeVolumes?: boolean };
   }>(
     `${API_PREFIX}/containers/:id/:action`,
     {
@@ -148,12 +150,26 @@ export const containersModule: FastifyPluginAsync = async (app: FastifyInstance)
         throw app.httpErrors.badRequest(`Unknown container action: ${request.params.action}`);
       }
       const body = request.body ?? {};
-      const result = await withDockerError(app, () =>
-        service.action(request.params.id, action, {
-          force: body.force,
-          deleteProjectDir: body.deleteProjectDir,
-        }),
-      );
+      let result: ActionResult | null = null;
+      try {
+        result = await delegateComposeContainerAction(
+          app.composeService,
+          app.docker,
+          request.params.id,
+          action,
+          { removeVolumes: body.removeVolumes === true },
+        );
+      } catch (error) {
+        return await throwComposeError(app, error);
+      }
+      if (!result) {
+        result = await withDockerError(app, () =>
+          service.action(request.params.id, action, {
+            force: body.force,
+            deleteProjectDir: body.deleteProjectDir,
+          }),
+        );
+      }
       if (DESTRUCTIVE_CONTAINER_ACTIONS.has(action)) {
         void auditService.record({
           action: `container.${action}`,
@@ -162,6 +178,8 @@ export const containersModule: FastifyPluginAsync = async (app: FastifyInstance)
           resourceId: request.params.id,
           metadata: {
             deleteProjectDir: body.deleteProjectDir !== false,
+            removeVolumes: body.removeVolumes === true,
+            viaCompose: Boolean(result && 'removedProject' in result),
           },
         });
       }

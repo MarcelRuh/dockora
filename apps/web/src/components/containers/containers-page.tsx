@@ -64,7 +64,8 @@ export function ContainersPage() {
   const [confirm, setConfirm] = useState<null | {
     action: 'stop' | 'restart' | 'remove';
     ids: string[];
-    deleteProjectDir?: boolean;
+    compose?: boolean;
+    removeVolumes?: boolean;
   }>(null);
 
   useEffect(() => {
@@ -142,7 +143,8 @@ export function ContainersPage() {
   }, [enrichStats, filter]);
   const runAction = async (id: string, action: 'start' | 'stop' | 'restart' | 'remove') => {
     if (action === 'remove') {
-      setConfirm({ action: 'remove', ids: [id], deleteProjectDir: true });
+      const compose = Boolean(items.find((c) => c.id === id)?.labels['com.docker.compose.service']);
+      setConfirm({ action: 'remove', ids: [id], compose, removeVolumes: false });
       return;
     }
     setBusy(id);
@@ -159,7 +161,7 @@ export function ContainersPage() {
   const runBulk = async (
     action: 'stop' | 'restart' | 'remove',
     ids: string[],
-    opts?: { deleteProjectDir?: boolean },
+    opts?: { removeVolumes?: boolean },
   ) => {
     setConfirm(null);
     setError(null);
@@ -174,7 +176,7 @@ export function ContainersPage() {
           id,
           action,
           action === 'remove'
-            ? { force: true, deleteProjectDir: opts?.deleteProjectDir !== false }
+            ? { force: true, deleteProjectDir: false, removeVolumes: opts?.removeVolumes === true }
             : undefined,
         );
       } catch (err) {
@@ -346,7 +348,12 @@ export function ContainersPage() {
                 size="sm"
                 variant="danger"
                 disabled={Boolean(busy)}
-                onClick={() => setConfirm({ action: 'remove', ids: selectedIds, deleteProjectDir: true })}
+                onClick={() => {
+                  const compose = selectedIds.some((id) =>
+                    items.find((c) => c.id === id)?.labels['com.docker.compose.service'],
+                  );
+                  setConfirm({ action: 'remove', ids: selectedIds, compose, removeVolumes: false });
+                }}
               >
                 {t.containers.bulkRemove}
               </Button>
@@ -468,21 +475,21 @@ export function ContainersPage() {
         onConfirm={() => {
           if (!confirm) return;
           void runBulk(confirm.action, confirm.ids, {
-            deleteProjectDir: confirm.deleteProjectDir,
+            removeVolumes: confirm.removeVolumes === true,
           });
         }}
       >
-        {confirm?.action === 'remove' ? (
+        {confirm?.action === 'remove' && confirm.compose ? (
           <label className="mt-3 flex cursor-pointer items-start gap-2 text-sm text-dockora-muted">
             <input
               type="checkbox"
               className="mt-0.5 h-3.5 w-3.5 accent-dockora-pink"
-              checked={confirm.deleteProjectDir !== false}
+              checked={confirm.removeVolumes === true}
               onChange={(e) =>
-                setConfirm((c) => (c ? { ...c, deleteProjectDir: e.target.checked } : c))
+                setConfirm((c) => (c ? { ...c, removeVolumes: e.target.checked } : c))
               }
             />
-            <span>{t.containers.deleteProjectDirConfirm}</span>
+            <span>{t.containers.removeVolumesConfirm}</span>
           </label>
         ) : null}
       </ConfirmDialog>

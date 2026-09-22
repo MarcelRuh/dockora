@@ -30,7 +30,7 @@ Wenn Auth aktiv ist, gilt: **Viewer nur lesen**. Mutationen brauchen `operator` 
 | Bereich | Operator + Admin | Nur Admin |
 |---------|------------------|-----------|
 | Container | start, stop, restart, pause, unpause | kill, remove |
-| Compose | create, yaml/env write, backup, up, restart, pull, build, recreate | down, delete, einzelnen Service entfernen |
+| Compose | create, yaml/env write, backup, up, start, stop, restart, pull, build, recreate | down, delete, einzelnen Service entfernen |
 | Images | pull | prune, remove |
 | Volumes | — | prune, remove |
 | Updates | check, apply pull | — |

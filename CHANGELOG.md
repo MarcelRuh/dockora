@@ -5,6 +5,13 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.11] – 2026-09-22
+
+### Added
+
+- Compose service cards can start and stop a single service without removing it from the file
+- Removing a Compose container (list or detail) also removes that service from the Compose file, same as on the stack page
+
 ## [2.0.10] – 2026-09-22
 
 ### Added

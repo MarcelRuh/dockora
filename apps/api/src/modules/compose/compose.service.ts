@@ -110,6 +110,17 @@ export class ComposeService {
     const yaml = await readComposeYaml(project.absoluteComposePath);
     const svc = assertComposeService(yaml, service, action);
     const args = await buildComposeArgs(project, action, svc);
+    if (action === 'start') {
+      try {
+        await execCompose(args, { cwd: project.path });
+      } catch (error) {
+        const message = composeCliMessage(error);
+        if (!/no such|not created|not found|no container/i.test(message)) throw error;
+        const upArgs = await buildComposeArgs(project, 'up', svc);
+        await execCompose(upArgs, { cwd: project.path });
+      }
+      return { ok: true, message: `Compose start succeeded for ${project.name}${svc ? ` (${svc})` : ''}` };
+    }
     await execCompose(args, { cwd: project.path });
     const suffix = svc ? ` (${svc})` : '';
     if (action === 'build') {
@@ -677,6 +688,18 @@ export class ComposeService {
     };
   }
 
+  async findId(workingDir: string, projectName?: string): Promise<string | null> {
+    const projects = await this.list();
+    const dir = path.resolve(workingDir);
+    const byDir = projects.find((p) => path.resolve(p.path) === dir);
+    if (byDir) return byDir.id;
+    if (projectName) {
+      const byName = projects.find((p) => p.name === projectName);
+      if (byName) return byName.id;
+    }
+    return null;
+  }
+
   private async resolveProject(id: string) {
     const project = await resolveDiscoveredProject(
       id,
@@ -756,6 +779,10 @@ async function buildComposeArgs(
       return [...base, 'up', '-d', '--remove-orphans', ...svc];
     case 'down':
       return [...base, 'down', '--remove-orphans'];
+    case 'start':
+      return [...base, 'start', ...svc];
+    case 'stop':
+      return [...base, 'stop', ...svc];
     case 'restart':
       return [...base, 'restart', ...svc];
     case 'pull':
