@@ -198,6 +198,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {t.common.skipToContent}
       </a>
 
+      {home ? null : (
       <aside className="relative z-10 hidden h-full w-60 shrink-0 flex-col border-r border-white/10 bg-black/35 text-dockora-railText backdrop-blur-xl md:flex">
         <Link
           href="/"
@@ -211,9 +212,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <NavList />
         </nav>
       </aside>
+      )}
 
       <div className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <header className={cn('z-40 items-center justify-between gap-3 border-b border-white/10 bg-black/30 px-4 py-3 backdrop-blur', home ? 'flex md:hidden' : 'flex')}>
+        <header className={cn('z-40 items-center justify-between gap-3 border-b border-white/10 bg-black/30 px-4 py-3 backdrop-blur', home ? 'hidden' : 'flex')}>
           <div className="flex items-center gap-2 md:hidden">
             <button
               type="button"
@@ -234,9 +236,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <span className="hidden min-w-0 flex-1 truncate text-sm font-medium md:block">
             {current ? t.nav[current.key] : t.appName}
           </span>
-          <GlobalSearch compact className={cn('hidden md:inline-flex', home && 'md:hidden')} />
-          {home ? null : <LocaleControls dense search={false} />}
-          {home ? null : <AuthLogoutButton className="hidden w-auto md:inline-flex" />}
+          <GlobalSearch compact className="hidden md:inline-flex" />
+          <LocaleControls dense search={false} />
+          <AuthLogoutButton className="hidden w-auto md:inline-flex" />
         </header>
 
         {drawerOpen ? (

@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.23] – 2026-09-26
+
+### Changed
+
+- The home keeps the side menu hidden and the dock points, and the sidebar returns after opening a module
+
 ## [2.0.22] – 2026-09-26
 
 ### Changed

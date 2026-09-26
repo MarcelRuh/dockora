@@ -485,7 +485,7 @@ export function CasaDesktop({
 
       <div className="flex min-w-0 flex-col gap-4">
         <div className="flex flex-wrap items-center gap-3">
-          <BrandLogoWide size="sm" priority className="md:hidden" />
+          <BrandLogoWide size="sm" priority />
           <div className="relative min-w-[12rem] flex-1">
             <input
               value={query}
