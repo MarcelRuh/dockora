@@ -71,6 +71,7 @@ const TILE: Record<AppKey, string> = {
 const ORDER_KEY = 'dockora.home.appOrder';
 const CONTAINER_ORDER_KEY = 'dockora.home.containerOrder';
 const URL_KEY = 'dockora.home.appUrls';
+const LINKS_KEY = 'dockora.home.links';
 const WIDGET_KEY = 'dockora.home.widgets';
 const HINT_KEY = 'dockora.home.dragHint';
 
@@ -114,6 +115,30 @@ function withUrlOverride(container: ContainerSummary, overrides: Record<string, 
     return { ...container, labels };
   }
   return { ...container, labels: { ...container.labels, url: stored } };
+}
+
+type HomeLink = { id: string; name: string; url: string; icon: string };
+
+function linkKey(id: string) {
+  return `link:${id}`;
+}
+
+function readLinks(): HomeLink[] {
+  try {
+    const raw = JSON.parse(localStorage.getItem(LINKS_KEY) ?? '[]') as unknown;
+    if (!Array.isArray(raw)) return [];
+    return raw.filter(
+      (item): item is HomeLink =>
+        Boolean(item) &&
+        typeof item === 'object' &&
+        typeof (item as HomeLink).id === 'string' &&
+        typeof (item as HomeLink).name === 'string' &&
+        typeof (item as HomeLink).url === 'string' &&
+        typeof (item as HomeLink).icon === 'string',
+    );
+  } catch {
+    return [];
+  }
 }
 
 function readWidgets(): Widgets {
@@ -163,6 +188,11 @@ export function CasaDesktop({
   const [updateBusy, setUpdateBusy] = useState<string | null>(null);
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [containerOrder, setContainerOrder] = useState<string[]>([]);
+  const [homeLinks, setHomeLinks] = useState<HomeLink[]>([]);
+  const [addMenu, setAddMenu] = useState(false);
+  const [linkForm, setLinkForm] = useState(false);
+  const [linkDraft, setLinkDraft] = useState({ name: '', url: '', icon: '' });
+  const [linkError, setLinkError] = useState<string | null>(null);
   const [dragContainer, setDragContainer] = useState<string | null>(null);
   const dragged = useRef(false);
   const [pageHost, setPageHost] = useState('');
@@ -173,6 +203,7 @@ export function CasaDesktop({
     setHint(localStorage.getItem(HINT_KEY) !== '0');
     setPageHost(window.location.hostname);
     setUrlOverrides(readUrlOverrides());
+    setHomeLinks(readLinks());
     try {
       const raw = JSON.parse(localStorage.getItem(CONTAINER_ORDER_KEY) ?? '[]') as unknown;
       setContainerOrder(Array.isArray(raw) ? raw.filter((id): id is string => typeof id === 'string') : []);
@@ -221,18 +252,37 @@ export function CasaDesktop({
     [containers, urlOverrides],
   );
 
-  const orderedContainers = useMemo(() => {
-    const byName = new Map(decoratedContainers.map((container) => [container.name, container]));
-    const next: ContainerSummary[] = [];
-    for (const name of containerOrder) {
-      const container = byName.get(name);
-      if (!container) continue;
-      next.push(container);
-      byName.delete(name);
+  const gridItems = useMemo(() => {
+    const byContainer = new Map(decoratedContainers.map((container) => [container.name, container]));
+    const byLink = new Map(homeLinks.map((link) => [linkKey(link.id), link]));
+    const next: Array<
+      | { key: string; kind: 'container'; container: ContainerSummary }
+      | { key: string; kind: 'link'; link: HomeLink }
+    > = [];
+    const seen = new Set<string>();
+    for (const key of containerOrder) {
+      const container = byContainer.get(key);
+      if (container) {
+        next.push({ key, kind: 'container', container });
+        seen.add(key);
+        continue;
+      }
+      const link = byLink.get(key);
+      if (link) {
+        next.push({ key, kind: 'link', link });
+        seen.add(key);
+      }
     }
-    const rest = [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
-    return [...next, ...rest];
-  }, [decoratedContainers, containerOrder]);
+    const restContainers = [...byContainer.entries()]
+      .filter(([key]) => !seen.has(key))
+      .sort((a, b) => a[0].localeCompare(b[0]));
+    const restLinks = [...byLink.entries()]
+      .filter(([key]) => !seen.has(key))
+      .sort((a, b) => a[1].name.localeCompare(b[1].name));
+    for (const [key, container] of restContainers) next.push({ key, kind: 'container', container });
+    for (const [key, link] of restLinks) next.push({ key, kind: 'link', link });
+    return next;
+  }, [decoratedContainers, homeLinks, containerOrder]);
 
   const apps = useMemo(
     () =>
@@ -244,12 +294,19 @@ export function CasaDesktop({
   );
 
   const needle = query.trim().toLowerCase();
-  const visibleContainers = needle
-    ? orderedContainers.filter(
-        (container) =>
-          container.name.toLowerCase().includes(needle) || container.image.toLowerCase().includes(needle),
-      )
-    : orderedContainers;
+  const visibleItems = needle
+    ? gridItems.filter((item) => {
+        if (item.kind === 'link') {
+          return (
+            item.link.name.toLowerCase().includes(needle) || item.link.url.toLowerCase().includes(needle)
+          );
+        }
+        return (
+          item.container.name.toLowerCase().includes(needle) ||
+          item.container.image.toLowerCase().includes(needle)
+        );
+      })
+    : gridItems;
   const pageHits = needle
     ? APPS.filter((app) => t.nav[app.key].toLowerCase().includes(needle))
     : [];
@@ -488,9 +545,11 @@ export function CasaDesktop({
             onSecondary={onOpenEngine}
             updateLabel={
               canEdit && pendingUpdates.length > 0
-                ? pendingUpdates.length > 1
-                  ? t.updates.applyAll
-                  : t.updates.pull
+                ? updateBusy
+                  ? home.upgrading
+                  : pendingUpdates.length > 1
+                    ? home.upgradeAll
+                    : home.upgrade
                 : undefined
             }
             updateBusy={updateBusy !== null}
@@ -522,16 +581,188 @@ export function CasaDesktop({
                 </button>
               </p>
             ) : null}
-            <Link
-              href="/compose/new"
-              className="dockora-glass ml-auto flex h-9 w-9 items-center justify-center text-2xl leading-none text-dockora-muted hover:text-white"
-              aria-label={home.add}
-            >
-              +
-            </Link>
+            <div className="relative ml-auto">
+              <button
+                type="button"
+                className="dockora-glass flex h-9 w-9 items-center justify-center text-2xl leading-none text-dockora-muted hover:text-white"
+                aria-label={home.add}
+                aria-expanded={addMenu}
+                onClick={() => setAddMenu((open) => !open)}
+              >
+                +
+              </button>
+              {addMenu ? (
+                <div className="dockora-glass absolute right-0 z-30 mt-2 w-44 overflow-hidden py-1 text-sm">
+                  <Link
+                    href="/compose/new"
+                    className="block px-3 py-2 hover:bg-white/5"
+                    onClick={() => setAddMenu(false)}
+                  >
+                    {home.addStack}
+                  </Link>
+                  <button
+                    type="button"
+                    className="block w-full px-3 py-2 text-left hover:bg-white/5"
+                    onClick={() => {
+                      setAddMenu(false);
+                      setLinkForm(true);
+                      setLinkError(null);
+                    }}
+                  >
+                    {home.addLink}
+                  </button>
+                </div>
+              ) : null}
+            </div>
           </div>
+          {linkForm ? (
+            <form
+              className="dockora-glass mb-3 grid gap-2 p-3 sm:grid-cols-2"
+              onSubmit={(event) => {
+                event.preventDefault();
+                const name = linkDraft.name.trim();
+                const url = linkDraft.url.trim();
+                const icon = linkDraft.icon.trim();
+                if (!name || !/^https?:\/\//i.test(url) || !/^https?:\/\//i.test(icon)) {
+                  setLinkError(home.linkInvalid);
+                  return;
+                }
+                const link = {
+                  id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+                  name,
+                  url,
+                  icon,
+                };
+                const nextLinks = [...homeLinks, link];
+                const nextOrder = [...containerOrder, linkKey(link.id)];
+                setHomeLinks(nextLinks);
+                setContainerOrder(nextOrder);
+                localStorage.setItem(LINKS_KEY, JSON.stringify(nextLinks));
+                localStorage.setItem(CONTAINER_ORDER_KEY, JSON.stringify(nextOrder));
+                setLinkDraft({ name: '', url: '', icon: '' });
+                setLinkError(null);
+                setLinkForm(false);
+              }}
+            >
+              <label className="text-[11px] text-dockora-muted">
+                {home.linkName}
+                <input
+                  value={linkDraft.name}
+                  onChange={(event) => setLinkDraft((draft) => ({ ...draft, name: event.target.value }))}
+                  className="mt-1 w-full rounded-md border border-white/10 bg-black/40 px-2 py-1 text-xs text-dockora-text"
+                />
+              </label>
+              <label className="text-[11px] text-dockora-muted">
+                {home.linkUrl}
+                <input
+                  value={linkDraft.url}
+                  onChange={(event) => setLinkDraft((draft) => ({ ...draft, url: event.target.value }))}
+                  placeholder="https://"
+                  className="mt-1 w-full rounded-md border border-white/10 bg-black/40 px-2 py-1 text-xs text-dockora-text"
+                />
+              </label>
+              <label className="text-[11px] text-dockora-muted sm:col-span-2">
+                {home.linkIcon}
+                <input
+                  value={linkDraft.icon}
+                  onChange={(event) => setLinkDraft((draft) => ({ ...draft, icon: event.target.value }))}
+                  placeholder="https://"
+                  className="mt-1 w-full rounded-md border border-white/10 bg-black/40 px-2 py-1 text-xs text-dockora-text"
+                />
+              </label>
+              {linkError ? <p className="text-[11px] text-dockora-danger sm:col-span-2">{linkError}</p> : null}
+              <div className="flex gap-2 sm:col-span-2">
+                <button type="submit" className="rounded-full bg-dockora-pink px-3 py-1 text-[11px] text-white">
+                  {home.linkSave}
+                </button>
+                <button
+                  type="button"
+                  className="rounded-full px-3 py-1 text-[11px] text-dockora-muted hover:text-white"
+                  onClick={() => {
+                    setLinkForm(false);
+                    setLinkError(null);
+                  }}
+                >
+                  {t.common.close}
+                </button>
+              </div>
+            </form>
+          ) : null}
           <ul className="grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-3">
-            {visibleContainers.map((container) => {
+            {visibleItems.map((item) => {
+              if (item.kind === 'link') {
+                const { link } = item;
+                return (
+                  <li key={item.key}>
+                    <ContainerTile
+                      href={link.url}
+                      external
+                      name={link.name}
+                      dimmed={false}
+                      dragging={dragContainer === item.key}
+                      detailHref={link.url}
+                      detailLabel={link.name}
+                      removeLabel={home.linkRemove}
+                      onRemove={() => {
+                        const nextLinks = homeLinks.filter((entry) => entry.id !== link.id);
+                        const nextOrder = containerOrder.filter((key) => key !== item.key);
+                        setHomeLinks(nextLinks);
+                        setContainerOrder(nextOrder);
+                        localStorage.setItem(LINKS_KEY, JSON.stringify(nextLinks));
+                        localStorage.setItem(CONTAINER_ORDER_KEY, JSON.stringify(nextOrder));
+                      }}
+                      onPointerDown={(event) => {
+                        const startX = event.clientX;
+                        const startY = event.clientY;
+                        const targetEl = event.currentTarget;
+                        const move = (ev: globalThis.PointerEvent) => {
+                          if (Math.hypot(ev.clientX - startX, ev.clientY - startY) > 8) {
+                            dragged.current = true;
+                            targetEl.draggable = true;
+                            setDragContainer(item.key);
+                          }
+                        };
+                        const up = () => {
+                          window.removeEventListener('pointermove', move);
+                          window.removeEventListener('pointerup', up);
+                          window.setTimeout(() => {
+                            dragged.current = false;
+                          }, 0);
+                        };
+                        window.addEventListener('pointermove', move);
+                        window.addEventListener('pointerup', up);
+                      }}
+                      onDragOver={(event) => event.preventDefault()}
+                      onDrop={() => {
+                        if (!dragContainer || dragContainer === item.key) return;
+                        const keys = gridItems.map((entry) => entry.key);
+                        const next = keys.filter((key) => key !== dragContainer);
+                        const index = next.indexOf(item.key);
+                        next.splice(index < 0 ? next.length : index, 0, dragContainer);
+                        setContainerOrder(next);
+                        localStorage.setItem(CONTAINER_ORDER_KEY, JSON.stringify(next));
+                        setDragContainer(null);
+                      }}
+                      onDragEnd={(event) => {
+                        event.currentTarget.draggable = false;
+                        setDragContainer(null);
+                      }}
+                      onClick={(event) => {
+                        if (!dragged.current) return;
+                        event.preventDefault();
+                        dragged.current = false;
+                      }}
+                    >
+                      <ServiceIcon
+                        url={link.icon}
+                        alt={link.name}
+                        className="h-[4.25rem] w-[4.25rem] rounded-[1.15rem] bg-white/[0.06] object-contain p-1.5 text-2xl"
+                      />
+                    </ContainerTile>
+                  </li>
+                );
+              }
+              const container = item.container;
               const target = resolveContainerAppHref(container, pageHost);
               const icon = resolveContainerIconUrl(container.labels);
               const runningTile = container.status === 'running';
@@ -567,8 +798,8 @@ export function CasaDesktop({
                     onDragOver={(event) => event.preventDefault()}
                     onDrop={() => {
                       if (!dragContainer || dragContainer === container.name) return;
-                      const names = orderedContainers.map((item) => item.name);
-                      const next = names.filter((name) => name !== dragContainer);
+                      const keys = gridItems.map((entry) => entry.key);
+                      const next = keys.filter((key) => key !== dragContainer);
                       const index = next.indexOf(container.name);
                       next.splice(index < 0 ? next.length : index, 0, dragContainer);
                       setContainerOrder(next);
@@ -588,7 +819,7 @@ export function CasaDesktop({
                     detailLabel={home.openInDockora}
                     editLabel={home.appUrl}
                     updateLabel={
-                      updateBusy === container.id ? t.updates.applying : t.updates.pull
+                      updateBusy === container.id ? home.upgrading : home.upgrade
                     }
                     onUpdate={
                       canEdit && pendingUpdates.some((item) => item.containerId === container.id)
@@ -757,7 +988,7 @@ export function CasaDesktop({
       </div>
       <ConfirmDialog
         open={updateConfirm !== null}
-        title={updateConfirm && updateConfirm.length > 1 ? t.updates.applyAll : t.updates.pull}
+        title={updateConfirm && updateConfirm.length > 1 ? home.upgradeAll : home.upgrade}
         description={
           updateConfirm && updateConfirm.length > 1
             ? t.updates.applyAllConfirm.replace('{count}', String(updateConfirm.length))
@@ -795,6 +1026,8 @@ function ContainerTile({
   detailLabel,
   editLabel,
   onEdit,
+  removeLabel,
+  onRemove,
   updateLabel,
   onUpdate,
   updateBusy,
@@ -815,6 +1048,8 @@ function ContainerTile({
   detailLabel: string;
   editLabel?: string;
   onEdit?: () => void;
+  removeLabel?: string;
+  onRemove?: () => void;
   updateLabel?: string;
   onUpdate?: () => void;
   updateBusy?: boolean;
@@ -855,16 +1090,29 @@ function ContainerTile({
       }}
     >
       {open}
-      <Link
-        href={detailHref}
-        title={name}
-        aria-label={`${name}. ${detailLabel}`}
-        className="mt-2 max-w-full truncate px-1 text-xs text-dockora-text hover:text-dockora-pink"
-        onPointerDown={(event) => event.stopPropagation()}
-      >
-        {name}
-      </Link>
-      {onUpdate || onEdit ? (
+      {detailHref.startsWith('http') ? (
+        <a
+          href={detailHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={name}
+          className="mt-2 max-w-full truncate px-1 text-xs text-dockora-text hover:text-dockora-pink"
+          onPointerDown={(event) => event.stopPropagation()}
+        >
+          {name}
+        </a>
+      ) : (
+        <Link
+          href={detailHref}
+          title={name}
+          aria-label={`${name}. ${detailLabel}`}
+          className="mt-2 max-w-full truncate px-1 text-xs text-dockora-text hover:text-dockora-pink"
+          onPointerDown={(event) => event.stopPropagation()}
+        >
+          {name}
+        </Link>
+      )}
+      {onUpdate || onEdit || onRemove ? (
         <div className="mt-1.5 flex flex-wrap items-center justify-center gap-1">
           {onUpdate ? (
             <button
@@ -898,6 +1146,20 @@ function ContainerTile({
                 <path d="m12 6 4 4" />
               </svg>
               {editLabel}
+            </button>
+          ) : null}
+          {onRemove ? (
+            <button
+              type="button"
+              className="inline-flex rounded-full border border-white/15 px-2.5 py-1 text-[11px] text-dockora-muted hover:text-white"
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onRemove();
+              }}
+            >
+              {removeLabel}
             </button>
           ) : null}
         </div>

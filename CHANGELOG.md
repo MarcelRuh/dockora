@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.21] – 2026-09-26
+
+### Changed
+
+- Container image updates are labeled Upgrade, and the home plus button can add a link with an icon
+
 ## [2.0.20] – 2026-09-26
 
 ### Added
