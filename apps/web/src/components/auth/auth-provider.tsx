@@ -8,6 +8,7 @@ import { useLocale } from '@/i18n/locale-provider';
 import { Button, Input } from '@/components/ui/form-controls';
 import { ErrorBanner } from '@/components/ui/page-parts';
 import { BrandLogoWide } from '@/components/ui/brand-logo';
+import { cn } from '@/lib/utils';
 import { NeonAtmosphere, NeonParticles } from '@/components/ui/neon-particles';
 
 type AuthContextValue = {
@@ -255,12 +256,12 @@ export function useAuth(): AuthContextValue {
   return ctx;
 }
 
-export function AuthLogoutButton() {
+export function AuthLogoutButton({ className }: { className?: string }) {
   const { authEnabled, user, logout } = useAuth();
   const { t } = useLocale();
   if (!authEnabled || !user) return null;
   return (
-    <Button variant="ghost" onClick={logout} className="w-full justify-start text-xs text-inherit">
+    <Button variant="ghost" onClick={logout} className={cn('w-full justify-start text-xs text-inherit', className)}>
       {t.auth.logout}
     </Button>
   );

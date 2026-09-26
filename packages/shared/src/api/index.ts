@@ -44,6 +44,10 @@ export interface DashboardOverview {
     memoryTotalBytes: number | null;
     diskUsedBytes: number | null;
     diskTotalBytes: number | null;
+    temperatureC: number | null;
+    networkInterface: string | null;
+    networkRxBytesPerSec: number | null;
+    networkTxBytesPerSec: number | null;
   };
   docker: {
     engineVersion: string | null;

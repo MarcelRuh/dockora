@@ -123,6 +123,14 @@ body {
   animation: dockora-fade-in 0.45s ease forwards;
 }
 
+.dockora-glass {
+  background: rgba(13, 13, 21, 0.62);
+  border: 1px solid rgba(131, 56, 236, 0.32);
+  border-radius: 1.15rem;
+  backdrop-filter: blur(18px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.32);
+}
+
 .dockora-panel {
   border: 1px solid var(--dockora-border);
   background: var(--dockora-surface);

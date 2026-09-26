@@ -8,6 +8,13 @@ interface CpuSample {
   total: number;
 }
 
+interface NetSample {
+  at: number;
+  iface: string;
+  rx: number;
+  tx: number;
+}
+
 interface MemorySample {
   usedBytes: number;
   totalBytes: number;
@@ -22,6 +29,7 @@ interface MemorySample {
  */
 export class HostMetricsService implements IHostMetrics {
   private lastCpuSample: CpuSample | null = null;
+  private lastNetSample: NetSample | null = null;
 
   constructor(
     private readonly snapPath = process.env.DOCKORA_HOST_PROC_SNAP?.trim() || '/data/host-proc.snap',
@@ -50,6 +58,7 @@ export class HostMetricsService implements IHostMetrics {
       (snap?.df ? parseDfLine(snap.df) : null) ?? (await this.measureDisk(diskPath));
 
     const temperatureC = snap?.temperatureC ?? (await readCpuTemperatureC());
+    const network = await this.readNetworkRates();
 
     return {
       cpuPercent,
@@ -60,7 +69,40 @@ export class HostMetricsService implements IHostMetrics {
       diskTotalBytes: disk?.total ?? null,
       diskPath,
       temperatureC,
+      networkInterface: network.iface,
+      networkRxBytesPerSec: network.rxBytesPerSec,
+      networkTxBytesPerSec: network.txBytesPerSec,
     };
+  }
+
+  private async readNetworkRates(): Promise<{
+    iface: string | null;
+    rxBytesPerSec: number | null;
+    txBytesPerSec: number | null;
+  }> {
+    const sample = await this.readNetDev();
+    if (!sample) {
+      return { iface: null, rxBytesPerSec: null, txBytesPerSec: null };
+    }
+    const now = Date.now();
+    const prev =
+      this.lastNetSample && this.lastNetSample.iface === sample.iface ? this.lastNetSample : null;
+    this.lastNetSample = { at: now, iface: sample.iface, rx: sample.rx, tx: sample.tx };
+    const rate = computeNetRate(prev, { at: now, rx: sample.rx, tx: sample.tx });
+    return { iface: sample.iface, rxBytesPerSec: rate.rx, txBytesPerSec: rate.tx };
+  }
+
+  private async readNetDev(): Promise<{ iface: string; rx: number; tx: number } | null> {
+    for (const root of this.procRoots) {
+      try {
+        const content = await fs.readFile(`${root}/net/dev`, 'utf8');
+        const parsed = parsePrimaryNetDev(content);
+        if (parsed) return parsed;
+      } catch {
+        // try next
+      }
+    }
+    return null;
   }
 
   private async readCpuCoresFromProc(): Promise<number | null> {
@@ -231,6 +273,40 @@ async function readProcStatFile(filePath: string): Promise<CpuSample | null> {
   } catch {
     return null;
   }
+}
+
+const SKIP_NET_IFACE = /^(lo|docker\d*|veth|br-|cni|flannel|tun|tap|virbr|tailscale|cali)/;
+
+/** Pick a host-facing NIC from /proc/net/dev (skip loopback and bridge noise). */
+export function parsePrimaryNetDev(content: string): { iface: string; rx: number; tx: number } | null {
+  const rows: Array<{ iface: string; rx: number; tx: number }> = [];
+  for (const line of content.split('\n')) {
+    const split = line.split(':');
+    if (split.length < 2) continue;
+    const iface = split[0]!.trim();
+    if (!iface || iface === 'Inter-' || iface === 'face') continue;
+    const nums = split.slice(1).join(':').trim().split(/\s+/).map((n) => Number(n));
+    const rx = nums[0];
+    const tx = nums[8];
+    if (rx === undefined || tx === undefined || !Number.isFinite(rx) || !Number.isFinite(tx)) continue;
+    rows.push({ iface, rx, tx });
+  }
+  const usable = rows.filter((row) => row.iface !== 'lo' && !SKIP_NET_IFACE.test(row.iface));
+  const preferred = usable.find((row) => /^(eth|en|wlan|wl|bond)/.test(row.iface));
+  return preferred ?? usable[0] ?? null;
+}
+
+export function computeNetRate(
+  prev: { at: number; rx: number; tx: number } | null,
+  next: { at: number; rx: number; tx: number },
+): { rx: number | null; tx: number | null } {
+  if (!prev) return { rx: null, tx: null };
+  const dt = (next.at - prev.at) / 1000;
+  if (dt < 0.5 || dt > 120) return { rx: null, tx: null };
+  const rx = next.rx - prev.rx;
+  const tx = next.tx - prev.tx;
+  if (rx < 0 || tx < 0) return { rx: null, tx: null };
+  return { rx: rx / dt, tx: tx / dt };
 }
 
 function parseDfLine(line: string): { used: number; total: number } | null {

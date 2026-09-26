@@ -27,7 +27,13 @@ const NAV_HITS = [
   { href: '/settings', key: 'settings' },
 ] as const;
 
-export function GlobalSearch({ compact = false }: { compact?: boolean }) {
+export function GlobalSearch({
+  compact = false,
+  className,
+}: {
+  compact?: boolean;
+  className?: string;
+}) {
   const { t, locale } = useLocale();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -132,6 +138,7 @@ export function GlobalSearch({ compact = false }: { compact?: boolean }) {
         className={cn(
           'dockora-field font-mono text-xs uppercase tracking-wider transition-shadow hover:border-dockora-pink hover:shadow-neon-pink',
           compact ? 'px-2 py-1' : 'w-full px-3 py-1.5 text-left',
+          className,
         )}
         aria-label={t.common.globalSearch}
       >

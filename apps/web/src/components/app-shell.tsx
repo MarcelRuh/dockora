@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { useLocale } from '@/i18n/locale-provider';
 import { GlobalSearch } from '@/components/global-search';
+import { NeonAtmosphere, NeonParticles } from '@/components/ui/neon-particles';
 import { cn } from '@/lib/utils';
 import type { Locale } from '@dockora/shared';
 import { AuthLogoutButton, useAuth } from '@/components/auth/auth-provider';
@@ -66,9 +67,11 @@ function useSelfUpdateAvailable() {
 function NavList({
   onNavigate,
   compact = false,
+  iconOnly = false,
 }: {
   onNavigate?: () => void;
   compact?: boolean;
+  iconOnly?: boolean;
 }) {
   const { t } = useLocale();
   const pathname = usePathname();
@@ -82,6 +85,7 @@ function NavList({
         const className = cn(
           'flex items-center gap-2.5 px-3 py-2.5 text-sm font-medium uppercase tracking-wide transition-colors',
           compact && 'py-2',
+          iconOnly && 'justify-center rounded-xl px-2 py-2.5',
           active
             ? 'dockora-nav-active'
             : 'text-dockora-railMuted hover:bg-dockora-accentSoft hover:text-white hover:shadow-[0_0_16px_rgba(255,0,110,0.15)]',
@@ -101,8 +105,13 @@ function NavList({
                     : undefined
                 }
               >
-                <Icon className="h-4 w-4 opacity-90" />
-                <span className="flex min-w-0 items-center gap-2">
+                <span className="relative">
+                  <Icon className={cn('opacity-90', iconOnly ? 'h-5 w-5' : 'h-4 w-4')} />
+                  {iconOnly && item.key === 'selfUpdate' && selfUpdateAvailable ? (
+                    <span className="absolute -right-1 -top-1 h-1.5 w-1.5 rounded-full bg-dockora-pink" aria-hidden />
+                  ) : null}
+                </span>
+                <span className={cn('flex min-w-0 items-center gap-2', iconOnly && 'sr-only')}>
                   {t.nav[item.key]}
                   {item.key === 'selfUpdate' && selfUpdateAvailable ? (
                     <span
@@ -151,6 +160,7 @@ function LocaleControls({ dense = false, search = true }: { dense?: boolean; sea
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { t } = useLocale();
   const pathname = usePathname();
+  const home = pathname === '/';
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   useEffect(() => {
@@ -170,8 +180,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     };
   }, [drawerOpen]);
 
+  const current = NAV_ITEMS.find((item) =>
+    item.href === '/' ? pathname === '/' : pathname.startsWith(item.href),
+  );
+
   return (
     <div className="relative flex h-dvh overflow-hidden">
+      <div className="pointer-events-none fixed inset-0 z-0">
+        <NeonParticles />
+        <NeonAtmosphere />
+      </div>
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[200] focus:bg-dockora-surface focus:px-3 focus:py-2 focus:text-sm focus:text-dockora-text"
@@ -179,28 +197,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {t.common.skipToContent}
       </a>
 
-      <aside className="relative z-10 hidden h-full w-60 shrink-0 flex-col border-r border-dockora-railBorder bg-dockora-rail text-dockora-railText md:flex">
+      {home ? null : (
+      <aside className="relative z-10 hidden h-full w-[4.75rem] shrink-0 flex-col border-r border-white/10 bg-black/35 text-dockora-railText backdrop-blur-xl md:flex">
         <Link
           href="/"
-          className="group block border-b border-dockora-railBorder px-4 py-4 transition-opacity hover:opacity-95"
+          className="flex justify-center border-b border-white/10 px-2 py-4 transition-opacity hover:opacity-95"
           aria-label={t.appName}
         >
-          <BrandLogoWide priority />
+          <BrandLogo size="sm" priority />
         </Link>
 
-        <nav className="flex-1 overflow-y-auto px-2 py-4">
-          <NavList />
+        <nav className="flex-1 overflow-y-auto px-2 py-3">
+          <NavList iconOnly />
         </nav>
-
-        <div className="space-y-2 border-t border-dockora-railBorder px-3 py-4">
-          <LocaleControls />
-          <AuthLogoutButton />
-        </div>
       </aside>
+      )}
 
       <div className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="z-40 flex items-center justify-between gap-3 border-b border-dockora-border bg-dockora-bg px-4 py-3 md:hidden">
-          <div className="flex items-center gap-2">
+        <header className={cn('z-40 items-center justify-between gap-3 border-b border-white/10 bg-black/30 px-4 py-3 backdrop-blur', home ? 'hidden' : 'flex')}>
+          <div className="flex items-center gap-2 md:hidden">
             <button
               type="button"
               className="dockora-field flex h-9 w-9 items-center justify-center"
@@ -217,32 +232,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <BrandLogo size="sm" priority />
             </Link>
           </div>
-          <LocaleControls dense />
-        </header>
-
-        <nav className="flex items-center gap-2 border-b border-dockora-border bg-dockora-surface px-3 py-2 md:hidden">
-          <button
-            type="button"
-            onClick={() => setDrawerOpen(true)}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wide text-dockora-muted hover:bg-dockora-surface2 hover:text-dockora-text"
-          >
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M4 7h16M4 12h16M4 17h16" />
-            </svg>
-            {t.common.menu}
-          </button>
-          <span className="truncate font-mono text-[10px] uppercase tracking-wider text-dockora-muted">
-            {NAV_ITEMS.find((item) =>
-              item.href === '/' ? pathname === '/' : pathname.startsWith(item.href),
-            )
-              ? t.nav[
-                  NAV_ITEMS.find((item) =>
-                    item.href === '/' ? pathname === '/' : pathname.startsWith(item.href),
-                  )!.key
-                ]
-              : t.appName}
+          <span className="hidden min-w-0 flex-1 truncate text-sm font-medium md:block">
+            {current ? t.nav[current.key] : t.appName}
           </span>
-        </nav>
+          <GlobalSearch compact className="hidden md:inline-flex" />
+          <LocaleControls dense search={false} />
+          <AuthLogoutButton className="hidden w-auto md:inline-flex" />
+        </header>
 
         {drawerOpen ? (
           <div className="fixed inset-0 z-50 md:hidden" role="presentation">
@@ -283,8 +279,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           id="main-content"
           tabIndex={-1}
           className={cn(
-            'mx-auto w-full max-w-shell min-h-0 flex-1 overflow-y-auto px-4 sm:px-6 xl:px-8',
-            pathname === '/' ? 'py-5 sm:py-6' : 'py-8 sm:py-10',
+            'min-h-0 flex-1 overflow-y-auto',
+            home
+              ? 'px-3 py-3 sm:px-5 sm:py-5'
+              : 'mx-auto w-full max-w-shell px-4 py-8 sm:px-6 sm:py-10 xl:px-8',
           )}
         >
           {children}

@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.13] – 2026-09-26
+
+### Added
+
+- CasaOS-style home: clock, system, storage and network widgets plus an app grid, in the existing Ora colors
+
 ## [2.0.12] – 2026-09-22
 
 ### Added

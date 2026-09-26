@@ -51,6 +51,10 @@ export class DashboardService {
         memoryTotalBytes: resources.memoryTotalBytes,
         diskUsedBytes: resources.diskUsedBytes,
         diskTotalBytes: resources.diskTotalBytes,
+        temperatureC: resources.temperatureC ?? null,
+        networkInterface: resources.networkInterface ?? null,
+        networkRxBytesPerSec: resources.networkRxBytesPerSec ?? null,
+        networkTxBytesPerSec: resources.networkTxBytesPerSec ?? null,
       },
       docker: {
         engineVersion: engine.version,

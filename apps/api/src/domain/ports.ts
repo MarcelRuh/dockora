@@ -151,6 +151,10 @@ export interface HostResources {
   diskTotalBytes: number | null;
   diskPath: string;
   temperatureC: number | null;
+  /** Primary non-loopback interface, when /proc/net/dev is readable. */
+  networkInterface?: string | null;
+  networkRxBytesPerSec?: number | null;
+  networkTxBytesPerSec?: number | null;
 }
 
 export interface IHostMetrics {
