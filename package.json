@@ -25,8 +25,8 @@
     "release-check": "bash scripts/release-check.sh"
   },
   "devDependencies": {
-    "prettier": "^3.4.2",
-    "turbo": "^2.3.3",
-    "typescript": "^5.7.2"
+    "prettier": "^3.9.8",
+    "turbo": "^2.11.2",
+    "typescript": "^7.0.2"
   }
 }
