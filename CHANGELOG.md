@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.37] – 2026-09-26
+
+### Changed
+
+- A dragged app shows a clear drop slot, and the plus menu no longer lists a manual order
+
 ## [2.0.36] – 2026-09-26
 
 ### Fixed

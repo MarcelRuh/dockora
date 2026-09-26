@@ -127,7 +127,7 @@ export function CasaDesktop({
   const [layoutError, setLayoutError] = useState<string | null>(null);
   const [containerOrder, setContainerOrder] = useState<string[]>([]);
   const [homeLinks, setHomeLinks] = useState<HomeLink[]>([]);
-  const [addEditor, setAddEditor] = useState<null | 'choose' | 'link' | 'order'>(null);
+  const [addEditor, setAddEditor] = useState<null | 'choose' | 'link'>(null);
   const [linkDraft, setLinkDraft] = useState({ name: '', url: '', icon: '' });
   const [linkError, setLinkError] = useState<string | null>(null);
   const [dragContainer, setDragContainer] = useState<string | null>(null);
@@ -374,17 +374,6 @@ export function CasaDesktop({
     const next = [...keys];
     next.splice(fromIndex, 1);
     next.splice(toIndex, 0, from);
-    publish({ containerOrder: next });
-  };
-
-  const moveApp = (key: string, direction: -1 | 1) => {
-    const keys = gridItems.map((entry) => entry.key);
-    const index = keys.indexOf(key);
-    const target = index + direction;
-    if (index < 0 || target < 0 || target >= keys.length) return;
-    const next = [...keys];
-    const [moved] = next.splice(index, 1);
-    next.splice(target, 0, moved!);
     publish({ containerOrder: next });
   };
 
@@ -782,6 +771,7 @@ export function CasaDesktop({
                       dimmed={false}
                       dragging={dragContainer === item.key}
                       dropOver={dropTarget === item.key}
+                      dropLabel={home.dropHere}
                       detailHref={link.url}
                       detailLabel={link.name}
                       removeLabel={home.linkRemove}
@@ -843,6 +833,7 @@ export function CasaDesktop({
                     dimmed={!runningTile}
                     dragging={dragContainer === container.name}
                     dropOver={dropTarget === container.name}
+                    dropLabel={home.dropHere}
                     onPointerDown={(event) => startAppDrag(container.name, event)}
                     onClick={(event) => {
                       if (!dragged.current) return;
@@ -1030,7 +1021,7 @@ export function CasaDesktop({
       {dragContainer && dragPoint
         ? createPortal(
             <div
-              className="dockora-panel pointer-events-none fixed z-[90] -translate-x-1/2 -translate-y-1/2 px-3 py-2 text-sm shadow-neon"
+              className="dockora-panel pointer-events-none fixed z-[90] -translate-x-1/2 -translate-y-[130%] border-dockora-pink px-4 py-2 text-sm shadow-neon"
               style={{ left: dragPoint.x, top: dragPoint.y }}
             >
               {dragLabel}
@@ -1057,7 +1048,7 @@ export function CasaDesktop({
                   <div className="min-w-0 flex-1">
                     <p className="dockora-section-tag">{home.apps}</p>
                     <h2 className="dockora-title-gradient text-3xl tracking-tight">
-                      {addEditor === 'link' ? home.addLink : addEditor === 'order' ? home.arrange : home.add}
+                      {addEditor === 'link' ? home.addLink : home.add}
                     </h2>
                   </div>
                   <Button type="button" size="sm" variant="ghost" onClick={() => setAddEditor(null)}>
@@ -1088,59 +1079,7 @@ export function CasaDesktop({
                         {home.addLink}
                       </button>
                     </li>
-                    <li className="border-t border-dockora-border/70">
-                      <button
-                        type="button"
-                        className="block w-full px-5 py-3 text-left text-sm uppercase tracking-wide hover:bg-white/[0.03]"
-                        onClick={() => setAddEditor('order')}
-                      >
-                        {home.arrange}
-                      </button>
-                    </li>
                   </ul>
-                ) : addEditor === 'order' ? (
-                  <>
-                  <ul className="max-h-[min(24rem,60vh)] overflow-y-auto">
-                    {gridItems.map((item, index) => {
-                      const name = item.kind === 'link' ? item.link.name : item.container.name;
-                      return (
-                        <li
-                          key={item.key}
-                          className="flex items-center gap-3 border-t border-dockora-border/70 px-5 py-2"
-                        >
-                          <span className="min-w-0 flex-1 truncate text-sm">{name}</span>
-                          <button
-                            type="button"
-                            className={buttonClassName({ size: 'sm', className: 'w-9 px-0' })}
-                            aria-label={home.moveUp}
-                            disabled={index === 0}
-                            onClick={() => moveApp(item.key, -1)}
-                          >
-                            ↑
-                          </button>
-                          <button
-                            type="button"
-                            className={buttonClassName({ size: 'sm', className: 'w-9 px-0' })}
-                            aria-label={home.moveDown}
-                            disabled={index === gridItems.length - 1}
-                            onClick={() => moveApp(item.key, 1)}
-                          >
-                            ↓
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                  <div className="flex justify-end border-t border-dockora-border/70 px-5 py-3">
-                    <button
-                      type="button"
-                      className={buttonClassName({ variant: 'ghost', size: 'sm' })}
-                      onClick={() => setAddEditor('choose')}
-                    >
-                      {t.common.back}
-                    </button>
-                  </div>
-                  </>
                 ) : (
                   <form
                     className="space-y-3 px-5 py-4"
@@ -1336,6 +1275,7 @@ function ContainerTile({
   dimmed,
   dragging,
   dropOver,
+  dropLabel,
   children,
   detailHref,
   detailLabel,
@@ -1363,6 +1303,7 @@ function ContainerTile({
   dimmed: boolean;
   dragging: boolean;
   dropOver: boolean;
+  dropLabel: string;
   children: ReactNode;
   detailHref: string;
   detailLabel: string;
@@ -1387,7 +1328,6 @@ function ContainerTile({
     'dockora-panel relative flex cursor-grab flex-col items-center px-2 pb-3 active:cursor-grabbing',
     dimmed && 'opacity-50',
     dragging && 'opacity-40',
-    dropOver && 'outline outline-2 outline-offset-2 outline-dockora-pink',
   );
   const face = 'flex w-full items-center justify-center px-2 pt-3';
   const open =
@@ -1428,6 +1368,13 @@ function ContainerTile({
         onEdit();
       }}
     >
+      {dropOver ? (
+        <div className="absolute inset-0 z-20 flex items-center justify-center border-2 border-dashed border-dockora-pink bg-[#0d0d15] shadow-neon">
+          <span className="px-2 text-center font-display text-xs font-semibold uppercase tracking-[0.16em] text-dockora-pink">
+            {dropLabel}
+          </span>
+        </div>
+      ) : null}
       {open}
       {detailHref.startsWith('http') ? (
         <a
