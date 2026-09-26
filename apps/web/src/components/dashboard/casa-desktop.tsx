@@ -11,9 +11,10 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from 'react';
-import type { ContainerSummary, DashboardOverview, Locale } from '@dockora/shared';
+import type { ContainerSummary, DashboardOverview, Locale, UpdateCheckResult } from '@dockora/shared';
 import { AuthLogoutButton, useAuth } from '@/components/auth/auth-provider';
 import { BrandLogoWide } from '@/components/ui/brand-logo';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { NAV_ICONS } from '@/components/ui/nav-icons';
 import { ServiceIcon } from '@/components/ui/service-icon';
 import { useLocale } from '@/i18n/locale-provider';
@@ -22,6 +23,8 @@ import {
   fetchComposeProject,
   fetchComposeProjects,
   fetchContainers,
+  fetchUpdates,
+  pullUpdate,
   saveComposeYaml,
 } from '@/lib/api';
 import { resolveContainerAppHref } from '@/lib/container-app-link';
@@ -155,6 +158,10 @@ export function CasaDesktop({
     service: string;
   } | null>(null);
   const [containers, setContainers] = useState<ContainerSummary[]>([]);
+  const [updates, setUpdates] = useState<UpdateCheckResult[]>([]);
+  const [updateConfirm, setUpdateConfirm] = useState<string[] | null>(null);
+  const [updateBusy, setUpdateBusy] = useState<string | null>(null);
+  const [updateError, setUpdateError] = useState<string | null>(null);
   const [containerOrder, setContainerOrder] = useState<string[]>([]);
   const [dragContainer, setDragContainer] = useState<string | null>(null);
   const dragged = useRef(false);
@@ -178,11 +185,14 @@ export function CasaDesktop({
     let cancelled = false;
     const load = () => {
       if (document.visibilityState === 'hidden') return;
-      void fetchContainers()
-        .then((list) => {
-          if (!cancelled) setContainers(list);
-        })
-        .catch(() => undefined);
+      void Promise.all([
+        fetchContainers().catch(() => null),
+        fetchUpdates().catch(() => null),
+      ]).then(([list, checks]) => {
+        if (cancelled) return;
+        if (list) setContainers(list);
+        if (checks) setUpdates(checks);
+      });
     };
     load();
     const timer = window.setInterval(load, 30_000);
@@ -243,6 +253,11 @@ export function CasaDesktop({
   const pageHits = needle
     ? APPS.filter((app) => t.nav[app.key].toLowerCase().includes(needle))
     : [];
+  const pendingUpdates = useMemo(
+    () => updates.filter((item) => item.updateAvailable && !item.error),
+    [updates],
+  );
+  const updateCount = updates.length > 0 ? pendingUpdates.length : overview.updatesAvailable;
 
   const saveOrder = (next: DockKey[]) => {
     setOrder(next);
@@ -322,6 +337,30 @@ export function CasaDesktop({
     }
   };
 
+  const applyContainerUpdates = async (ids: string[]) => {
+    setUpdateError(null);
+    setUpdateBusy(ids[0] ?? 'all');
+    try {
+      for (const id of ids) {
+        setUpdateBusy(id);
+        const result = await pullUpdate(id);
+        if (!result.ok) {
+          throw new Error(result.message);
+        }
+      }
+      const [list, checks] = await Promise.all([
+        fetchContainers().catch(() => null),
+        fetchUpdates().catch(() => null),
+      ]);
+      if (list) setContainers(list);
+      if (checks) setUpdates(checks);
+    } catch (error) {
+      setUpdateError(error instanceof Error ? error.message : t.common.failed);
+    } finally {
+      setUpdateBusy(null);
+    }
+  };
+
   const setWidget = (key: keyof Widgets, value: boolean) => {
     const next = { ...widgets, [key]: value };
     setWidgets(next);
@@ -339,6 +378,7 @@ export function CasaDesktop({
         : t.dashboard.unknown;
 
   return (
+    <>
     <div className="grid items-start gap-4 lg:grid-cols-[17.5rem_minmax(0,1fr)]">
       <div className="flex flex-col gap-3">
         <ClockCard locale={loc} />
@@ -432,11 +472,11 @@ export function CasaDesktop({
             icon={<NAV_ICONS.containers className="h-8 w-8" />}
           />
           <FeatureCard
-            href={overview.updatesAvailable > 0 ? '/updates' : '/monitoring'}
+            href={updateCount > 0 ? '/updates' : '/monitoring'}
             title={t.dashboard.engine}
             body={
-              overview.updatesAvailable > 0
-                ? home.updatesHint.replace('{count}', String(overview.updatesAvailable))
+              updateCount > 0
+                ? home.updatesHint.replace('{count}', String(updateCount))
                 : home.engineHint
                     .replace('{status}', engineLabel)
                     .replace('{version}', overview.docker.engineVersion ?? t.dashboard.versionUnknown)
@@ -446,8 +486,22 @@ export function CasaDesktop({
             icon={<NAV_ICONS.monitoring className="h-8 w-8" />}
             secondaryLabel={home.more}
             onSecondary={onOpenEngine}
+            updateLabel={
+              canEdit && pendingUpdates.length > 0
+                ? pendingUpdates.length > 1
+                  ? t.updates.applyAll
+                  : t.updates.pull
+                : undefined
+            }
+            updateBusy={updateBusy !== null}
+            onUpdate={
+              canEdit && pendingUpdates.length > 0
+                ? () => setUpdateConfirm(pendingUpdates.map((item) => item.containerId))
+                : undefined
+            }
           />
         </div>
+        {updateError ? <p className="text-xs text-dockora-danger">{updateError}</p> : null}
 
         <section aria-label={home.apps} className="relative">
           <div className="mb-3 flex items-center gap-3">
@@ -533,6 +587,15 @@ export function CasaDesktop({
                     detailHref={`/containers/${encodeURIComponent(container.id)}`}
                     detailLabel={home.openInDockora}
                     editLabel={home.appUrl}
+                    updateLabel={
+                      updateBusy === container.id ? t.updates.applying : t.updates.pull
+                    }
+                    onUpdate={
+                      canEdit && pendingUpdates.some((item) => item.containerId === container.id)
+                        ? () => setUpdateConfirm([container.id])
+                        : undefined
+                    }
+                    updateBusy={updateBusy !== null}
                     onEdit={
                       canEdit
                         ? () => {
@@ -692,7 +755,32 @@ export function CasaDesktop({
           </ul>
         </section>
       </div>
+      <ConfirmDialog
+        open={updateConfirm !== null}
+        title={updateConfirm && updateConfirm.length > 1 ? t.updates.applyAll : t.updates.pull}
+        description={
+          updateConfirm && updateConfirm.length > 1
+            ? t.updates.applyAllConfirm.replace('{count}', String(updateConfirm.length))
+            : t.updates.applyConfirm
+        }
+        consequences={[
+          t.updates.stepPull,
+          t.updates.stepRecreate,
+          t.updates.stepHealth,
+          t.updates.stepRollback,
+        ]}
+        confirmLabel={t.common.confirm}
+        cancelLabel={t.common.cancel}
+        busy={updateBusy !== null}
+        onCancel={() => setUpdateConfirm(null)}
+        onConfirm={() => {
+          const ids = updateConfirm;
+          setUpdateConfirm(null);
+          if (ids && ids.length > 0) void applyContainerUpdates(ids);
+        }}
+      />
     </div>
+    </>
   );
 }
 
@@ -707,6 +795,9 @@ function ContainerTile({
   detailLabel,
   editLabel,
   onEdit,
+  updateLabel,
+  onUpdate,
+  updateBusy,
   editor,
   onPointerDown,
   onDragOver,
@@ -724,6 +815,9 @@ function ContainerTile({
   detailLabel: string;
   editLabel?: string;
   onEdit?: () => void;
+  updateLabel?: string;
+  onUpdate?: () => void;
+  updateBusy?: boolean;
   editor?: ReactNode;
   onPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onDragOver: (event: ReactDragEvent<HTMLDivElement>) => void;
@@ -770,24 +864,43 @@ function ContainerTile({
       >
         {name}
       </Link>
-      {onEdit ? (
-        <button
-          type="button"
-          aria-label={editLabel}
-          className="mt-1.5 inline-flex items-center gap-1 rounded-full border border-white/15 px-2.5 py-1 text-[11px] text-dockora-text hover:border-dockora-pink/50 hover:text-white"
-          onPointerDown={(event) => event.stopPropagation()}
-          onClick={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            onEdit();
-          }}
-        >
-          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-            <path d="M4 20h4l10-10-4-4L4 16v4Z" />
-            <path d="m12 6 4 4" />
-          </svg>
-          {editLabel}
-        </button>
+      {onUpdate || onEdit ? (
+        <div className="mt-1.5 flex flex-wrap items-center justify-center gap-1">
+          {onUpdate ? (
+            <button
+              type="button"
+              disabled={updateBusy}
+              className="inline-flex rounded-full bg-dockora-pink px-2.5 py-1 text-[11px] text-white disabled:opacity-50"
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onUpdate();
+              }}
+            >
+              {updateLabel}
+            </button>
+          ) : null}
+          {onEdit ? (
+            <button
+              type="button"
+              aria-label={editLabel}
+              className="inline-flex items-center gap-1 rounded-full border border-white/15 px-2.5 py-1 text-[11px] text-dockora-text hover:border-dockora-pink/50 hover:text-white"
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onEdit();
+              }}
+            >
+              <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                <path d="M4 20h4l10-10-4-4L4 16v4Z" />
+                <path d="m12 6 4 4" />
+              </svg>
+              {editLabel}
+            </button>
+          ) : null}
+        </div>
       ) : null}
       {editor}
     </div>
@@ -1054,6 +1167,9 @@ function FeatureCard({
   icon,
   secondaryLabel,
   onSecondary,
+  updateLabel,
+  onUpdate,
+  updateBusy,
 }: {
   href: string;
   title: string;
@@ -1064,6 +1180,9 @@ function FeatureCard({
   icon?: ReactNode;
   secondaryLabel?: string;
   onSecondary?: () => void;
+  updateLabel?: string;
+  onUpdate?: () => void;
+  updateBusy?: boolean;
 }) {
   return (
     <div className="dockora-glass relative flex min-h-[8.5rem] items-center justify-between gap-3 overflow-hidden px-5 py-4">
@@ -1081,6 +1200,16 @@ function FeatureCard({
           >
             {action}
           </Link>
+          {updateLabel && onUpdate ? (
+            <button
+              type="button"
+              disabled={updateBusy}
+              onClick={onUpdate}
+              className="inline-flex rounded-full bg-dockora-pink px-3 py-1 text-xs font-medium text-white disabled:opacity-50"
+            >
+              {updateLabel}
+            </button>
+          ) : null}
           {secondaryLabel && onSecondary ? (
             <button
               type="button"

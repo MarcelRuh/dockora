@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.20] – 2026-09-26
+
+### Added
+
+- Dashboard shows the container image update action on the engine card and on tiles that have an update
+
 ## [2.0.19] – 2026-09-26
 
 ### Fixed
