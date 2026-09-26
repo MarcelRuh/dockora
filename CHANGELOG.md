@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.38] – 2026-09-27
+
+### Fixed
+
+- Dragging a home app no longer selects text, and the drop slot stays put between tiles
+
 ## [2.0.37] – 2026-09-26
 
 ### Changed

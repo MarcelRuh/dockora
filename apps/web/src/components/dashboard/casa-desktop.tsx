@@ -382,10 +382,23 @@ export function CasaDesktop({
     const startX = event.clientX;
     const startY = event.clientY;
     let active = false;
+    let current: string | null = null;
+    const blockSelect = (ev: Event) => ev.preventDefault();
     const tileAt = (x: number, y: number) => {
       const hit = document.elementFromPoint(x, y);
       const tile = hit instanceof Element ? hit.closest('[data-app-key]') : null;
-      return tile?.getAttribute('data-app-key') ?? null;
+      const next = tile?.getAttribute('data-app-key') ?? null;
+      return next === key ? null : next;
+    };
+    const aim = (x: number, y: number) => {
+      const over = tileAt(x, y);
+      if (over) {
+        current = over;
+        return;
+      }
+      const hit = document.elementFromPoint(x, y);
+      const grid = document.querySelector('[data-app-grid]');
+      if (!(hit instanceof Element) || !grid?.contains(hit)) current = null;
     };
     const move = (ev: PointerEvent) => {
       if (!active) {
@@ -393,27 +406,35 @@ export function CasaDesktop({
         active = true;
         dragged.current = true;
         setDragContainer(key);
+        window.getSelection()?.removeAllRanges();
       }
+      ev.preventDefault();
       setDragPoint({ x: ev.clientX, y: ev.clientY });
-      const over = tileAt(ev.clientX, ev.clientY);
-      setDropTarget(over && over !== key ? over : null);
+      const previous = current;
+      aim(ev.clientX, ev.clientY);
+      if (current !== previous) setDropTarget(current);
     };
     const up = (ev: PointerEvent) => {
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
-      if (active) {
-        const over = tileAt(ev.clientX, ev.clientY);
-        if (over && over !== key) placeApp(key, over);
-      }
+      window.removeEventListener('pointercancel', up);
+      document.removeEventListener('selectstart', blockSelect);
+      document.body.style.userSelect = '';
+      window.getSelection()?.removeAllRanges();
+      if (active && current) placeApp(key, current);
       setDragContainer(null);
       setDropTarget(null);
       setDragPoint(null);
       window.setTimeout(() => {
         dragged.current = false;
       }, 0);
+      ev.preventDefault();
     };
+    document.body.style.userSelect = 'none';
+    document.addEventListener('selectstart', blockSelect);
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
   };
 
   const dropOn = (target: DockKey) => {
@@ -757,7 +778,10 @@ export function CasaDesktop({
               </button>
             </div>
           </div>
-          <ul className="grid grid-cols-[repeat(auto-fill,minmax(7.25rem,1fr))] gap-3 sm:grid-cols-[repeat(auto-fill,minmax(9rem,1fr))]">
+          <ul
+            data-app-grid=""
+            className="grid grid-cols-[repeat(auto-fill,minmax(7.25rem,1fr))] gap-3 sm:grid-cols-[repeat(auto-fill,minmax(9rem,1fr))]"
+          >
             {visibleItems.map((item) => {
               if (item.kind === 'link') {
                 const { link } = item;
@@ -1325,7 +1349,7 @@ function ContainerTile({
   onClick: (event: ReactMouseEvent<HTMLElement>) => void;
 }) {
   const shell = cn(
-    'dockora-panel relative flex cursor-grab flex-col items-center px-2 pb-3 active:cursor-grabbing',
+    'dockora-panel relative flex cursor-grab select-none flex-col items-center px-2 pb-3 active:cursor-grabbing [&_img]:pointer-events-none',
     dimmed && 'opacity-50',
     dragging && 'opacity-40',
   );
