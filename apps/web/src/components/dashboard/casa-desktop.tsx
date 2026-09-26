@@ -1,12 +1,25 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import type { DashboardOverview, Locale } from '@dockora/shared';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type DragEvent as ReactDragEvent,
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from 'react';
+import type { ContainerSummary, DashboardOverview, Locale } from '@dockora/shared';
 import { AuthLogoutButton } from '@/components/auth/auth-provider';
 import { GlobalSearch } from '@/components/global-search';
 import { NAV_ICONS } from '@/components/ui/nav-icons';
+import { ServiceIcon } from '@/components/ui/service-icon';
 import { useLocale } from '@/i18n/locale-provider';
+import { fetchContainers } from '@/lib/api';
+import { resolveContainerAppHref } from '@/lib/container-app-link';
+import { resolveContainerIconUrl } from '@/lib/container-icon';
 import { formatBytes, formatPercent, usageRatio } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
@@ -43,6 +56,7 @@ const TILE: Record<AppKey, string> = {
 };
 
 const ORDER_KEY = 'dockora.home.appOrder';
+const CONTAINER_ORDER_KEY = 'dockora.home.containerOrder';
 const WIDGET_KEY = 'dockora.home.widgets';
 const HINT_KEY = 'dockora.home.dragHint';
 
@@ -84,13 +98,54 @@ export function CasaDesktop({ overview }: { overview: DashboardOverview }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [hint, setHint] = useState(true);
   const [dragKey, setDragKey] = useState<AppKey | null>(null);
+  const [containers, setContainers] = useState<ContainerSummary[]>([]);
+  const [containerOrder, setContainerOrder] = useState<string[]>([]);
+  const [dragContainer, setDragContainer] = useState<string | null>(null);
   const dragged = useRef(false);
+  const [pageHost, setPageHost] = useState('');
 
   useEffect(() => {
     setOrder(readOrder());
     setWidgets(readWidgets());
     setHint(localStorage.getItem(HINT_KEY) !== '0');
+    setPageHost(window.location.hostname);
+    try {
+      const raw = JSON.parse(localStorage.getItem(CONTAINER_ORDER_KEY) ?? '[]') as unknown;
+      setContainerOrder(Array.isArray(raw) ? raw.filter((id): id is string => typeof id === 'string') : []);
+    } catch {
+      setContainerOrder([]);
+    }
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = () => {
+      void fetchContainers()
+        .then((list) => {
+          if (!cancelled) setContainers(list);
+        })
+        .catch(() => undefined);
+    };
+    load();
+    const timer = window.setInterval(load, 30_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [overview.containers.total, overview.containers.running]);
+
+  const orderedContainers = useMemo(() => {
+    const byId = new Map(containers.map((container) => [container.id, container]));
+    const next: ContainerSummary[] = [];
+    for (const id of containerOrder) {
+      const container = byId.get(id);
+      if (!container) continue;
+      next.push(container);
+      byId.delete(id);
+    }
+    const rest = [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
+    return [...next, ...rest];
+  }, [containers, containerOrder]);
 
   const apps = useMemo(
     () => order.map((key) => APPS.find((app) => app.key === key)).filter((app) => app != null),
@@ -235,6 +290,73 @@ export function CasaDesktop({ overview }: { overview: DashboardOverview }) {
             ) : null}
           </div>
           <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+            {orderedContainers.map((container) => {
+              const target = resolveContainerAppHref(container, pageHost);
+              const icon = resolveContainerIconUrl(container.labels);
+              const runningTile = container.status === 'running';
+              return (
+                <li key={container.id}>
+                  <ContainerTile
+                    href={target.href}
+                    external={target.external}
+                    name={container.name}
+                    dimmed={!runningTile}
+                    dragging={dragContainer === container.id}
+                    onPointerDown={(event) => {
+                      const startX = event.clientX;
+                      const startY = event.clientY;
+                      const targetEl = event.currentTarget;
+                      const move = (ev: globalThis.PointerEvent) => {
+                        if (Math.hypot(ev.clientX - startX, ev.clientY - startY) > 8) {
+                          dragged.current = true;
+                          targetEl.draggable = true;
+                          setDragContainer(container.id);
+                        }
+                      };
+                      const up = () => {
+                        window.removeEventListener('pointermove', move);
+                        window.removeEventListener('pointerup', up);
+                      };
+                      window.addEventListener('pointermove', move);
+                      window.addEventListener('pointerup', up);
+                    }}
+                    onDragOver={(event) => event.preventDefault()}
+                    onDrop={() => {
+                      if (!dragContainer || dragContainer === container.id) return;
+                      const ids = orderedContainers.map((item) => item.id);
+                      const next = ids.filter((id) => id !== dragContainer);
+                      const index = next.indexOf(container.id);
+                      next.splice(index < 0 ? next.length : index, 0, dragContainer);
+                      setContainerOrder(next);
+                      localStorage.setItem(CONTAINER_ORDER_KEY, JSON.stringify(next));
+                      setDragContainer(null);
+                    }}
+                    onDragEnd={(event) => {
+                      event.currentTarget.draggable = false;
+                      setDragContainer(null);
+                    }}
+                    onClick={(event) => {
+                      if (!dragged.current) return;
+                      event.preventDefault();
+                      dragged.current = false;
+                    }}
+                  >
+                    <span className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl bg-white/10">
+                      <ServiceIcon url={icon} alt={container.name} className="h-14 w-14 rounded-2xl" />
+                    </span>
+                    <span className="max-w-full truncate text-sm text-dockora-text">{container.name}</span>
+                  </ContainerTile>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+
+        <section aria-label={home.suite}>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 className="text-sm font-medium text-dockora-text">{home.suite}</h2>
+          </div>
+          <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
             {apps.map((app) => {
               const Icon = NAV_ICONS[app.key];
               return (
@@ -246,7 +368,7 @@ export function CasaDesktop({ overview }: { overview: DashboardOverview }) {
                       const startX = event.clientX;
                       const startY = event.clientY;
                       const target = event.currentTarget;
-                      const move = (ev: PointerEvent) => {
+                      const move = (ev: globalThis.PointerEvent) => {
                         if (Math.hypot(ev.clientX - startX, ev.clientY - startY) > 8) {
                           dragged.current = true;
                           target.draggable = true;
@@ -307,6 +429,72 @@ export function CasaDesktop({ overview }: { overview: DashboardOverview }) {
         </section>
       </div>
     </div>
+  );
+}
+
+function ContainerTile({
+  href,
+  external,
+  name,
+  dimmed,
+  dragging,
+  children,
+  onPointerDown,
+  onDragOver,
+  onDrop,
+  onDragEnd,
+  onClick,
+}: {
+  href: string;
+  external: boolean;
+  name: string;
+  dimmed: boolean;
+  dragging: boolean;
+  children: ReactNode;
+  onPointerDown: (event: ReactPointerEvent<HTMLAnchorElement>) => void;
+  onDragOver: (event: ReactDragEvent<HTMLAnchorElement>) => void;
+  onDrop: () => void;
+  onDragEnd: (event: ReactDragEvent<HTMLAnchorElement>) => void;
+  onClick: (event: ReactMouseEvent<HTMLAnchorElement>) => void;
+}) {
+  const className = cn(
+    'dockora-glass flex h-full min-h-[8.5rem] flex-col items-center justify-center gap-3 px-3 py-5 text-center transition-transform hover:-translate-y-0.5',
+    dimmed && 'opacity-50',
+    dragging && 'opacity-50',
+  );
+  if (external) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        title={name}
+        draggable={dragging}
+        className={className}
+        onPointerDown={onPointerDown}
+        onDragOver={onDragOver}
+        onDrop={onDrop}
+        onDragEnd={onDragEnd}
+        onClick={onClick}
+      >
+        {children}
+      </a>
+    );
+  }
+  return (
+    <Link
+      href={href}
+      title={name}
+      draggable={dragging}
+      className={className}
+      onPointerDown={onPointerDown}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      onDragEnd={onDragEnd}
+      onClick={onClick}
+    >
+      {children}
+    </Link>
   );
 }
 

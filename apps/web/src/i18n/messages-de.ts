@@ -82,6 +82,7 @@ export const de = {
         showNetwork: 'Netzwerk anzeigen',
         dragHint: 'Icons ziehen zum Sortieren.',
         apps: 'Apps',
+        suite: 'Dockora',
         add: 'Stack anlegen',
         open: 'Öffnen',
         runningHint: '{running} von {total} laufen',

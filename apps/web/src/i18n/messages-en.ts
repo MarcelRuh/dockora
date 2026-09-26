@@ -84,6 +84,7 @@ export const en = {
         showNetwork: 'Show network',
         dragHint: 'Drag icons to sort.',
         apps: 'Apps',
+        suite: 'Dockora',
         add: 'Add stack',
         open: 'Open',
         runningHint: '{running} of {total} running',
