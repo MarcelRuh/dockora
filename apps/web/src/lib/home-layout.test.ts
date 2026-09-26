@@ -58,7 +58,12 @@ describe('home layout helpers', () => {
     expect(layout.departments).toEqual([]);
     expect(layout.appDepartments).toEqual({});
     expect(layout.appOrder).toEqual(['settings']);
-    expect(homeLayoutHasData({ ...EMPTY_HOME_LAYOUT, departments: [{ id: 'media1', name: 'Medien' }] })).toBe(true);
+    expect(
+      homeLayoutHasData({
+        ...EMPTY_HOME_LAYOUT,
+        departments: [{ id: 'media1', name: 'Medien', column: 'wide' }],
+      }),
+    ).toBe(true);
   });
 
   it('treats the default widgets as empty', () => {

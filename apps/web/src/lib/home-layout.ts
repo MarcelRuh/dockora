@@ -145,13 +145,13 @@ function readDepartments(): HomeDepartment[] {
   try {
     const raw = JSON.parse(localStorage.getItem(DEPARTMENT_KEY) ?? '[]') as unknown;
     if (!Array.isArray(raw)) return [];
-    return raw.filter(
-      (item): item is HomeDepartment =>
-        Boolean(item) &&
-        typeof item === 'object' &&
-        typeof (item as HomeDepartment).id === 'string' &&
-        typeof (item as HomeDepartment).name === 'string',
-    );
+    return raw.flatMap((item) => {
+      if (!item || typeof item !== 'object') return [];
+      const entry = item as Partial<HomeDepartment>;
+      if (typeof entry.id !== 'string' || typeof entry.name !== 'string') return [];
+      const column = entry.column === 'left' || entry.column === 'right' || entry.column === 'wide' ? entry.column : 'wide';
+      return [{ id: entry.id, name: entry.name, column }];
+    });
   } catch {
     return [];
   }

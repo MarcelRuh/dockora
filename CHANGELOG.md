@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.40] – 2026-09-27
+
+### Added
+
+- Home departments can sit on the left, on the right, or across the full width
+
 ## [2.0.39] – 2026-09-27
 
 ### Added

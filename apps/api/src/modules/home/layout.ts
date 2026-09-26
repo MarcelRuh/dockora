@@ -89,8 +89,9 @@ function normalizeDepartments(input: unknown): HomeDepartment[] {
     const name = typeof item.name === 'string' ? item.name.trim() : '';
     if (!/^[a-z0-9-]{4,40}$/i.test(id) || seen.has(id) || id.toLowerCase() === 'loose') continue;
     if (!name || name.length > 40 || /[\u0000-\u001f]/.test(name)) continue;
+    const column = item.column === 'left' || item.column === 'right' || item.column === 'wide' ? item.column : 'wide';
     seen.add(id);
-    departments.push({ id, name });
+    departments.push({ id, name, column });
   }
   return departments;
 }

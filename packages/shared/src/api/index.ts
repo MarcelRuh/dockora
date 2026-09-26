@@ -291,9 +291,13 @@ export interface HomeWidgets {
   network: boolean;
 }
 
+export type HomeDepartmentColumn = 'left' | 'right' | 'wide';
+
 export interface HomeDepartment {
   id: string;
   name: string;
+  /** wide sits under the apps. left and right share one row. */
+  column: HomeDepartmentColumn;
 }
 
 /** Shared home screen: one layout for the whole Dockora instance. */

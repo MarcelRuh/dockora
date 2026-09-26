@@ -144,6 +144,7 @@ export function CasaDesktop({
   const [departments, setDepartments] = useState<HomeDepartment[]>([]);
   const [appDepartments, setAppDepartments] = useState<Record<string, string>>({});
   const [departmentDraft, setDepartmentDraft] = useState('');
+  const [departmentColumn, setDepartmentColumn] = useState<'left' | 'right' | 'wide'>('left');
   const [renameId, setRenameId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState('');
   const [addEditor, setAddEditor] = useState<null | 'choose' | 'link' | 'department'>(null);
@@ -372,21 +373,12 @@ export function CasaDesktop({
   });
   const departmentSections = departments
     .map((dept) => ({
-      ...dept,
+      id: dept.id,
+      name: dept.name,
+      column: dept.column === 'left' || dept.column === 'right' ? dept.column : ('wide' as const),
       items: visibleItems.filter((item) => appDepartments[item.key] === dept.id),
     }))
     .filter((section) => !needle || section.items.length > 0);
-  const appRows: Array<
-    | { kind: 'heading'; id: string; name: string }
-    | { kind: 'empty'; id: string }
-    | (typeof visibleItems)[number]
-  > = [
-    ...looseItems,
-    ...departmentSections.flatMap((section) => [
-      { kind: 'heading' as const, id: section.id, name: section.name },
-      ...(section.items.length > 0 ? section.items : [{ kind: 'empty' as const, id: section.id }]),
-    ]),
-  ];
   const pageHits = needle
     ? APPS.filter((app) => t.nav[app.key].toLowerCase().includes(needle))
     : [];
@@ -657,6 +649,317 @@ export function CasaDesktop({
   const running = overview.containers.running;
   const total = overview.containers.total;
   const unhealthy = overview.unhealthyContainers ?? [];
+  const renderGridItem = (item: (typeof visibleItems)[number]) => {
+              if (item.kind === 'link') {
+                const { link } = item;
+                return (
+                  <li key={item.key}>
+                    <ContainerTile
+                      href={link.url}
+                      external
+                      name={link.name}
+                      appKey={item.key}
+                      dimmed={false}
+                      dragging={dragContainer === item.key}
+                      dropOver={dropTarget === item.key}
+                      dropLabel={home.dropHere}
+                      detailHref={link.url}
+                      detailLabel={link.name}
+                      removeLabel={home.linkRemove}
+                      onRemove={() => {
+                        const nextLinks = homeLinks.filter((entry) => entry.id !== link.id);
+                        const nextOrder = containerOrder.filter((entry) => entry !== item.key);
+                        const nextMap = { ...appDepartments };
+                        delete nextMap[item.key];
+                        publish({ links: nextLinks, containerOrder: nextOrder, appDepartments: nextMap });
+                      }}
+                      onPointerDown={(event) => startAppDrag(item.key, event)}
+                      onClick={(event) => {
+                        if (!dragged.current) return;
+                        event.preventDefault();
+                        event.stopPropagation();
+                      }}
+                    >
+                      <ServiceIcon
+                        url={link.icon}
+                        alt={link.name}
+                        className="h-14 w-14 object-contain sm:h-16 sm:w-16"
+                      />
+                    </ContainerTile>
+                  </li>
+                );
+              }
+              const container = item.container;
+              const target = resolveContainerAppHref(container, pageHost);
+              const publicHref = resolvePublicAppUrl(
+                container.name,
+                container.labels,
+                publicUrlOverrides,
+                discoveredUrls,
+              );
+              const linkChoices = containerLinkChoices(
+                container,
+                pageHost,
+                publicUrlOverrides,
+                discoveredUrls,
+              ).map((choice) => ({
+                ...choice,
+                label: choice.key === 'public' ? home.appUrlPublic : home.appUrlInternal,
+              }));
+              const primary =
+                target.external || !publicHref ? target : { href: publicHref, external: true as const };
+              const icon = resolveContainerIconUrl(container.labels);
+              const runningTile = container.status === 'running';
+              return (
+                <li key={container.id}>
+                  <ContainerTile
+                    href={primary.href}
+                    external={primary.external}
+                    name={container.name}
+                    linkChoices={linkChoices}
+                    linksOpen={linkPicker === container.name}
+                    linksLabel={home.chooseLink}
+                    onToggleLinks={() =>
+                      setLinkPicker((current) => (current === container.name ? null : container.name))
+                    }
+                    appKey={container.name}
+                    dimmed={!runningTile}
+                    dragging={dragContainer === container.name}
+                    dropOver={dropTarget === container.name}
+                    dropLabel={home.dropHere}
+                    onPointerDown={(event) => startAppDrag(container.name, event)}
+                    onClick={(event) => {
+                      if (!dragged.current) return;
+                      event.preventDefault();
+                      event.stopPropagation();
+                    }}
+                    detailHref={`/containers/${encodeURIComponent(container.id)}`}
+                    detailLabel={home.openInDockora}
+                    editLabel={home.appUrl}
+                    updateLabel={
+                      updateBusy === container.id ? home.upgrading : home.upgrade
+                    }
+                    onUpdate={
+                      canEdit && pendingUpdates.some((item) => item.containerId === container.id)
+                        ? () => setUpdateConfirm([container.id])
+                        : undefined
+                    }
+                    updateBusy={updateBusy !== null}
+                    onEdit={
+                      canEdit
+                        ? () => {
+                            if (editingName === container.name) {
+                              setEditingName(null);
+                              return;
+                            }
+                            const pending = pendingRecreate?.name === container.name;
+                            setLinkPicker(null);
+                            setEditingName(container.name);
+                            setDraftUrl(target.external ? target.href : '');
+                            setDraftPublicUrl(publicHref ?? '');
+                            setPendingRecreate((current) =>
+                              current?.name === container.name ? current : null,
+                            );
+                            setUrlMessage(pending ? home.appUrlSavedRecreate : null);
+                          }
+                        : undefined
+                    }
+                    editor={
+                      editingName === container.name ? (
+                        <form
+                          className="mt-2 w-full space-y-2 border-t border-white/10 pt-2 text-left"
+                          onSubmit={(event) => {
+                            event.preventDefault();
+                            void saveAppUrl(container);
+                          }}
+                          onPointerDown={(event) => event.stopPropagation()}
+                        >
+                          <label className="block text-[11px] text-dockora-muted">
+                            {home.appUrlInternal}
+                            <input
+                              value={draftUrl}
+                              onChange={(event) => setDraftUrl(event.target.value)}
+                              placeholder="http://"
+                              className="dockora-field mt-1 h-8 w-full px-2 text-xs"
+                            />
+                          </label>
+                          <label className="block text-[11px] text-dockora-muted">
+                            {home.appUrlPublic}
+                            <input
+                              value={draftPublicUrl}
+                              onChange={(event) => setDraftPublicUrl(event.target.value)}
+                              placeholder="https://"
+                              className="dockora-field mt-1 h-8 w-full px-2 text-xs"
+                            />
+                          </label>
+                          <p className="text-[10px] leading-snug text-dockora-muted">{home.appUrlHint}</p>
+                          <p className="text-[10px] leading-snug text-dockora-muted">{home.appUrlPublicHint}</p>
+                          {urlMessage ? <p className="text-[11px] leading-snug text-dockora-text">{urlMessage}</p> : null}
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="submit"
+                              disabled={urlBusy}
+                              className={buttonClassName({ variant: 'primary', size: 'sm' })}
+                            >
+                              {home.appUrlSave}
+                            </button>
+                            {pendingRecreate?.name === container.name ? (
+                              <button
+                                type="button"
+                                disabled={urlBusy}
+                                onClick={() => void recreateSavedService()}
+                                className={buttonClassName({ size: 'sm' })}
+                              >
+                                {urlBusy ? home.appUrlRecreating : home.appUrlRecreate}
+                              </button>
+                            ) : null}
+                            <button
+                              type="button"
+                              className={buttonClassName({ variant: 'ghost', size: 'sm' })}
+                              onClick={() => setEditingName(null)}
+                            >
+                              {t.common.close}
+                            </button>
+                          </div>
+                        </form>
+                      ) : null
+                    }
+                  >
+                    <span className="relative">
+                      <ServiceIcon
+                        url={icon}
+                        alt={container.name}
+                        className="h-14 w-14 object-contain sm:h-16 sm:w-16"
+                      />
+                      <span
+                        className={cn(
+                          'absolute right-0.5 top-0.5 h-2 w-2 rounded-full ring-2 ring-dockora-surface',
+                          runningTile ? 'bg-dockora-success' : 'bg-dockora-muted',
+                        )}
+                      />
+                    </span>
+                  </ContainerTile>
+                </li>
+              );
+  };
+
+  const renderDepartment = (section: (typeof departmentSections)[number]) => (
+    <div key={section.id}>
+      <div
+        data-department-drop={section.id}
+        className={cn(
+          'mb-3 flex flex-wrap items-center gap-3',
+          dropDepartment === section.id && 'border border-dashed border-dockora-pink px-2 py-1',
+        )}
+      >
+        {renameId === section.id ? (
+          <input
+            autoFocus
+            value={renameDraft}
+            aria-label={home.departmentName}
+            onChange={(event) => setRenameDraft(event.target.value)}
+            onBlur={() => {
+              if (renameSkip.current) {
+                renameSkip.current = false;
+                return;
+              }
+              const name = renameDraft.trim();
+              setRenameId(null);
+              if (!name || name.length > 40 || name === section.name) return;
+              publish({
+                departments: departments.map((entry) =>
+                  entry.id === section.id ? { ...entry, name } : entry,
+                ),
+              });
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                event.currentTarget.blur();
+              }
+              if (event.key === 'Escape') {
+                renameSkip.current = true;
+                setRenameId(null);
+              }
+            }}
+            className="dockora-field h-7 w-48 px-2 text-xs"
+          />
+        ) : canEdit ? (
+          <button
+            type="button"
+            className="dockora-section-tag border-0 bg-transparent p-0"
+            onClick={() => {
+              setRenameId(section.id);
+              setRenameDraft(section.name);
+            }}
+          >
+            {section.name}
+          </button>
+        ) : (
+          <h3 className="dockora-section-tag">{section.name}</h3>
+        )}
+        {canEdit ? (
+          <>
+            {(['left', 'right', 'wide'] as const).map((column) => (
+              <button
+                key={column}
+                type="button"
+                className={cn(
+                  'text-[10px] font-semibold uppercase tracking-[0.12em]',
+                  section.column === column ? 'text-dockora-pink' : 'text-dockora-muted hover:text-white',
+                )}
+                onClick={() => {
+                  if (section.column === column) return;
+                  publish({
+                    departments: departments.map((entry) =>
+                      entry.id === section.id ? { ...entry, column } : entry,
+                    ),
+                  });
+                }}
+              >
+                {column === 'left' ? home.departmentLeft : column === 'right' ? home.departmentRight : home.departmentWide}
+              </button>
+            ))}
+            <button
+              type="button"
+              className="text-[10px] font-semibold uppercase tracking-[0.12em] text-dockora-muted hover:text-white"
+              onClick={() => {
+                const nextMap = { ...appDepartments };
+                for (const [key, value] of Object.entries(nextMap)) {
+                  if (value === section.id) delete nextMap[key];
+                }
+                publish({
+                  departments: departments.filter((entry) => entry.id !== section.id),
+                  appDepartments: nextMap,
+                });
+              }}
+            >
+              {home.departmentRemove}
+            </button>
+          </>
+        ) : null}
+      </div>
+      <ul className="grid grid-cols-[repeat(auto-fill,minmax(7.25rem,1fr))] gap-3">
+        {section.items.map((item) => renderGridItem(item))}
+        {section.items.length === 0 ? (
+          <li
+            data-department-drop={section.id}
+            className={cn(
+              'dockora-panel col-span-full flex min-h-16 items-center justify-center border border-dashed text-xs uppercase tracking-[0.12em] text-dockora-muted',
+              dropDepartment === section.id ? 'border-dockora-pink text-white' : 'border-dockora-border',
+            )}
+          >
+            {home.departmentEmpty}
+          </li>
+        ) : null}
+      </ul>
+    </div>
+  );
+
+  const leftDepartments = departmentSections.filter((section) => section.column === 'left');
+  const rightDepartments = departmentSections.filter((section) => section.column === 'right');
+  const wideDepartments = departmentSections.filter((section) => section.column === 'wide');
+
   const engineLabel =
     overview.docker.engineStatus === 'online'
       ? t.dashboard.online
@@ -872,294 +1175,23 @@ export function CasaDesktop({
             </div>
           </div>
           <ul className="grid grid-cols-[repeat(auto-fill,minmax(7.25rem,1fr))] gap-3 sm:grid-cols-[repeat(auto-fill,minmax(9rem,1fr))]">
-            {appRows.map((item) => {
-              if (item.kind === 'heading') {
-                return (
-                  <li key={`dept-${item.id}`} className="col-span-full mt-5">
-                    <div
-                      data-department-drop={item.id}
-                      className={cn(
-                        'flex items-center gap-3',
-                        dropDepartment === item.id && 'border border-dashed border-dockora-pink px-2 py-1',
-                      )}
-                    >
-                      {renameId === item.id ? (
-                        <input
-                          autoFocus
-                          value={renameDraft}
-                          aria-label={home.departmentName}
-                          onChange={(event) => setRenameDraft(event.target.value)}
-                          onBlur={() => {
-                            if (renameSkip.current) {
-                              renameSkip.current = false;
-                              return;
-                            }
-                            const name = renameDraft.trim();
-                            setRenameId(null);
-                            if (!name || name.length > 40 || name === item.name) return;
-                            publish({
-                              departments: departments.map((entry) =>
-                                entry.id === item.id ? { ...entry, name } : entry,
-                              ),
-                            });
-                          }}
-                          onKeyDown={(event) => {
-                            if (event.key === 'Enter') {
-                              event.preventDefault();
-                              event.currentTarget.blur();
-                            }
-                            if (event.key === 'Escape') {
-                              renameSkip.current = true;
-                              setRenameId(null);
-                            }
-                          }}
-                          className="dockora-field h-7 w-48 px-2 text-xs"
-                        />
-                      ) : (
-                        canEdit ? (
-                          <button
-                            type="button"
-                            className="dockora-section-tag border-0 bg-transparent p-0"
-                            onClick={() => {
-                              setRenameId(item.id);
-                              setRenameDraft(item.name);
-                            }}
-                          >
-                            {item.name}
-                          </button>
-                        ) : (
-                          <h3 className="dockora-section-tag">{item.name}</h3>
-                        )
-                      )}
-                      {canEdit ? (
-                        <button
-                          type="button"
-                          className="text-[10px] font-semibold uppercase tracking-[0.12em] text-dockora-muted hover:text-white"
-                          onClick={() => {
-                            const nextMap = { ...appDepartments };
-                            for (const [key, value] of Object.entries(nextMap)) {
-                              if (value === item.id) delete nextMap[key];
-                            }
-                            publish({
-                              departments: departments.filter((entry) => entry.id !== item.id),
-                              appDepartments: nextMap,
-                            });
-                          }}
-                        >
-                          {home.departmentRemove}
-                        </button>
-                      ) : null}
-                    </div>
-                  </li>
-                );
-              }
-              if (item.kind === 'empty') {
-                return (
-                  <li
-                    key={`empty-${item.id}`}
-                    data-department-drop={item.id}
-                    className={cn(
-                      'dockora-panel col-span-full flex min-h-16 items-center justify-center border border-dashed text-xs uppercase tracking-[0.12em] text-dockora-muted',
-                      dropDepartment === item.id ? 'border-dockora-pink text-white' : 'border-dockora-border',
-                    )}
-                  >
-                    {home.departmentEmpty}
-                  </li>
-                );
-              }
-              if (item.kind === 'link') {
-                const { link } = item;
-                return (
-                  <li key={item.key}>
-                    <ContainerTile
-                      href={link.url}
-                      external
-                      name={link.name}
-                      appKey={item.key}
-                      dimmed={false}
-                      dragging={dragContainer === item.key}
-                      dropOver={dropTarget === item.key}
-                      dropLabel={home.dropHere}
-                      detailHref={link.url}
-                      detailLabel={link.name}
-                      removeLabel={home.linkRemove}
-                      onRemove={() => {
-                        const nextLinks = homeLinks.filter((entry) => entry.id !== link.id);
-                        const nextOrder = containerOrder.filter((entry) => entry !== item.key);
-                        const nextMap = { ...appDepartments };
-                        delete nextMap[item.key];
-                        publish({ links: nextLinks, containerOrder: nextOrder, appDepartments: nextMap });
-                      }}
-                      onPointerDown={(event) => startAppDrag(item.key, event)}
-                      onClick={(event) => {
-                        if (!dragged.current) return;
-                        event.preventDefault();
-                        event.stopPropagation();
-                      }}
-                    >
-                      <ServiceIcon
-                        url={link.icon}
-                        alt={link.name}
-                        className="h-14 w-14 object-contain sm:h-16 sm:w-16"
-                      />
-                    </ContainerTile>
-                  </li>
-                );
-              }
-              const container = item.container;
-              const target = resolveContainerAppHref(container, pageHost);
-              const publicHref = resolvePublicAppUrl(
-                container.name,
-                container.labels,
-                publicUrlOverrides,
-                discoveredUrls,
-              );
-              const linkChoices = containerLinkChoices(
-                container,
-                pageHost,
-                publicUrlOverrides,
-                discoveredUrls,
-              ).map((choice) => ({
-                ...choice,
-                label: choice.key === 'public' ? home.appUrlPublic : home.appUrlInternal,
-              }));
-              const primary =
-                target.external || !publicHref ? target : { href: publicHref, external: true as const };
-              const icon = resolveContainerIconUrl(container.labels);
-              const runningTile = container.status === 'running';
-              return (
-                <li key={container.id}>
-                  <ContainerTile
-                    href={primary.href}
-                    external={primary.external}
-                    name={container.name}
-                    linkChoices={linkChoices}
-                    linksOpen={linkPicker === container.name}
-                    linksLabel={home.chooseLink}
-                    onToggleLinks={() =>
-                      setLinkPicker((current) => (current === container.name ? null : container.name))
-                    }
-                    appKey={container.name}
-                    dimmed={!runningTile}
-                    dragging={dragContainer === container.name}
-                    dropOver={dropTarget === container.name}
-                    dropLabel={home.dropHere}
-                    onPointerDown={(event) => startAppDrag(container.name, event)}
-                    onClick={(event) => {
-                      if (!dragged.current) return;
-                      event.preventDefault();
-                      event.stopPropagation();
-                    }}
-                    detailHref={`/containers/${encodeURIComponent(container.id)}`}
-                    detailLabel={home.openInDockora}
-                    editLabel={home.appUrl}
-                    updateLabel={
-                      updateBusy === container.id ? home.upgrading : home.upgrade
-                    }
-                    onUpdate={
-                      canEdit && pendingUpdates.some((item) => item.containerId === container.id)
-                        ? () => setUpdateConfirm([container.id])
-                        : undefined
-                    }
-                    updateBusy={updateBusy !== null}
-                    onEdit={
-                      canEdit
-                        ? () => {
-                            if (editingName === container.name) {
-                              setEditingName(null);
-                              return;
-                            }
-                            const pending = pendingRecreate?.name === container.name;
-                            setLinkPicker(null);
-                            setEditingName(container.name);
-                            setDraftUrl(target.external ? target.href : '');
-                            setDraftPublicUrl(publicHref ?? '');
-                            setPendingRecreate((current) =>
-                              current?.name === container.name ? current : null,
-                            );
-                            setUrlMessage(pending ? home.appUrlSavedRecreate : null);
-                          }
-                        : undefined
-                    }
-                    editor={
-                      editingName === container.name ? (
-                        <form
-                          className="mt-2 w-full space-y-2 border-t border-white/10 pt-2 text-left"
-                          onSubmit={(event) => {
-                            event.preventDefault();
-                            void saveAppUrl(container);
-                          }}
-                          onPointerDown={(event) => event.stopPropagation()}
-                        >
-                          <label className="block text-[11px] text-dockora-muted">
-                            {home.appUrlInternal}
-                            <input
-                              value={draftUrl}
-                              onChange={(event) => setDraftUrl(event.target.value)}
-                              placeholder="http://"
-                              className="dockora-field mt-1 h-8 w-full px-2 text-xs"
-                            />
-                          </label>
-                          <label className="block text-[11px] text-dockora-muted">
-                            {home.appUrlPublic}
-                            <input
-                              value={draftPublicUrl}
-                              onChange={(event) => setDraftPublicUrl(event.target.value)}
-                              placeholder="https://"
-                              className="dockora-field mt-1 h-8 w-full px-2 text-xs"
-                            />
-                          </label>
-                          <p className="text-[10px] leading-snug text-dockora-muted">{home.appUrlHint}</p>
-                          <p className="text-[10px] leading-snug text-dockora-muted">{home.appUrlPublicHint}</p>
-                          {urlMessage ? <p className="text-[11px] leading-snug text-dockora-text">{urlMessage}</p> : null}
-                          <div className="flex flex-wrap gap-2">
-                            <button
-                              type="submit"
-                              disabled={urlBusy}
-                              className={buttonClassName({ variant: 'primary', size: 'sm' })}
-                            >
-                              {home.appUrlSave}
-                            </button>
-                            {pendingRecreate?.name === container.name ? (
-                              <button
-                                type="button"
-                                disabled={urlBusy}
-                                onClick={() => void recreateSavedService()}
-                                className={buttonClassName({ size: 'sm' })}
-                              >
-                                {urlBusy ? home.appUrlRecreating : home.appUrlRecreate}
-                              </button>
-                            ) : null}
-                            <button
-                              type="button"
-                              className={buttonClassName({ variant: 'ghost', size: 'sm' })}
-                              onClick={() => setEditingName(null)}
-                            >
-                              {t.common.close}
-                            </button>
-                          </div>
-                        </form>
-                      ) : null
-                    }
-                  >
-                    <span className="relative">
-                      <ServiceIcon
-                        url={icon}
-                        alt={container.name}
-                        className="h-14 w-14 object-contain sm:h-16 sm:w-16"
-                      />
-                      <span
-                        className={cn(
-                          'absolute right-0.5 top-0.5 h-2 w-2 rounded-full ring-2 ring-dockora-surface',
-                          runningTile ? 'bg-dockora-success' : 'bg-dockora-muted',
-                        )}
-                      />
-                    </span>
-                  </ContainerTile>
-                </li>
-              );
-            })}
+            {looseItems.map((item) => renderGridItem(item))}
           </ul>
+          {leftDepartments.length > 0 || rightDepartments.length > 0 ? (
+            <div className="mt-6 grid items-start gap-6 lg:grid-cols-2">
+              {leftDepartments.length > 0 ? (
+                <div className="flex min-w-0 flex-col gap-6">{leftDepartments.map((section) => renderDepartment(section))}</div>
+              ) : null}
+              {rightDepartments.length > 0 ? (
+                <div className={cn('flex min-w-0 flex-col gap-6', leftDepartments.length === 0 && 'lg:col-start-2')}>
+                  {rightDepartments.map((section) => renderDepartment(section))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+          {wideDepartments.length > 0 ? (
+            <div className="mt-6 flex flex-col gap-6">{wideDepartments.map((section) => renderDepartment(section))}</div>
+          ) : null}
         </section>
 
         <section aria-label={home.suite}>
@@ -1300,6 +1332,9 @@ export function CasaDesktop({
                         onClick={() => {
                           setLinkError(null);
                           setDepartmentDraft('');
+                          const hasLeft = departments.some((entry) => entry.column === 'left');
+                          const hasRight = departments.some((entry) => entry.column === 'right');
+                          setDepartmentColumn(hasLeft && !hasRight ? 'right' : 'left');
                           setAddEditor('department');
                         }}
                       >
@@ -1318,7 +1353,7 @@ export function CasaDesktop({
                         return;
                       }
                       const id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-                      publish({ departments: [...departments, { id, name }] });
+                      publish({ departments: [...departments, { id, name, column: departmentColumn }] });
                       setDepartmentDraft('');
                       setLinkError(null);
                       setAddEditor(null);
@@ -1334,6 +1369,27 @@ export function CasaDesktop({
                         className="dockora-field mt-1 w-full px-3"
                       />
                     </label>
+                    <div className="flex gap-2">
+                      {(['left', 'right', 'wide'] as const).map((column) => (
+                        <button
+                          key={column}
+                          type="button"
+                          className={cn(
+                            'border px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em]',
+                            departmentColumn === column
+                              ? 'border-dockora-pink text-white'
+                              : 'border-dockora-border text-dockora-muted hover:text-white',
+                          )}
+                          onClick={() => setDepartmentColumn(column)}
+                        >
+                          {column === 'left'
+                            ? home.departmentLeft
+                            : column === 'right'
+                              ? home.departmentRight
+                              : home.departmentWide}
+                        </button>
+                      ))}
+                    </div>
                     {linkError ? <p className="text-xs text-dockora-danger">{linkError}</p> : null}
                     <button type="submit" className={buttonClassName({ variant: 'primary', size: 'sm' })}>
                       {home.linkSave}

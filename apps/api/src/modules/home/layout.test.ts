@@ -53,8 +53,19 @@ describe('normalizeHomeLayout', () => {
       ],
       appDepartments: { plex: 'media1', sonarr: 'missing', radarr: 'media1' },
     });
-    expect(layout.departments).toEqual([{ id: 'media1', name: 'Medien' }]);
+    expect(layout.departments).toEqual([{ id: 'media1', name: 'Medien', column: 'wide' }]);
     expect(layout.appDepartments).toEqual({ plex: 'media1', radarr: 'media1' });
+  });
+
+  it('keeps a left or right column and treats anything else as full width', () => {
+    const layout = normalizeHomeLayout({
+      departments: [
+        { id: 'left01', name: 'Links', column: 'left' },
+        { id: 'right1', name: 'Rechts', column: 'right' },
+        { id: 'other1', name: 'Mitte', column: 'top' },
+      ],
+    });
+    expect(layout.departments.map((item) => item.column)).toEqual(['left', 'right', 'wide']);
   });
 
   it('preserves hidden widgets', () => {
