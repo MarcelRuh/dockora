@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.17] – 2026-09-26
+
+### Changed
+
+- Home and page header show the gradient Dockora wordmark again, with the Docker Management Suite line
+
 ## [2.0.16] – 2026-09-26
 
 ### Changed

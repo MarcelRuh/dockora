@@ -13,6 +13,7 @@ import {
 } from 'react';
 import type { ContainerSummary, DashboardOverview, Locale } from '@dockora/shared';
 import { AuthLogoutButton, useAuth } from '@/components/auth/auth-provider';
+import { BrandLogoWide } from '@/components/ui/brand-logo';
 import { NAV_ICONS } from '@/components/ui/nav-icons';
 import { ServiceIcon } from '@/components/ui/service-icon';
 import { useLocale } from '@/i18n/locale-provider';
@@ -341,8 +342,9 @@ export function CasaDesktop({
       </div>
 
       <div className="flex min-w-0 flex-col gap-4">
-        <div className="flex items-center gap-2">
-          <div className="relative min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-3">
+          <BrandLogoWide size="sm" priority />
+          <div className="relative min-w-[12rem] flex-1">
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
@@ -551,8 +553,9 @@ export function CasaDesktop({
         </section>
 
         <section aria-label={home.suite}>
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <h2 className="text-sm font-medium text-dockora-text">{home.suite}</h2>
+          <div className="mb-3">
+            <h2 className="dockora-logo-gradient text-sm">{home.suite}</h2>
+            <p className="dockora-logo-tagline mt-1 text-[0.58rem]">{t.tagline}</p>
           </div>
           <ul className="flex flex-wrap gap-2">
             {apps.map((app) => {
