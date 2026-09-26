@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.29] – 2026-09-26
+
+### Changed
+
+- The app link chooser uses the same Ora panel as the other dialogs
+
 ## [2.0.28] – 2026-09-26
 
 ### Changed

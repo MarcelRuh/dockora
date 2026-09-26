@@ -17,6 +17,7 @@ import { HOME_DOCK_KEYS } from '@dockora/shared';
 import { AuthLogoutButton, useAuth } from '@/components/auth/auth-provider';
 import { BrandLogoWide } from '@/components/ui/brand-logo';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Button } from '@/components/ui/form-controls';
 import { NAV_ICONS } from '@/components/ui/nav-icons';
 import { ServiceIcon } from '@/components/ui/service-icon';
 import { useLocale } from '@/i18n/locale-provider';
@@ -1094,60 +1095,59 @@ export function CasaDesktop({
       </div>
       {linkDialog
         ? createPortal(
-        <div
-          className="fixed inset-0 z-[80] flex items-center justify-center p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-label={home.chooseLink}
-        >
-          <button
-            type="button"
-            className="absolute inset-0 bg-black/75 backdrop-blur-sm"
-            aria-label={t.common.close}
-            onClick={() => setLinkPicker(null)}
-          />
-          <div className="dockora-glass relative z-10 w-[min(26rem,92vw)] border-dockora-pink/40 p-5 shadow-neon">
-            <div className="flex items-center gap-3">
-              <ServiceIcon
-                url={linkDialog.icon}
-                alt=""
-                className="h-14 w-14 rounded-2xl bg-white/[0.06] object-contain p-1.5"
-              />
-              <div className="min-w-0">
-                <h2 className="truncate text-lg font-medium">{linkDialog.name}</h2>
-                <p className="text-xs text-dockora-muted">{home.chooseLink}</p>
-              </div>
-              <button
-                type="button"
-                className="ml-auto rounded-full px-3 py-1 text-sm text-dockora-muted hover:text-white"
-                onClick={() => setLinkPicker(null)}
+            <div
+              className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+              role="presentation"
+              onMouseDown={(event) => {
+                if (event.target === event.currentTarget) setLinkPicker(null);
+              }}
+            >
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-label={home.chooseLink}
+                className="dockora-panel w-full max-w-md space-y-4 p-5 shadow-neon"
               >
-                {t.common.close}
-              </button>
-            </div>
-            <ul className="mt-4 space-y-2">
-              {linkDialog.choices.map((choice) => (
-                <li key={choice.key}>
-                  <a
-                    href={choice.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-3 transition-colors hover:border-dockora-pink/60 hover:bg-white/[0.08]"
-                    onClick={() => setLinkPicker(null)}
-                  >
-                    <LinkChoiceIcon kind={choice.key} />
-                    <span className="min-w-0">
-                      <span className="block text-sm text-dockora-text">{choice.label}</span>
-                      <span className="block truncate text-xs text-dockora-muted">{choice.href}</span>
-                    </span>
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>,
-          document.body,
-        )
+                <div className="flex items-start gap-3">
+                  <ServiceIcon
+                    url={linkDialog.icon}
+                    alt=""
+                    className="h-12 w-12 rounded border border-dockora-border bg-black/30 object-contain p-1"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="dockora-section-tag">{home.chooseLink}</p>
+                    <h2 className="dockora-title-gradient truncate text-xl">{linkDialog.name}</h2>
+                  </div>
+                  <Button type="button" size="sm" variant="ghost" onClick={() => setLinkPicker(null)}>
+                    {t.common.close}
+                  </Button>
+                </div>
+                <div className="dockora-neon-line" />
+                <ul className="space-y-2">
+                  {linkDialog.choices.map((choice) => (
+                    <li key={choice.key}>
+                      <a
+                        href={choice.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-3 border border-dockora-border bg-black/30 px-3 py-2.5 transition-[border-color,box-shadow] hover:border-dockora-pink hover:shadow-neon-pink"
+                        onClick={() => setLinkPicker(null)}
+                      >
+                        <LinkChoiceIcon kind={choice.key} />
+                        <span className="min-w-0">
+                          <span className="block font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-dockora-text">
+                            {choice.label}
+                          </span>
+                          <span className="block truncate font-mono text-xs text-dockora-muted">{choice.href}</span>
+                        </span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>,
+            document.body,
+          )
         : null}
       <ConfirmDialog
         open={updateConfirm !== null}
@@ -1183,7 +1183,7 @@ function LinkChoiceIcon({ kind }: { kind: string }) {
   return (
     <span
       className={cn(
-        'flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-white',
+        'flex h-8 w-8 shrink-0 items-center justify-center rounded text-white shadow-neon',
         publicLink
           ? 'bg-gradient-to-br from-dockora-blue to-dockora-purple'
           : 'bg-gradient-to-br from-dockora-pink to-dockora-purple',
