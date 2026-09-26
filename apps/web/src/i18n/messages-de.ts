@@ -99,6 +99,8 @@ export const de = {
         runningHint: '{running} von {total} laufen',
         engineHint: 'Engine {status} · {version}',
         updatesHint: '{count} Image-Updates',
+        dockoraUpdate: 'Update verfügbar',
+        dockoraUpdateVersion: '{current} → {next}',
         checkedAt: 'Zuletzt geprüft',
         neverChecked: 'Noch nicht geprüft',
         checkNow: 'Jetzt prüfen',

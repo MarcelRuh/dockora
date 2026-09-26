@@ -29,6 +29,7 @@ import {
   fetchContainers,
   fetchDiscoveredAppUrls,
   fetchHomeLayout,
+  fetchSelfUpdateStatus,
   fetchUpdates,
   pullUpdate,
   saveComposeYaml,
@@ -119,6 +120,7 @@ export function CasaDesktop({
   } | null>(null);
   const [containers, setContainers] = useState<ContainerSummary[]>([]);
   const [updates, setUpdates] = useState<UpdateCheckResult[]>([]);
+  const [selfUpdate, setSelfUpdate] = useState<Awaited<ReturnType<typeof fetchSelfUpdateStatus>> | null>(null);
   const [updateConfirm, setUpdateConfirm] = useState<string[] | null>(null);
   const [updateBusy, setUpdateBusy] = useState<string | null>(null);
   const [updateError, setUpdateError] = useState<string | null>(null);
@@ -215,11 +217,13 @@ export function CasaDesktop({
         fetchContainers().catch(() => null),
         fetchUpdates().catch(() => null),
         fetchDiscoveredAppUrls().catch(() => null),
-      ]).then(([list, checks, discovered]) => {
+        fetchSelfUpdateStatus().catch(() => null),
+      ]).then(([list, checks, discovered, dockora]) => {
         if (cancelled) return;
         if (list) setContainers(list);
         if (checks) setUpdates(checks);
         if (discovered) setDiscoveredUrls(discovered);
+        if (dockora) setSelfUpdate(dockora);
       });
     };
     load();
@@ -234,6 +238,17 @@ export function CasaDesktop({
       document.removeEventListener('visibilitychange', onVisibility);
     };
   }, []);
+
+  useEffect(() => {
+    if (!addMenu) return;
+    const close = (event: MouseEvent) => {
+      const target = event.target;
+      if (target instanceof Element && target.closest('[data-add-menu]')) return;
+      setAddMenu(false);
+    };
+    window.addEventListener('click', close);
+    return () => window.removeEventListener('click', close);
+  }, [addMenu]);
 
   useEffect(() => {
     if (!linkPicker) return;
@@ -537,7 +552,7 @@ export function CasaDesktop({
       <div className="flex min-w-0 flex-col gap-4">
         <div className="flex flex-wrap items-center gap-3">
           <BrandLogoWide size="sm" priority />
-          <div className="relative min-w-[12rem] flex-1">
+          <div className={cn('relative min-w-[12rem] flex-1', pageHits.length > 0 && 'z-30')}>
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
@@ -546,7 +561,7 @@ export function CasaDesktop({
               className="dockora-field w-full px-3.5"
             />
             {pageHits.length > 0 ? (
-              <ul className="dockora-panel absolute left-0 right-0 z-30 mt-2 overflow-hidden py-1">
+              <ul className="dockora-panel !absolute left-0 right-0 z-30 mt-2 overflow-hidden py-1">
                 {pageHits.map((hit) => (
                   <li key={hit.key}>
                     <Link href={hit.href} className="block px-4 py-2 text-sm uppercase tracking-wide hover:bg-dockora-accentSoft" onClick={() => setQuery('')}>
@@ -569,6 +584,25 @@ export function CasaDesktop({
           <AuthLogoutButton className="w-auto shrink-0 px-3" />
         </div>
         <div className="dockora-neon-line" />
+
+        {selfUpdate?.updateAvailable ? (
+          <div className="dockora-panel flex flex-wrap items-center justify-between gap-3 border-l-[3px] border-l-dockora-pink px-5 py-4">
+            <div className="min-w-0">
+              <p className="dockora-section-tag">{t.nav.selfUpdate}</p>
+              <h2 className="dockora-title-gradient mt-1 text-xl">{home.dockoraUpdate}</h2>
+              <p className="mt-1 truncate font-mono text-xs text-dockora-muted">
+                {selfUpdate.targetVersion && selfUpdate.targetVersion !== selfUpdate.currentVersion
+                  ? home.dockoraUpdateVersion
+                      .replace('{current}', selfUpdate.currentVersion)
+                      .replace('{next}', selfUpdate.targetVersion)
+                  : selfUpdate.currentVersion}
+              </p>
+            </div>
+            <Link href="/self-update" className={buttonClassName({ variant: 'primary', size: 'sm' })}>
+              {t.settings.selfUpdate.apply}
+            </Link>
+          </div>
+        ) : null}
 
         <div className="grid gap-3 md:grid-cols-2">
           <FeatureCard
@@ -651,7 +685,7 @@ export function CasaDesktop({
                 </button>
               </p>
             ) : null}
-            <div className="relative ml-auto">
+            <div className={cn('relative ml-auto', addMenu && 'z-30')} data-add-menu="">
               <button
                 type="button"
                 className={buttonClassName({ size: 'sm', className: 'w-9 px-0 text-base' })}
@@ -662,7 +696,7 @@ export function CasaDesktop({
                 +
               </button>
               {addMenu ? (
-                <div className="dockora-panel absolute right-0 z-30 mt-2 w-44 overflow-hidden py-1 text-sm">
+                <div className="dockora-panel !absolute right-0 z-30 mt-2 w-44 overflow-hidden py-1 text-sm">
                   <Link
                     href="/compose/new"
                     className="block px-3 py-2 uppercase tracking-wide hover:bg-dockora-accentSoft"
@@ -1067,7 +1101,10 @@ export function CasaDesktop({
                     <span className="flex h-7 w-7 items-center justify-center text-dockora-pink">
                       <Icon className="h-4 w-4" />
                     </span>
-                    <span className="hidden text-dockora-text sm:inline">{t.nav[app.key]}</span>
+                    <span className="hidden text-inherit sm:inline">{t.nav[app.key]}</span>
+                    {app.key === 'selfUpdate' && selfUpdate?.updateAvailable ? (
+                      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-dockora-pink" aria-hidden />
+                    ) : null}
                   </Link>
                 </li>
               );

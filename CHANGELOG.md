@@ -5,6 +5,16 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.33] – 2026-09-26
+
+### Fixed
+
+- The add menu overlays the app grid instead of pushing it down
+
+### Changed
+
+- A Dockora update shows on the home dashboard, with a marker on the Dockora dock item
+
 ## [2.0.32] – 2026-09-26
 
 ### Changed

@@ -101,6 +101,8 @@ export const en = {
         runningHint: '{running} of {total} running',
         engineHint: 'Engine {status} · {version}',
         updatesHint: '{count} image updates',
+        dockoraUpdate: 'Update available',
+        dockoraUpdateVersion: '{current} → {next}',
         checkedAt: 'Last checked',
         neverChecked: 'Not checked yet',
         checkNow: 'Check now',
