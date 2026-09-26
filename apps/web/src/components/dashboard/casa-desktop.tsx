@@ -11,7 +11,15 @@ import {
   type ReactNode,
 } from 'react';
 import { createPortal } from 'react-dom';
-import type { ContainerSummary, DashboardOverview, HomeLayout, HomeLink, Locale, UpdateCheckResult } from '@dockora/shared';
+import type {
+  ContainerSummary,
+  DashboardOverview,
+  HomeDepartment,
+  HomeLayout,
+  HomeLink,
+  Locale,
+  UpdateCheckResult,
+} from '@dockora/shared';
 import { HOME_DOCK_KEYS } from '@dockora/shared';
 import { AuthLogoutButton, useAuth } from '@/components/auth/auth-provider';
 import { BrandLogoWide } from '@/components/ui/brand-logo';
@@ -34,7 +42,13 @@ import {
   saveComposeYaml,
   saveHomeLayout,
 } from '@/lib/api';
-import { pickHomeLayout, readHomeLayoutCache, withDockDefaults, writeHomeLayoutCache } from '@/lib/home-layout';
+import {
+  completeHomeLayout,
+  pickHomeLayout,
+  readHomeLayoutCache,
+  withDockDefaults,
+  writeHomeLayoutCache,
+} from '@/lib/home-layout';
 import { containerLinkChoices, resolveContainerAppHref, resolvePublicAppUrl } from '@/lib/container-app-link';
 import { resolveContainerIconUrl } from '@/lib/container-icon';
 import { setComposeServicePublicUrl, setComposeServiceUrl } from '@/lib/compose-icon-yaml';
@@ -127,11 +141,17 @@ export function CasaDesktop({
   const [layoutError, setLayoutError] = useState<string | null>(null);
   const [containerOrder, setContainerOrder] = useState<string[]>([]);
   const [homeLinks, setHomeLinks] = useState<HomeLink[]>([]);
-  const [addEditor, setAddEditor] = useState<null | 'choose' | 'link'>(null);
+  const [departments, setDepartments] = useState<HomeDepartment[]>([]);
+  const [appDepartments, setAppDepartments] = useState<Record<string, string>>({});
+  const [departmentDraft, setDepartmentDraft] = useState('');
+  const [renameId, setRenameId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState('');
+  const [addEditor, setAddEditor] = useState<null | 'choose' | 'link' | 'department'>(null);
   const [linkDraft, setLinkDraft] = useState({ name: '', url: '', icon: '' });
   const [linkError, setLinkError] = useState<string | null>(null);
   const [dragContainer, setDragContainer] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
+  const [dropDepartment, setDropDepartment] = useState<string | null>(null);
   const [dragPoint, setDragPoint] = useState<{ x: number; y: number } | null>(null);
   const dragged = useRef(false);
   const [pageHost, setPageHost] = useState('');
@@ -148,8 +168,10 @@ export function CasaDesktop({
     setWidgets(layout.widgets);
     setUrlOverrides(layout.appUrls ?? {});
     setPublicUrlOverrides(layout.appPublicUrls ?? {});
-    setHomeLinks(layout.links);
-    setContainerOrder(layout.containerOrder);
+    setHomeLinks(layout.links ?? []);
+    setContainerOrder(layout.containerOrder ?? []);
+    setDepartments(layout.departments ?? []);
+    setAppDepartments(layout.appDepartments ?? {});
   };
 
   const publish = (patch: Partial<HomeLayout>) => {
@@ -176,8 +198,8 @@ export function CasaDesktop({
         if (cancelled) return;
         const choice = pickHomeLayout({
           remoteStored: remote.stored,
-          remote: remote.layout,
-          local: dirtyRef.current ? layoutRef.current : local,
+          remote: completeHomeLayout(remote.layout),
+          local: completeHomeLayout(dirtyRef.current ? layoutRef.current : local),
           dirty: dirtyRef.current,
           canEdit,
         });
@@ -343,6 +365,28 @@ export function CasaDesktop({
         );
       })
     : gridItems;
+  const knownDepartments = new Set(departments.map((item) => item.id));
+  const looseItems = visibleItems.filter((item) => {
+    const dept = appDepartments[item.key];
+    return !dept || !knownDepartments.has(dept);
+  });
+  const departmentSections = departments
+    .map((dept) => ({
+      ...dept,
+      items: visibleItems.filter((item) => appDepartments[item.key] === dept.id),
+    }))
+    .filter((section) => !needle || section.items.length > 0);
+  const appRows: Array<
+    | { kind: 'heading'; id: string; name: string }
+    | { kind: 'empty'; id: string }
+    | (typeof visibleItems)[number]
+  > = [
+    ...looseItems,
+    ...departmentSections.flatMap((section) => [
+      { kind: 'heading' as const, id: section.id, name: section.name },
+      ...(section.items.length > 0 ? section.items : [{ kind: 'empty' as const, id: section.id }]),
+    ]),
+  ];
   const pageHits = needle
     ? APPS.filter((app) => t.nav[app.key].toLowerCase().includes(needle))
     : [];
@@ -365,6 +409,9 @@ export function CasaDesktop({
 
   const gridKeysRef = useRef<string[]>([]);
   gridKeysRef.current = gridItems.map((entry) => entry.key);
+  const appDepartmentsRef = useRef(appDepartments);
+  appDepartmentsRef.current = appDepartments;
+  const renameSkip = useRef(false);
 
   const placeApp = (from: string, to: string) => {
     const keys = gridKeysRef.current;
@@ -374,7 +421,38 @@ export function CasaDesktop({
     const next = [...keys];
     next.splice(fromIndex, 1);
     next.splice(toIndex, 0, from);
-    publish({ containerOrder: next });
+    const targetDept = appDepartmentsRef.current[to];
+    const map = { ...appDepartmentsRef.current };
+    if (targetDept) map[from] = targetDept;
+    else delete map[from];
+    publish({ containerOrder: next, appDepartments: map });
+  };
+
+  const assignDepartment = (appKey: string, departmentId: string) => {
+    const map = { ...appDepartmentsRef.current };
+    const current = map[appKey];
+    const keys = [...gridKeysRef.current];
+    const fromIndex = keys.indexOf(appKey);
+    if (departmentId === 'loose') {
+      if (!current) return;
+      delete map[appKey];
+      publish({ appDepartments: map });
+      return;
+    }
+    if (current === departmentId) return;
+    map[appKey] = departmentId;
+    if (fromIndex >= 0) {
+      keys.splice(fromIndex, 1);
+      let insertAt = keys.length;
+      for (let index = keys.length - 1; index >= 0; index -= 1) {
+        if (map[keys[index] ?? ''] === departmentId) {
+          insertAt = index + 1;
+          break;
+        }
+      }
+      keys.splice(insertAt, 0, appKey);
+    }
+    publish({ containerOrder: keys, appDepartments: map });
   };
 
   const startAppDrag = (key: string, event: ReactPointerEvent<HTMLElement>) => {
@@ -382,23 +460,28 @@ export function CasaDesktop({
     const startX = event.clientX;
     const startY = event.clientY;
     let active = false;
-    let current: string | null = null;
+    let current: { kind: 'tile'; key: string } | { kind: 'department'; id: string } | null = null;
     const blockSelect = (ev: Event) => ev.preventDefault();
-    const tileAt = (x: number, y: number) => {
-      const hit = document.elementFromPoint(x, y);
-      const tile = hit instanceof Element ? hit.closest('[data-app-key]') : null;
-      const next = tile?.getAttribute('data-app-key') ?? null;
-      return next === key ? null : next;
-    };
+    const aimKey = (aim: typeof current) =>
+      aim?.kind === 'tile' ? `t:${aim.key}` : aim?.kind === 'department' ? `d:${aim.id}` : '';
     const aim = (x: number, y: number) => {
-      const over = tileAt(x, y);
-      if (over) {
-        current = over;
+      const hit = document.elementFromPoint(x, y);
+      if (!(hit instanceof Element)) {
+        current = null;
         return;
       }
-      const hit = document.elementFromPoint(x, y);
+      const tile = hit.closest('[data-app-key]')?.getAttribute('data-app-key') ?? null;
+      if (tile && tile !== key) {
+        current = { kind: 'tile', key: tile };
+        return;
+      }
+      const zone = hit.closest('[data-department-drop]')?.getAttribute('data-department-drop');
+      if (zone) {
+        current = { kind: 'department', id: zone };
+        return;
+      }
       const grid = document.querySelector('[data-app-grid]');
-      if (!(hit instanceof Element) || !grid?.contains(hit)) current = null;
+      if (!grid?.contains(hit)) current = null;
     };
     const move = (ev: PointerEvent) => {
       if (!active) {
@@ -410,9 +493,11 @@ export function CasaDesktop({
       }
       ev.preventDefault();
       setDragPoint({ x: ev.clientX, y: ev.clientY });
-      const previous = current;
+      const previous = aimKey(current);
       aim(ev.clientX, ev.clientY);
-      if (current !== previous) setDropTarget(current);
+      if (aimKey(current) === previous) return;
+      setDropTarget(current?.kind === 'tile' ? current.key : null);
+      setDropDepartment(current?.kind === 'department' ? current.id : null);
     };
     const up = (ev: PointerEvent) => {
       window.removeEventListener('pointermove', move);
@@ -421,9 +506,11 @@ export function CasaDesktop({
       document.removeEventListener('selectstart', blockSelect);
       document.body.style.userSelect = '';
       window.getSelection()?.removeAllRanges();
-      if (active && current) placeApp(key, current);
+      if (active && current?.kind === 'tile') placeApp(key, current.key);
+      if (active && current?.kind === 'department') assignDepartment(key, current.id);
       setDragContainer(null);
       setDropTarget(null);
+      setDropDepartment(null);
       setDragPoint(null);
       window.setTimeout(() => {
         dragged.current = false;
@@ -743,8 +830,14 @@ export function CasaDesktop({
         {updateError ? <p className="text-xs text-dockora-danger">{updateError}</p> : null}
         {layoutError ? <p className="text-xs text-dockora-danger">{layoutError}</p> : null}
 
-        <section aria-label={home.apps} className="relative">
-          <div className="mb-3 flex items-center gap-3">
+        <section aria-label={home.apps} data-app-grid="" className="relative">
+          <div
+            data-department-drop="loose"
+            className={cn(
+              'mb-3 flex items-center gap-3',
+              dropDepartment === 'loose' && 'border border-dashed border-dockora-pink px-2 py-1',
+            )}
+          >
             <h2 className="dockora-section-tag">{home.apps}</h2>
             {hint ? (
               <p className="flex items-center gap-2 text-xs text-dockora-muted">
@@ -778,11 +871,102 @@ export function CasaDesktop({
               </button>
             </div>
           </div>
-          <ul
-            data-app-grid=""
-            className="grid grid-cols-[repeat(auto-fill,minmax(7.25rem,1fr))] gap-3 sm:grid-cols-[repeat(auto-fill,minmax(9rem,1fr))]"
-          >
-            {visibleItems.map((item) => {
+          <ul className="grid grid-cols-[repeat(auto-fill,minmax(7.25rem,1fr))] gap-3 sm:grid-cols-[repeat(auto-fill,minmax(9rem,1fr))]">
+            {appRows.map((item) => {
+              if (item.kind === 'heading') {
+                return (
+                  <li key={`dept-${item.id}`} className="col-span-full mt-5">
+                    <div
+                      data-department-drop={item.id}
+                      className={cn(
+                        'flex items-center gap-3',
+                        dropDepartment === item.id && 'border border-dashed border-dockora-pink px-2 py-1',
+                      )}
+                    >
+                      {renameId === item.id ? (
+                        <input
+                          autoFocus
+                          value={renameDraft}
+                          aria-label={home.departmentName}
+                          onChange={(event) => setRenameDraft(event.target.value)}
+                          onBlur={() => {
+                            if (renameSkip.current) {
+                              renameSkip.current = false;
+                              return;
+                            }
+                            const name = renameDraft.trim();
+                            setRenameId(null);
+                            if (!name || name.length > 40 || name === item.name) return;
+                            publish({
+                              departments: departments.map((entry) =>
+                                entry.id === item.id ? { ...entry, name } : entry,
+                              ),
+                            });
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter') {
+                              event.preventDefault();
+                              event.currentTarget.blur();
+                            }
+                            if (event.key === 'Escape') {
+                              renameSkip.current = true;
+                              setRenameId(null);
+                            }
+                          }}
+                          className="dockora-field h-7 w-48 px-2 text-xs"
+                        />
+                      ) : (
+                        canEdit ? (
+                          <button
+                            type="button"
+                            className="dockora-section-tag border-0 bg-transparent p-0"
+                            onClick={() => {
+                              setRenameId(item.id);
+                              setRenameDraft(item.name);
+                            }}
+                          >
+                            {item.name}
+                          </button>
+                        ) : (
+                          <h3 className="dockora-section-tag">{item.name}</h3>
+                        )
+                      )}
+                      {canEdit ? (
+                        <button
+                          type="button"
+                          className="text-[10px] font-semibold uppercase tracking-[0.12em] text-dockora-muted hover:text-white"
+                          onClick={() => {
+                            const nextMap = { ...appDepartments };
+                            for (const [key, value] of Object.entries(nextMap)) {
+                              if (value === item.id) delete nextMap[key];
+                            }
+                            publish({
+                              departments: departments.filter((entry) => entry.id !== item.id),
+                              appDepartments: nextMap,
+                            });
+                          }}
+                        >
+                          {home.departmentRemove}
+                        </button>
+                      ) : null}
+                    </div>
+                  </li>
+                );
+              }
+              if (item.kind === 'empty') {
+                return (
+                  <li
+                    key={`empty-${item.id}`}
+                    data-department-drop={item.id}
+                    className={cn(
+                      'dockora-panel col-span-full flex min-h-16 items-center justify-center border border-dashed text-xs uppercase tracking-[0.12em] text-dockora-muted',
+                      dropDepartment === item.id ? 'border-dockora-pink text-white' : 'border-dockora-border',
+                    )}
+                  >
+                    {home.departmentEmpty}
+                  </li>
+                );
+              }
               if (item.kind === 'link') {
                 const { link } = item;
                 return (
@@ -801,8 +985,10 @@ export function CasaDesktop({
                       removeLabel={home.linkRemove}
                       onRemove={() => {
                         const nextLinks = homeLinks.filter((entry) => entry.id !== link.id);
-                        const nextOrder = containerOrder.filter((key) => key !== item.key);
-                        publish({ links: nextLinks, containerOrder: nextOrder });
+                        const nextOrder = containerOrder.filter((entry) => entry !== item.key);
+                        const nextMap = { ...appDepartments };
+                        delete nextMap[item.key];
+                        publish({ links: nextLinks, containerOrder: nextOrder, appDepartments: nextMap });
                       }}
                       onPointerDown={(event) => startAppDrag(item.key, event)}
                       onClick={(event) => {
@@ -1072,7 +1258,11 @@ export function CasaDesktop({
                   <div className="min-w-0 flex-1">
                     <p className="dockora-section-tag">{home.apps}</p>
                     <h2 className="dockora-title-gradient text-3xl tracking-tight">
-                      {addEditor === 'link' ? home.addLink : home.add}
+                      {addEditor === 'link'
+                        ? home.addLink
+                        : addEditor === 'department'
+                          ? home.addDepartment
+                          : home.add}
                     </h2>
                   </div>
                   <Button type="button" size="sm" variant="ghost" onClick={() => setAddEditor(null)}>
@@ -1103,7 +1293,52 @@ export function CasaDesktop({
                         {home.addLink}
                       </button>
                     </li>
+                    <li className="border-t border-dockora-border/70">
+                      <button
+                        type="button"
+                        className="block w-full px-5 py-3 text-left text-sm uppercase tracking-wide hover:bg-white/[0.03]"
+                        onClick={() => {
+                          setLinkError(null);
+                          setDepartmentDraft('');
+                          setAddEditor('department');
+                        }}
+                      >
+                        {home.addDepartment}
+                      </button>
+                    </li>
                   </ul>
+                ) : addEditor === 'department' ? (
+                  <form
+                    className="space-y-3 px-5 py-4"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      const name = departmentDraft.trim();
+                      if (!name || name.length > 40 || departments.length >= 24) {
+                        setLinkError(home.departmentInvalid);
+                        return;
+                      }
+                      const id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+                      publish({ departments: [...departments, { id, name }] });
+                      setDepartmentDraft('');
+                      setLinkError(null);
+                      setAddEditor(null);
+                    }}
+                  >
+                    <label className="block text-xs font-medium uppercase tracking-wide text-dockora-muted">
+                      {home.departmentName}
+                      <input
+                        autoFocus
+                        value={departmentDraft}
+                        maxLength={40}
+                        onChange={(event) => setDepartmentDraft(event.target.value)}
+                        className="dockora-field mt-1 w-full px-3"
+                      />
+                    </label>
+                    {linkError ? <p className="text-xs text-dockora-danger">{linkError}</p> : null}
+                    <button type="submit" className={buttonClassName({ variant: 'primary', size: 'sm' })}>
+                      {home.linkSave}
+                    </button>
+                  </form>
                 ) : (
                   <form
                     className="space-y-3 px-5 py-4"

@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.39] – 2026-09-27
+
+### Added
+
+- Home apps can be grouped into departments you create, rename, and remove
+
 ## [2.0.38] – 2026-09-27
 
 ### Fixed

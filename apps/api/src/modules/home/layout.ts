@@ -1,8 +1,15 @@
-import { HOME_DOCK_KEYS, type HomeLayout, type HomeLink, type HomeWidgets } from '@dockora/shared';
+import {
+  HOME_DOCK_KEYS,
+  type HomeDepartment,
+  type HomeLayout,
+  type HomeLink,
+  type HomeWidgets,
+} from '@dockora/shared';
 
 export const HOME_LAYOUT_KEY = 'homeLayout';
 
 const MAX_LINKS = 40;
+const MAX_DEPARTMENTS = 24;
 const MAX_ORDER = 200;
 const MAX_TEXT = 160;
 const MAX_URL = 500;
@@ -18,11 +25,14 @@ export function emptyHomeLayout(): HomeLayout {
     appPublicUrls: {},
     links: [],
     widgets: { system: true, storage: true, network: true },
+    departments: [],
+    appDepartments: {},
   };
 }
 
 export function normalizeHomeLayout(input: unknown): HomeLayout {
   const source = isRecord(input) ? input : {};
+  const departments = normalizeDepartments(source.departments);
   return {
     appOrder: stringList(source.appOrder, MAX_ORDER).filter((key) => DOCK.has(key)),
     containerOrder: stringList(source.containerOrder, MAX_ORDER).filter((key) => safeText(key)),
@@ -30,6 +40,8 @@ export function normalizeHomeLayout(input: unknown): HomeLayout {
     appPublicUrls: normalizeUrls(source.appPublicUrls),
     links: normalizeLinks(source.links),
     widgets: normalizeWidgets(source.widgets),
+    departments,
+    appDepartments: normalizeAppDepartments(source.appDepartments, departments),
   };
 }
 
@@ -65,6 +77,34 @@ function normalizeLinks(input: unknown): HomeLink[] {
     links.push({ id, name, url, icon });
   }
   return links;
+}
+
+function normalizeDepartments(input: unknown): HomeDepartment[] {
+  if (!Array.isArray(input)) return [];
+  const departments: HomeDepartment[] = [];
+  const seen = new Set<string>();
+  for (const item of input) {
+    if (departments.length >= MAX_DEPARTMENTS || !isRecord(item)) continue;
+    const id = typeof item.id === 'string' ? item.id.trim() : '';
+    const name = typeof item.name === 'string' ? item.name.trim() : '';
+    if (!/^[a-z0-9-]{4,40}$/i.test(id) || seen.has(id) || id.toLowerCase() === 'loose') continue;
+    if (!name || name.length > 40 || /[\u0000-\u001f]/.test(name)) continue;
+    seen.add(id);
+    departments.push({ id, name });
+  }
+  return departments;
+}
+
+function normalizeAppDepartments(input: unknown, departments: HomeDepartment[]): Record<string, string> {
+  if (!isRecord(input)) return {};
+  const known = new Set(departments.map((item) => item.id));
+  const next: Record<string, string> = {};
+  for (const [key, value] of Object.entries(input)) {
+    if (!safeText(key) || typeof value !== 'string' || !known.has(value)) continue;
+    if (Object.keys(next).length >= MAX_ORDER) break;
+    next[key] = value;
+  }
+  return next;
 }
 
 function normalizeWidgets(input: unknown): HomeWidgets {

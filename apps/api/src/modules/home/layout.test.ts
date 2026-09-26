@@ -44,6 +44,19 @@ describe('normalizeHomeLayout', () => {
     ]);
   });
 
+  it('keeps named departments and only assignments that point at them', () => {
+    const layout = normalizeHomeLayout({
+      departments: [
+        { id: 'media1', name: 'Medien' },
+        { id: 'x', name: 'kurz' },
+        { id: 'bad id', name: 'Leer' },
+      ],
+      appDepartments: { plex: 'media1', sonarr: 'missing', radarr: 'media1' },
+    });
+    expect(layout.departments).toEqual([{ id: 'media1', name: 'Medien' }]);
+    expect(layout.appDepartments).toEqual({ plex: 'media1', radarr: 'media1' });
+  });
+
   it('preserves hidden widgets', () => {
     expect(normalizeHomeLayout({ widgets: { system: false, storage: true } }).widgets).toEqual({
       system: false,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EMPTY_HOME_LAYOUT, homeLayoutHasData, pickHomeLayout, withDockDefaults } from './home-layout';
+import { completeHomeLayout, EMPTY_HOME_LAYOUT, homeLayoutHasData, pickHomeLayout, withDockDefaults } from './home-layout';
 
 const local = {
   ...EMPTY_HOME_LAYOUT,
@@ -51,6 +51,14 @@ describe('home layout helpers', () => {
     expect(order[0]).toBe('settings');
     expect(order).toContain('containers');
     expect(order).toHaveLength(12);
+  });
+
+  it('fills departments missing from an older layout', () => {
+    const layout = completeHomeLayout({ appOrder: ['settings'] });
+    expect(layout.departments).toEqual([]);
+    expect(layout.appDepartments).toEqual({});
+    expect(layout.appOrder).toEqual(['settings']);
+    expect(homeLayoutHasData({ ...EMPTY_HOME_LAYOUT, departments: [{ id: 'media1', name: 'Medien' }] })).toBe(true);
   });
 
   it('treats the default widgets as empty', () => {

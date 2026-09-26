@@ -291,6 +291,11 @@ export interface HomeWidgets {
   network: boolean;
 }
 
+export interface HomeDepartment {
+  id: string;
+  name: string;
+}
+
 /** Shared home screen: one layout for the whole Dockora instance. */
 export interface HomeLayout {
   appOrder: string[];
@@ -300,6 +305,9 @@ export interface HomeLayout {
   appPublicUrls: Record<string, string>;
   links: HomeLink[];
   widgets: HomeWidgets;
+  departments: HomeDepartment[];
+  /** App or custom-link key. Missing key means the app stays in the main list. */
+  appDepartments: Record<string, string>;
 }
 
 export interface HomeLayoutResponse {

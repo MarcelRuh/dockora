@@ -1,4 +1,10 @@
-import { HOME_DOCK_KEYS, type HomeLayout, type HomeLink, type HomeWidgets } from '@dockora/shared';
+import {
+  HOME_DOCK_KEYS,
+  type HomeDepartment,
+  type HomeLayout,
+  type HomeLink,
+  type HomeWidgets,
+} from '@dockora/shared';
 
 const ORDER_KEY = 'dockora.home.appOrder';
 const CONTAINER_ORDER_KEY = 'dockora.home.containerOrder';
@@ -6,6 +12,8 @@ const URL_KEY = 'dockora.home.appUrls';
 const PUBLIC_URL_KEY = 'dockora.home.appPublicUrls';
 const LINKS_KEY = 'dockora.home.links';
 const WIDGET_KEY = 'dockora.home.widgets';
+const DEPARTMENT_KEY = 'dockora.home.departments';
+const APP_DEPARTMENT_KEY = 'dockora.home.appDepartments';
 
 export const EMPTY_HOME_LAYOUT: HomeLayout = {
   appOrder: [],
@@ -14,7 +22,25 @@ export const EMPTY_HOME_LAYOUT: HomeLayout = {
   appPublicUrls: {},
   links: [],
   widgets: { system: true, storage: true, network: true },
+  departments: [],
+  appDepartments: {},
 };
+
+export function completeHomeLayout(layout: Partial<HomeLayout> | null | undefined): HomeLayout {
+  const source = layout ?? {};
+  return {
+    ...EMPTY_HOME_LAYOUT,
+    ...source,
+    appOrder: source.appOrder ?? [],
+    containerOrder: source.containerOrder ?? [],
+    appUrls: source.appUrls ?? {},
+    appPublicUrls: source.appPublicUrls ?? {},
+    links: source.links ?? [],
+    widgets: { ...EMPTY_HOME_LAYOUT.widgets, ...source.widgets },
+    departments: source.departments ?? [],
+    appDepartments: source.appDepartments ?? {},
+  };
+}
 
 export function withDockDefaults(saved: string[]): string[] {
   const known = new Set<string>(HOME_DOCK_KEYS);
@@ -30,6 +56,8 @@ export function homeLayoutHasData(layout: HomeLayout): boolean {
     layout.links.length > 0 ||
     Object.keys(layout.appUrls).length > 0 ||
     Object.keys(layout.appPublicUrls).length > 0 ||
+    layout.departments.length > 0 ||
+    Object.keys(layout.appDepartments).length > 0 ||
     !layout.widgets.system ||
     !layout.widgets.storage ||
     !layout.widgets.network
@@ -58,6 +86,8 @@ export function readHomeLayoutCache(): HomeLayout {
     appPublicUrls: readUrlMap(PUBLIC_URL_KEY),
     links: readLinks(),
     widgets: readWidgets(),
+    departments: readDepartments(),
+    appDepartments: readUrlMap(APP_DEPARTMENT_KEY),
   };
 }
 
@@ -68,6 +98,8 @@ export function writeHomeLayoutCache(layout: HomeLayout): void {
   localStorage.setItem(PUBLIC_URL_KEY, JSON.stringify(layout.appPublicUrls));
   localStorage.setItem(LINKS_KEY, JSON.stringify(layout.links));
   localStorage.setItem(WIDGET_KEY, JSON.stringify(layout.widgets));
+  localStorage.setItem(DEPARTMENT_KEY, JSON.stringify(layout.departments));
+  localStorage.setItem(APP_DEPARTMENT_KEY, JSON.stringify(layout.appDepartments));
 }
 
 function readStringList(key: string): string[] {
@@ -103,6 +135,22 @@ function readLinks(): HomeLink[] {
         typeof (item as HomeLink).name === 'string' &&
         typeof (item as HomeLink).url === 'string' &&
         typeof (item as HomeLink).icon === 'string',
+    );
+  } catch {
+    return [];
+  }
+}
+
+function readDepartments(): HomeDepartment[] {
+  try {
+    const raw = JSON.parse(localStorage.getItem(DEPARTMENT_KEY) ?? '[]') as unknown;
+    if (!Array.isArray(raw)) return [];
+    return raw.filter(
+      (item): item is HomeDepartment =>
+        Boolean(item) &&
+        typeof item === 'object' &&
+        typeof (item as HomeDepartment).id === 'string' &&
+        typeof (item as HomeDepartment).name === 'string',
     );
   } catch {
     return [];
