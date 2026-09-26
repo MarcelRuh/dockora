@@ -11,6 +11,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from 'react';
+import { createPortal } from 'react-dom';
 import type { ContainerSummary, DashboardOverview, HomeLayout, HomeLink, Locale, UpdateCheckResult } from '@dockora/shared';
 import { HOME_DOCK_KEYS } from '@dockora/shared';
 import { AuthLogoutButton, useAuth } from '@/components/auth/auth-provider';
@@ -250,20 +251,11 @@ export function CasaDesktop({
 
   useEffect(() => {
     if (!linkPicker) return;
-    const close = (event: MouseEvent) => {
-      const target = event.target;
-      if (target instanceof Element && target.closest('[data-link-picker]')) return;
-      setLinkPicker(null);
-    };
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') setLinkPicker(null);
     };
-    window.addEventListener('click', close);
     window.addEventListener('keydown', onKey);
-    return () => {
-      window.removeEventListener('click', close);
-      window.removeEventListener('keydown', onKey);
-    };
+    return () => window.removeEventListener('keydown', onKey);
   }, [linkPicker]);
 
   useEffect(() => {
@@ -311,6 +303,18 @@ export function CasaDesktop({
     for (const [key, link] of restLinks) next.push({ key, kind: 'link', link });
     return next;
   }, [decoratedContainers, homeLinks, containerOrder]);
+
+  const linkDialog = useMemo(() => {
+    if (!linkPicker) return null;
+    const container = decoratedContainers.find((item) => item.name === linkPicker);
+    if (!container) return null;
+    const choices = containerLinkChoices(container, pageHost, publicUrlOverrides, discoveredUrls).map((choice) => ({
+      ...choice,
+      label: choice.key === 'public' ? home.appUrlPublic : home.appUrlInternal,
+    }));
+    if (choices.length === 0) return null;
+    return { name: container.name, icon: resolveContainerIconUrl(container.labels), choices };
+  }, [linkPicker, decoratedContainers, pageHost, publicUrlOverrides, discoveredUrls, home.appUrlInternal, home.appUrlPublic]);
 
   const apps = useMemo(
     () =>
@@ -1088,6 +1092,63 @@ export function CasaDesktop({
           </ul>
         </section>
       </div>
+      {linkDialog
+        ? createPortal(
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label={home.chooseLink}
+        >
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/75 backdrop-blur-sm"
+            aria-label={t.common.close}
+            onClick={() => setLinkPicker(null)}
+          />
+          <div className="dockora-glass relative z-10 w-[min(26rem,92vw)] border-dockora-pink/40 p-5 shadow-neon">
+            <div className="flex items-center gap-3">
+              <ServiceIcon
+                url={linkDialog.icon}
+                alt=""
+                className="h-14 w-14 rounded-2xl bg-white/[0.06] object-contain p-1.5"
+              />
+              <div className="min-w-0">
+                <h2 className="truncate text-lg font-medium">{linkDialog.name}</h2>
+                <p className="text-xs text-dockora-muted">{home.chooseLink}</p>
+              </div>
+              <button
+                type="button"
+                className="ml-auto rounded-full px-3 py-1 text-sm text-dockora-muted hover:text-white"
+                onClick={() => setLinkPicker(null)}
+              >
+                {t.common.close}
+              </button>
+            </div>
+            <ul className="mt-4 space-y-2">
+              {linkDialog.choices.map((choice) => (
+                <li key={choice.key}>
+                  <a
+                    href={choice.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-3 transition-colors hover:border-dockora-pink/60 hover:bg-white/[0.08]"
+                    onClick={() => setLinkPicker(null)}
+                  >
+                    <LinkChoiceIcon kind={choice.key} />
+                    <span className="min-w-0">
+                      <span className="block text-sm text-dockora-text">{choice.label}</span>
+                      <span className="block truncate text-xs text-dockora-muted">{choice.href}</span>
+                    </span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>,
+          document.body,
+        )
+        : null}
       <ConfirmDialog
         open={updateConfirm !== null}
         title={updateConfirm && updateConfirm.length > 1 ? home.upgradeAll : home.upgrade}
@@ -1200,17 +1261,8 @@ function ContainerTile({
   onDragEnd: (event: ReactDragEvent<HTMLDivElement>) => void;
   onClick: (event: ReactMouseEvent<HTMLElement>) => void;
 }) {
-  const anchorRef = useRef<HTMLButtonElement>(null);
-  const [openUp, setOpenUp] = useState(false);
-  useEffect(() => {
-    if (!linksOpen || !anchorRef.current) return;
-    const rect = anchorRef.current.getBoundingClientRect();
-    setOpenUp(window.innerHeight - rect.bottom < 150);
-  }, [linksOpen]);
   const shell = cn(
-    'dockora-glass relative flex flex-col items-center px-2 pb-3 transition-transform hover:border-dockora-pink/45',
-    !linksOpen && 'hover:-translate-y-0.5',
-    linksOpen && 'z-50',
+    'dockora-glass relative flex flex-col items-center px-2 pb-3 transition-transform hover:-translate-y-0.5 hover:border-dockora-pink/45',
     dimmed && 'opacity-50',
     dragging && 'opacity-50',
   );
@@ -1219,8 +1271,6 @@ function ContainerTile({
     linkChoices && linkChoices.length > 0 && onToggleLinks ? (
       <button
         type="button"
-        ref={anchorRef}
-        data-link-picker=""
         title={name}
         aria-label={`${name}. ${linksLabel ?? name}`}
         aria-expanded={linksOpen}
@@ -1259,36 +1309,6 @@ function ContainerTile({
       }}
     >
       {open}
-      {linksOpen && linkChoices && linkChoices.length > 0 ? (
-        <ul
-          data-link-picker=""
-          className={cn(
-            'dockora-glass absolute left-1/2 z-50 w-[min(16rem,70vw)] -translate-x-1/2 py-1 text-left shadow-neon',
-            openUp ? 'bottom-full mb-2' : 'top-16 mt-1',
-          )}
-        >
-          {linkChoices.map((choice) => (
-            <li key={choice.key}>
-              <a
-                href={choice.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 px-3 py-2 hover:bg-white/5"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  window.setTimeout(() => onToggleLinks?.(), 0);
-                }}
-              >
-                <LinkChoiceIcon kind={choice.key} />
-                <span className="min-w-0">
-                  <span className="block text-xs text-dockora-text">{choice.label}</span>
-                  <span className="block truncate text-[10px] text-dockora-muted">{choice.href}</span>
-                </span>
-              </a>
-            </li>
-          ))}
-        </ul>
-      ) : null}
       {detailHref.startsWith('http') ? (
         <a
           href={detailHref}

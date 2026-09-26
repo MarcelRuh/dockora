@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.28] – 2026-09-26
+
+### Changed
+
+- The app link chooser opens as a centered dialog
+
 ## [2.0.27] – 2026-09-26
 
 ### Fixed
