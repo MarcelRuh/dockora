@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.22] – 2026-09-26
+
+### Changed
+
+- The side menu with every module is visible on the home again, and the dock lists those entries too
+
 ## [2.0.21] – 2026-09-26
 
 ### Changed

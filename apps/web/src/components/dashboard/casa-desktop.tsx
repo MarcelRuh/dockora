@@ -50,8 +50,8 @@ const APPS = [
 ] as const;
 
 type AppKey = (typeof APPS)[number]['key'];
-const DOCK_KEYS = ['containers', 'compose', 'terminal', 'settings'] as const;
-type DockKey = (typeof DOCK_KEYS)[number];
+const DOCK_KEYS: AppKey[] = APPS.map((app) => app.key);
+type DockKey = AppKey;
 
 const TILE: Record<AppKey, string> = {
   containers: 'bg-gradient-to-br from-dockora-pink to-dockora-purple',
@@ -485,7 +485,7 @@ export function CasaDesktop({
 
       <div className="flex min-w-0 flex-col gap-4">
         <div className="flex flex-wrap items-center gap-3">
-          <BrandLogoWide size="sm" priority />
+          <BrandLogoWide size="sm" priority className="md:hidden" />
           <div className="relative min-w-[12rem] flex-1">
             <input
               value={query}

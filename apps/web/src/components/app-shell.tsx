@@ -98,11 +98,12 @@ function NavList({
                 href={item.href}
                 className={className}
                 onClick={onNavigate}
+                title={t.nav[item.key]}
                 aria-current={active ? 'page' : undefined}
                 aria-label={
                   item.key === 'selfUpdate' && selfUpdateAvailable
                     ? `${t.nav.selfUpdate} – ${t.settings.selfUpdate.apply}`
-                    : undefined
+                    : t.nav[item.key]
                 }
               >
                 <span className="relative">
@@ -197,24 +198,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {t.common.skipToContent}
       </a>
 
-      {home ? null : (
-      <aside className="relative z-10 hidden h-full w-[4.75rem] shrink-0 flex-col border-r border-white/10 bg-black/35 text-dockora-railText backdrop-blur-xl md:flex">
+      <aside className="relative z-10 hidden h-full w-60 shrink-0 flex-col border-r border-white/10 bg-black/35 text-dockora-railText backdrop-blur-xl md:flex">
         <Link
           href="/"
-          className="flex justify-center border-b border-white/10 px-2 py-4 transition-opacity hover:opacity-95"
+          className="border-b border-white/10 px-4 py-4 transition-opacity hover:opacity-95"
           aria-label={t.appName}
         >
-          <BrandLogo size="sm" priority />
+          <BrandLogoWide size="sm" priority />
         </Link>
 
         <nav className="flex-1 overflow-y-auto px-2 py-3">
-          <NavList iconOnly />
+          <NavList />
         </nav>
       </aside>
-      )}
 
       <div className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <header className={cn('z-40 items-center justify-between gap-3 border-b border-white/10 bg-black/30 px-4 py-3 backdrop-blur', home ? 'hidden' : 'flex')}>
+        <header className={cn('z-40 items-center justify-between gap-3 border-b border-white/10 bg-black/30 px-4 py-3 backdrop-blur', home ? 'flex md:hidden' : 'flex')}>
           <div className="flex items-center gap-2 md:hidden">
             <button
               type="button"
@@ -232,13 +231,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <BrandLogo size="sm" priority />
             </Link>
           </div>
-          <BrandLogoWide size="sm" className="hidden md:inline-flex" />
-          <span className="hidden min-w-0 flex-1 truncate text-sm font-medium text-dockora-muted md:block">
-            {current ? t.nav[current.key] : null}
+          <span className="hidden min-w-0 flex-1 truncate text-sm font-medium md:block">
+            {current ? t.nav[current.key] : t.appName}
           </span>
-          <GlobalSearch compact className="hidden md:inline-flex" />
-          <LocaleControls dense search={false} />
-          <AuthLogoutButton className="hidden w-auto md:inline-flex" />
+          <GlobalSearch compact className={cn('hidden md:inline-flex', home && 'md:hidden')} />
+          {home ? null : <LocaleControls dense search={false} />}
+          {home ? null : <AuthLogoutButton className="hidden w-auto md:inline-flex" />}
         </header>
 
         {drawerOpen ? (
