@@ -6,7 +6,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type DragEvent as ReactDragEvent,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
@@ -132,6 +131,8 @@ export function CasaDesktop({
   const [linkDraft, setLinkDraft] = useState({ name: '', url: '', icon: '' });
   const [linkError, setLinkError] = useState<string | null>(null);
   const [dragContainer, setDragContainer] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<string | null>(null);
+  const [dragPoint, setDragPoint] = useState<{ x: number; y: number } | null>(null);
   const dragged = useRef(false);
   const [pageHost, setPageHost] = useState('');
   const layoutRef = useRef<HomeLayout>(readHomeLayoutCache());
@@ -324,6 +325,11 @@ export function CasaDesktop({
   );
 
   const needle = query.trim().toLowerCase();
+  const dragLabel = (() => {
+    const entry = gridItems.find((item) => item.key === dragContainer);
+    if (!entry) return dragContainer ?? '';
+    return entry.kind === 'link' ? entry.link.name : entry.container.name;
+  })();
   const visibleItems = needle
     ? gridItems.filter((item) => {
         if (item.kind === 'link') {
@@ -357,6 +363,20 @@ export function CasaDesktop({
     publish({ appOrder: next });
   };
 
+  const gridKeysRef = useRef<string[]>([]);
+  gridKeysRef.current = gridItems.map((entry) => entry.key);
+
+  const placeApp = (from: string, to: string) => {
+    const keys = gridKeysRef.current;
+    const fromIndex = keys.indexOf(from);
+    const toIndex = keys.indexOf(to);
+    if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return;
+    const next = [...keys];
+    next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, from);
+    publish({ containerOrder: next });
+  };
+
   const moveApp = (key: string, direction: -1 | 1) => {
     const keys = gridItems.map((entry) => entry.key);
     const index = keys.indexOf(key);
@@ -366,6 +386,45 @@ export function CasaDesktop({
     const [moved] = next.splice(index, 1);
     next.splice(target, 0, moved!);
     publish({ containerOrder: next });
+  };
+
+  const startAppDrag = (key: string, event: ReactPointerEvent<HTMLElement>) => {
+    if (event.button !== 0) return;
+    const startX = event.clientX;
+    const startY = event.clientY;
+    let active = false;
+    const tileAt = (x: number, y: number) => {
+      const hit = document.elementFromPoint(x, y);
+      const tile = hit instanceof Element ? hit.closest('[data-app-key]') : null;
+      return tile?.getAttribute('data-app-key') ?? null;
+    };
+    const move = (ev: PointerEvent) => {
+      if (!active) {
+        if (Math.hypot(ev.clientX - startX, ev.clientY - startY) <= 8) return;
+        active = true;
+        dragged.current = true;
+        setDragContainer(key);
+      }
+      setDragPoint({ x: ev.clientX, y: ev.clientY });
+      const over = tileAt(ev.clientX, ev.clientY);
+      setDropTarget(over && over !== key ? over : null);
+    };
+    const up = (ev: PointerEvent) => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      if (active) {
+        const over = tileAt(ev.clientX, ev.clientY);
+        if (over && over !== key) placeApp(key, over);
+      }
+      setDragContainer(null);
+      setDropTarget(null);
+      setDragPoint(null);
+      window.setTimeout(() => {
+        dragged.current = false;
+      }, 0);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
   };
 
   const dropOn = (target: DockKey) => {
@@ -719,8 +778,10 @@ export function CasaDesktop({
                       href={link.url}
                       external
                       name={link.name}
+                      appKey={item.key}
                       dimmed={false}
                       dragging={dragContainer === item.key}
+                      dropOver={dropTarget === item.key}
                       detailHref={link.url}
                       detailLabel={link.name}
                       removeLabel={home.linkRemove}
@@ -729,45 +790,11 @@ export function CasaDesktop({
                         const nextOrder = containerOrder.filter((key) => key !== item.key);
                         publish({ links: nextLinks, containerOrder: nextOrder });
                       }}
-                      onPointerDown={(event) => {
-                        const startX = event.clientX;
-                        const startY = event.clientY;
-                        const targetEl = event.currentTarget;
-                        const move = (ev: globalThis.PointerEvent) => {
-                          if (Math.hypot(ev.clientX - startX, ev.clientY - startY) > 8) {
-                            dragged.current = true;
-                            targetEl.draggable = true;
-                            setDragContainer(item.key);
-                          }
-                        };
-                        const up = () => {
-                          window.removeEventListener('pointermove', move);
-                          window.removeEventListener('pointerup', up);
-                          window.setTimeout(() => {
-                            dragged.current = false;
-                          }, 0);
-                        };
-                        window.addEventListener('pointermove', move);
-                        window.addEventListener('pointerup', up);
-                      }}
-                      onDragOver={(event) => event.preventDefault()}
-                      onDrop={() => {
-                        if (!dragContainer || dragContainer === item.key) return;
-                        const keys = gridItems.map((entry) => entry.key);
-                        const next = keys.filter((key) => key !== dragContainer);
-                        const index = next.indexOf(item.key);
-                        next.splice(index < 0 ? next.length : index, 0, dragContainer);
-                        publish({ containerOrder: next });
-                        setDragContainer(null);
-                      }}
-                      onDragEnd={(event) => {
-                        event.currentTarget.draggable = false;
-                        setDragContainer(null);
-                      }}
+                      onPointerDown={(event) => startAppDrag(item.key, event)}
                       onClick={(event) => {
                         if (!dragged.current) return;
                         event.preventDefault();
-                        dragged.current = false;
+                        event.stopPropagation();
                       }}
                     >
                       <ServiceIcon
@@ -812,47 +839,15 @@ export function CasaDesktop({
                     onToggleLinks={() =>
                       setLinkPicker((current) => (current === container.name ? null : container.name))
                     }
+                    appKey={container.name}
                     dimmed={!runningTile}
                     dragging={dragContainer === container.name}
-                    onPointerDown={(event) => {
-                      const startX = event.clientX;
-                      const startY = event.clientY;
-                      const targetEl = event.currentTarget;
-                      const move = (ev: globalThis.PointerEvent) => {
-                        if (Math.hypot(ev.clientX - startX, ev.clientY - startY) > 8) {
-                          dragged.current = true;
-                          targetEl.draggable = true;
-                          setDragContainer(container.name);
-                        }
-                      };
-                      const up = () => {
-                        window.removeEventListener('pointermove', move);
-                        window.removeEventListener('pointerup', up);
-                        window.setTimeout(() => {
-                          dragged.current = false;
-                        }, 0);
-                      };
-                      window.addEventListener('pointermove', move);
-                      window.addEventListener('pointerup', up);
-                    }}
-                    onDragOver={(event) => event.preventDefault()}
-                    onDrop={() => {
-                      if (!dragContainer || dragContainer === container.name) return;
-                      const keys = gridItems.map((entry) => entry.key);
-                      const next = keys.filter((key) => key !== dragContainer);
-                      const index = next.indexOf(container.name);
-                      next.splice(index < 0 ? next.length : index, 0, dragContainer);
-                      publish({ containerOrder: next });
-                      setDragContainer(null);
-                    }}
-                    onDragEnd={(event) => {
-                      event.currentTarget.draggable = false;
-                      setDragContainer(null);
-                    }}
+                    dropOver={dropTarget === container.name}
+                    onPointerDown={(event) => startAppDrag(container.name, event)}
                     onClick={(event) => {
                       if (!dragged.current) return;
                       event.preventDefault();
-                      dragged.current = false;
+                      event.stopPropagation();
                     }}
                     detailHref={`/containers/${encodeURIComponent(container.id)}`}
                     detailLabel={home.openInDockora}
@@ -1032,6 +1027,17 @@ export function CasaDesktop({
           </ul>
         </section>
       </div>
+      {dragContainer && dragPoint
+        ? createPortal(
+            <div
+              className="dockora-panel pointer-events-none fixed z-[90] -translate-x-1/2 -translate-y-1/2 px-3 py-2 text-sm shadow-neon"
+              style={{ left: dragPoint.x, top: dragPoint.y }}
+            >
+              {dragLabel}
+            </div>,
+            document.body,
+          )
+        : null}
       {addEditor
         ? createPortal(
             <div
@@ -1326,8 +1332,10 @@ function ContainerTile({
   href,
   external,
   name,
+  appKey,
   dimmed,
   dragging,
+  dropOver,
   children,
   detailHref,
   detailLabel,
@@ -1346,16 +1354,15 @@ function ContainerTile({
   updateBusy,
   editor,
   onPointerDown,
-  onDragOver,
-  onDrop,
-  onDragEnd,
   onClick,
 }: {
   href: string;
   external: boolean;
   name: string;
+  appKey: string;
   dimmed: boolean;
   dragging: boolean;
+  dropOver: boolean;
   children: ReactNode;
   detailHref: string;
   detailLabel: string;
@@ -1374,15 +1381,13 @@ function ContainerTile({
   updateBusy?: boolean;
   editor?: ReactNode;
   onPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void;
-  onDragOver: (event: ReactDragEvent<HTMLDivElement>) => void;
-  onDrop: () => void;
-  onDragEnd: (event: ReactDragEvent<HTMLDivElement>) => void;
   onClick: (event: ReactMouseEvent<HTMLElement>) => void;
 }) {
   const shell = cn(
-    'dockora-panel relative flex flex-col items-center px-2 pb-3',
+    'dockora-panel relative flex cursor-grab flex-col items-center px-2 pb-3 active:cursor-grabbing',
     dimmed && 'opacity-50',
-    dragging && 'opacity-50',
+    dragging && 'opacity-40',
+    dropOver && 'outline outline-2 outline-offset-2 outline-dockora-pink',
   );
   const face = 'flex w-full items-center justify-center px-2 pt-3';
   const open =
@@ -1393,7 +1398,6 @@ function ContainerTile({
         aria-label={`${name}. ${linksLabel ?? name}`}
         aria-expanded={linksOpen}
         className={face}
-        onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => {
           event.stopPropagation();
           onClick(event);
@@ -1415,11 +1419,9 @@ function ContainerTile({
   return (
     <div
       className={shell}
-      draggable={dragging}
+      data-app-key={appKey}
       onPointerDown={onPointerDown}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
-      onDragEnd={onDragEnd}
+      onClickCapture={onClick}
       onContextMenu={(event) => {
         if (!onEdit) return;
         event.preventDefault();
@@ -1434,7 +1436,6 @@ function ContainerTile({
           rel="noopener noreferrer"
           title={name}
           className="mt-2 max-w-full truncate px-2 text-center text-sm text-dockora-text hover:text-dockora-pink"
-          onPointerDown={(event) => event.stopPropagation()}
         >
           {name}
         </a>
@@ -1444,7 +1445,6 @@ function ContainerTile({
           title={name}
           aria-label={`${name}. ${detailLabel}`}
           className="mt-2 max-w-full truncate px-2 text-center text-sm text-dockora-text hover:text-dockora-pink"
-          onPointerDown={(event) => event.stopPropagation()}
         >
           {name}
         </Link>

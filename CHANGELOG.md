@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.36] – 2026-09-26
+
+### Fixed
+
+- Home apps can be dragged onto the tile where they should sit
+
 ## [2.0.35] – 2026-09-26
 
 ### Changed

@@ -82,7 +82,7 @@ export const en = {
         showSystem: 'Show system status',
         showStorage: 'Show storage',
         showNetwork: 'Show network',
-        dragHint: 'Drag icons to sort.',
+        dragHint: 'Drag an app onto its place.',
         apps: 'Apps',
         suite: 'Dockora',
         add: 'Add',

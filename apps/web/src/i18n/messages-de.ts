@@ -80,7 +80,7 @@ export const de = {
         showSystem: 'Systemstatus anzeigen',
         showStorage: 'Speicher anzeigen',
         showNetwork: 'Netzwerk anzeigen',
-        dragHint: 'Icons ziehen zum Sortieren.',
+        dragHint: 'App auf den gewünschten Platz ziehen.',
         apps: 'Apps',
         suite: 'Dockora',
         add: 'Hinzufügen',
