@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.27] – 2026-09-26
+
+### Fixed
+
+- The app link chooser stays clickable above neighboring tiles and shows an icon for each address
+
 ## [2.0.26] – 2026-09-26
 
 ### Changed

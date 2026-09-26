@@ -250,7 +250,7 @@ export function CasaDesktop({
 
   useEffect(() => {
     if (!linkPicker) return;
-    const close = (event: PointerEvent) => {
+    const close = (event: MouseEvent) => {
       const target = event.target;
       if (target instanceof Element && target.closest('[data-link-picker]')) return;
       setLinkPicker(null);
@@ -258,10 +258,10 @@ export function CasaDesktop({
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') setLinkPicker(null);
     };
-    window.addEventListener('pointerdown', close);
+    window.addEventListener('click', close);
     window.addEventListener('keydown', onKey);
     return () => {
-      window.removeEventListener('pointerdown', close);
+      window.removeEventListener('click', close);
       window.removeEventListener('keydown', onKey);
     };
   }, [linkPicker]);
@@ -1117,6 +1117,32 @@ export function CasaDesktop({
   );
 }
 
+function LinkChoiceIcon({ kind }: { kind: string }) {
+  const publicLink = kind === 'public';
+  return (
+    <span
+      className={cn(
+        'flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-white',
+        publicLink
+          ? 'bg-gradient-to-br from-dockora-blue to-dockora-purple'
+          : 'bg-gradient-to-br from-dockora-pink to-dockora-purple',
+      )}
+      aria-hidden
+    >
+      {publicLink ? (
+        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M3 12h18M12 3c2.5 2.8 3.8 5.8 3.8 9s-1.3 6.2-3.8 9c-2.5-2.8-3.8-5.8-3.8-9s1.3-6.2 3.8-9Z" />
+        </svg>
+      ) : (
+        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M4 11.5 12 4l8 7.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-8.5Z" />
+        </svg>
+      )}
+    </span>
+  );
+}
+
 function ContainerTile({
   href,
   external,
@@ -1174,8 +1200,17 @@ function ContainerTile({
   onDragEnd: (event: ReactDragEvent<HTMLDivElement>) => void;
   onClick: (event: ReactMouseEvent<HTMLElement>) => void;
 }) {
+  const anchorRef = useRef<HTMLButtonElement>(null);
+  const [openUp, setOpenUp] = useState(false);
+  useEffect(() => {
+    if (!linksOpen || !anchorRef.current) return;
+    const rect = anchorRef.current.getBoundingClientRect();
+    setOpenUp(window.innerHeight - rect.bottom < 150);
+  }, [linksOpen]);
   const shell = cn(
-    'dockora-glass relative flex flex-col items-center px-2 pb-3 transition-transform hover:-translate-y-0.5 hover:border-dockora-pink/45',
+    'dockora-glass relative flex flex-col items-center px-2 pb-3 transition-transform hover:border-dockora-pink/45',
+    !linksOpen && 'hover:-translate-y-0.5',
+    linksOpen && 'z-50',
     dimmed && 'opacity-50',
     dragging && 'opacity-50',
   );
@@ -1184,12 +1219,15 @@ function ContainerTile({
     linkChoices && linkChoices.length > 0 && onToggleLinks ? (
       <button
         type="button"
+        ref={anchorRef}
         data-link-picker=""
         title={name}
         aria-label={`${name}. ${linksLabel ?? name}`}
         aria-expanded={linksOpen}
         className={face}
+        onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => {
+          event.stopPropagation();
           onClick(event);
           if (event.defaultPrevented) return;
           onToggleLinks();
@@ -1224,7 +1262,10 @@ function ContainerTile({
       {linksOpen && linkChoices && linkChoices.length > 0 ? (
         <ul
           data-link-picker=""
-          className="dockora-glass absolute left-1/2 top-[4.5rem] z-30 w-[min(16rem,70vw)] -translate-x-1/2 overflow-hidden py-1 text-left"
+          className={cn(
+            'dockora-glass absolute left-1/2 z-50 w-[min(16rem,70vw)] -translate-x-1/2 py-1 text-left shadow-neon',
+            openUp ? 'bottom-full mb-2' : 'top-16 mt-1',
+          )}
         >
           {linkChoices.map((choice) => (
             <li key={choice.key}>
@@ -1232,12 +1273,17 @@ function ContainerTile({
                 href={choice.href}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block px-3 py-2 hover:bg-white/5"
-                onPointerDown={(event) => event.stopPropagation()}
-                onClick={() => onToggleLinks?.()}
+                className="flex items-center gap-2 px-3 py-2 hover:bg-white/5"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  window.setTimeout(() => onToggleLinks?.(), 0);
+                }}
               >
-                <span className="block text-xs text-dockora-text">{choice.label}</span>
-                <span className="block truncate text-[10px] text-dockora-muted">{choice.href}</span>
+                <LinkChoiceIcon kind={choice.key} />
+                <span className="min-w-0">
+                  <span className="block text-xs text-dockora-text">{choice.label}</span>
+                  <span className="block truncate text-[10px] text-dockora-muted">{choice.href}</span>
+                </span>
               </a>
             </li>
           ))}
