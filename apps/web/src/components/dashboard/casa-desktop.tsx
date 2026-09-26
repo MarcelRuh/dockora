@@ -1106,39 +1106,39 @@ export function CasaDesktop({
                 role="dialog"
                 aria-modal="true"
                 aria-label={home.chooseLink}
-                className="dockora-panel w-full max-w-md space-y-4 p-5 shadow-neon"
+                className="dockora-panel w-full max-w-lg overflow-hidden"
               >
-                <div className="flex items-start gap-3">
+                <div className="flex items-start gap-3 px-5 pt-5">
                   <ServiceIcon
                     url={linkDialog.icon}
                     alt=""
-                    className="h-12 w-12 rounded border border-dockora-border bg-black/30 object-contain p-1"
+                    className="h-11 w-11 border border-dockora-border bg-black/40 object-contain p-1"
                   />
                   <div className="min-w-0 flex-1">
                     <p className="dockora-section-tag">{home.chooseLink}</p>
-                    <h2 className="dockora-title-gradient truncate text-xl">{linkDialog.name}</h2>
+                    <h2 className="dockora-title-gradient truncate text-3xl tracking-tight">{linkDialog.name}</h2>
                   </div>
                   <Button type="button" size="sm" variant="ghost" onClick={() => setLinkPicker(null)}>
                     {t.common.close}
                   </Button>
                 </div>
-                <div className="dockora-neon-line" />
-                <ul className="space-y-2">
+                <div className="dockora-neon-line mx-5 mt-4" />
+                <ul>
                   {linkDialog.choices.map((choice) => (
-                    <li key={choice.key}>
+                    <li key={choice.key} className="border-t border-dockora-border/70">
                       <a
                         href={choice.href}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-3 border border-dockora-border bg-black/30 px-3 py-2.5 transition-[border-color,box-shadow] hover:border-dockora-pink hover:shadow-neon-pink"
+                        className="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-white/[0.03]"
                         onClick={() => setLinkPicker(null)}
                       >
                         <LinkChoiceIcon kind={choice.key} />
-                        <span className="min-w-0">
-                          <span className="block font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-dockora-text">
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-xs font-medium uppercase tracking-wide text-dockora-muted">
                             {choice.label}
                           </span>
-                          <span className="block truncate font-mono text-xs text-dockora-muted">{choice.href}</span>
+                          <span className="block truncate font-mono text-sm text-dockora-text">{choice.href}</span>
                         </span>
                       </a>
                     </li>
@@ -1183,7 +1183,7 @@ function LinkChoiceIcon({ kind }: { kind: string }) {
   return (
     <span
       className={cn(
-        'flex h-8 w-8 shrink-0 items-center justify-center rounded text-white shadow-neon',
+        'flex h-8 w-8 shrink-0 items-center justify-center text-white',
         publicLink
           ? 'bg-gradient-to-br from-dockora-blue to-dockora-purple'
           : 'bg-gradient-to-br from-dockora-pink to-dockora-purple',
