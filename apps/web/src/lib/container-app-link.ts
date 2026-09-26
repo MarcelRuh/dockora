@@ -48,6 +48,25 @@ export function resolvePublicAppUrl(
   return httpUrl(discovered[name]);
 }
 
+export type AppLinkChoice = { key: 'internal' | 'public'; href: string };
+
+/** Links offered when opening an app icon. The detail page is not a choice. */
+export function containerLinkChoices(
+  input: { id: string; name: string; labels?: Record<string, string> | null; ports: string[] },
+  pageHost: string,
+  publicOverrides: Record<string, string>,
+  discovered: Record<string, string>,
+): AppLinkChoice[] {
+  const internal = resolveContainerAppHref(input, pageHost);
+  const publicUrl = resolvePublicAppUrl(input.name, input.labels, publicOverrides, discovered);
+  const choices: AppLinkChoice[] = [];
+  if (internal.external) choices.push({ key: 'internal', href: internal.href });
+  if (publicUrl && publicUrl !== (internal.external ? internal.href : null)) {
+    choices.push({ key: 'public', href: publicUrl });
+  }
+  return choices;
+}
+
 function httpUrl(value: string | undefined): string | null {
   const trimmed = value?.trim() ?? '';
   return /^https?:\/\//i.test(trimmed) ? trimmed : null;

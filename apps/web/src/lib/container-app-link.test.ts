@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveContainerAppHref, resolvePublicAppUrl } from './container-app-link';
+import { containerLinkChoices, resolveContainerAppHref, resolvePublicAppUrl } from './container-app-link';
 
 describe('resolveContainerAppHref', () => {
   it('prefers an explicit url label', () => {
@@ -71,6 +71,20 @@ describe('resolveContainerAppHref', () => {
     expect(
       resolvePublicAppUrl('seerr', { public_url: 'https://from-label.example' }, {}, {}),
     ).toBe('https://from-label.example');
+  });
+
+  it('offers the detected port and a different public URL', () => {
+    expect(
+      containerLinkChoices(
+        { id: 'abc', name: 'seerr', labels: {}, ports: ['0.0.0.0:5055->5055/tcp'] },
+        '192.168.1.10',
+        {},
+        { seerr: 'https://requests.example' },
+      ),
+    ).toEqual([
+      { key: 'internal', href: 'http://192.168.1.10:5055' },
+      { key: 'public', href: 'https://requests.example' },
+    ]);
   });
 
   it('opens the detail page when nothing is published', () => {

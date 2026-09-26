@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.26] – 2026-09-26
+
+### Changed
+
+- App icons open a link chooser, and the address editor shows the URLs the app already uses
+
 ## [2.0.25] – 2026-09-26
 
 ### Added

@@ -33,7 +33,7 @@ import {
   saveHomeLayout,
 } from '@/lib/api';
 import { pickHomeLayout, readHomeLayoutCache, withDockDefaults, writeHomeLayoutCache } from '@/lib/home-layout';
-import { resolveContainerAppHref, resolvePublicAppUrl } from '@/lib/container-app-link';
+import { containerLinkChoices, resolveContainerAppHref, resolvePublicAppUrl } from '@/lib/container-app-link';
 import { resolveContainerIconUrl } from '@/lib/container-icon';
 import { setComposeServicePublicUrl, setComposeServiceUrl } from '@/lib/compose-icon-yaml';
 import { formatBytes, formatPercent, formatRelativeTime, usageRatio } from '@/lib/format';
@@ -122,6 +122,7 @@ export function CasaDesktop({
   const [editingName, setEditingName] = useState<string | null>(null);
   const [draftUrl, setDraftUrl] = useState('');
   const [draftPublicUrl, setDraftPublicUrl] = useState('');
+  const [linkPicker, setLinkPicker] = useState<string | null>(null);
   const [urlMessage, setUrlMessage] = useState<string | null>(null);
   const [urlBusy, setUrlBusy] = useState(false);
   const [pendingRecreate, setPendingRecreate] = useState<{
@@ -246,6 +247,24 @@ export function CasaDesktop({
       document.removeEventListener('visibilitychange', onVisibility);
     };
   }, []);
+
+  useEffect(() => {
+    if (!linkPicker) return;
+    const close = (event: PointerEvent) => {
+      const target = event.target;
+      if (target instanceof Element && target.closest('[data-link-picker]')) return;
+      setLinkPicker(null);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setLinkPicker(null);
+    };
+    window.addEventListener('pointerdown', close);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('pointerdown', close);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [linkPicker]);
 
   useEffect(() => {
     if (!editingName) return;
@@ -823,9 +842,17 @@ export function CasaDesktop({
                 publicUrlOverrides,
                 discoveredUrls,
               );
+              const linkChoices = containerLinkChoices(
+                container,
+                pageHost,
+                publicUrlOverrides,
+                discoveredUrls,
+              ).map((choice) => ({
+                ...choice,
+                label: choice.key === 'public' ? home.appUrlPublic : home.appUrlInternal,
+              }));
               const primary =
                 target.external || !publicHref ? target : { href: publicHref, external: true as const };
-              const extraPublic = Boolean(publicHref && publicHref !== primary.href);
               const icon = resolveContainerIconUrl(container.labels);
               const runningTile = container.status === 'running';
               return (
@@ -834,8 +861,12 @@ export function CasaDesktop({
                     href={primary.href}
                     external={primary.external}
                     name={container.name}
-                    publicHref={extraPublic ? publicHref ?? undefined : undefined}
-                    publicLabel={home.appUrlPublic}
+                    linkChoices={linkChoices}
+                    linksOpen={linkPicker === container.name}
+                    linksLabel={home.chooseLink}
+                    onToggleLinks={() =>
+                      setLinkPicker((current) => (current === container.name ? null : container.name))
+                    }
                     dimmed={!runningTile}
                     dragging={dragContainer === container.name}
                     onPointerDown={(event) => {
@@ -898,21 +929,10 @@ export function CasaDesktop({
                               return;
                             }
                             const pending = pendingRecreate?.name === container.name;
+                            setLinkPicker(null);
                             setEditingName(container.name);
-                            setDraftUrl(
-                              container.labels.url ||
-                                container.labels['dockora.url'] ||
-                                container.labels['homepage.href'] ||
-                                '',
-                            );
-                            setDraftPublicUrl(
-                              resolvePublicAppUrl(
-                                container.name,
-                                container.labels,
-                                publicUrlOverrides,
-                                discoveredUrls,
-                              ) ?? '',
-                            );
+                            setDraftUrl(target.external ? target.href : '');
+                            setDraftPublicUrl(publicHref ?? '');
                             setPendingRecreate((current) =>
                               current?.name === container.name ? current : null,
                             );
@@ -1108,6 +1128,10 @@ function ContainerTile({
   detailLabel,
   editLabel,
   onEdit,
+  linkChoices,
+  linksOpen,
+  linksLabel,
+  onToggleLinks,
   publicHref,
   publicLabel,
   removeLabel,
@@ -1132,6 +1156,10 @@ function ContainerTile({
   detailLabel: string;
   editLabel?: string;
   onEdit?: () => void;
+  linkChoices?: { key: string; label: string; href: string }[];
+  linksOpen?: boolean;
+  linksLabel?: string;
+  onToggleLinks?: () => void;
   publicHref?: string;
   publicLabel?: string;
   removeLabel?: string;
@@ -1144,7 +1172,7 @@ function ContainerTile({
   onDragOver: (event: ReactDragEvent<HTMLDivElement>) => void;
   onDrop: () => void;
   onDragEnd: (event: ReactDragEvent<HTMLDivElement>) => void;
-  onClick: (event: ReactMouseEvent<HTMLAnchorElement>) => void;
+  onClick: (event: ReactMouseEvent<HTMLElement>) => void;
 }) {
   const shell = cn(
     'dockora-glass relative flex flex-col items-center px-2 pb-3 transition-transform hover:-translate-y-0.5 hover:border-dockora-pink/45',
@@ -1152,15 +1180,32 @@ function ContainerTile({
     dragging && 'opacity-50',
   );
   const face = 'flex w-full items-center justify-center px-2 pt-3';
-  const open = external ? (
-    <a href={href} target="_blank" rel="noopener noreferrer" title={name} className={face} onClick={onClick}>
-      {children}
-    </a>
-  ) : (
-    <Link href={href} title={name} className={face} onClick={onClick}>
-      {children}
-    </Link>
-  );
+  const open =
+    linkChoices && linkChoices.length > 0 && onToggleLinks ? (
+      <button
+        type="button"
+        data-link-picker=""
+        title={name}
+        aria-label={`${name}. ${linksLabel ?? name}`}
+        aria-expanded={linksOpen}
+        className={face}
+        onClick={(event) => {
+          onClick(event);
+          if (event.defaultPrevented) return;
+          onToggleLinks();
+        }}
+      >
+        {children}
+      </button>
+    ) : external ? (
+      <a href={href} target="_blank" rel="noopener noreferrer" title={name} className={face} onClick={onClick}>
+        {children}
+      </a>
+    ) : (
+      <Link href={href} title={name} className={face} onClick={onClick}>
+        {children}
+      </Link>
+    );
   return (
     <div
       className={shell}
@@ -1176,6 +1221,28 @@ function ContainerTile({
       }}
     >
       {open}
+      {linksOpen && linkChoices && linkChoices.length > 0 ? (
+        <ul
+          data-link-picker=""
+          className="dockora-glass absolute left-1/2 top-[4.5rem] z-30 w-[min(16rem,70vw)] -translate-x-1/2 overflow-hidden py-1 text-left"
+        >
+          {linkChoices.map((choice) => (
+            <li key={choice.key}>
+              <a
+                href={choice.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block px-3 py-2 hover:bg-white/5"
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={() => onToggleLinks?.()}
+              >
+                <span className="block text-xs text-dockora-text">{choice.label}</span>
+                <span className="block truncate text-[10px] text-dockora-muted">{choice.href}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      ) : null}
       {detailHref.startsWith('http') ? (
         <a
           href={detailHref}

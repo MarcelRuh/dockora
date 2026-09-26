@@ -109,6 +109,7 @@ export const en = {
         more: 'Engine and history',
         openInDockora: 'Open in Dockora',
         appUrl: 'Address',
+        chooseLink: 'Choose a link',
         appUrlInternal: 'Internal',
         appUrlPublic: 'Public',
         appUrlSave: 'Save',

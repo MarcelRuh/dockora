@@ -107,6 +107,7 @@ export const de = {
         more: 'Engine und Verlauf',
         openInDockora: 'In Dockora öffnen',
         appUrl: 'Adresse',
+        chooseLink: 'Link wählen',
         appUrlInternal: 'Intern',
         appUrlPublic: 'Öffentlich',
         appUrlSave: 'Speichern',
