@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.15] – 2026-09-26
+
+### Changed
+
+- Home screen: larger container icons, status dots, and a compact Dockora launcher
+
 ## [2.0.14] – 2026-09-26
 
 ### Added

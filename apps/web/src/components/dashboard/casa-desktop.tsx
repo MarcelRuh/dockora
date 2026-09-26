@@ -253,6 +253,7 @@ export function CasaDesktop({ overview }: { overview: DashboardOverview }) {
             action={home.open}
             tone="pink"
             alert={unhealthy.length > 0 ? unhealthy.map((item) => item.name).join(', ') : null}
+            icon={<NAV_ICONS.containers className="h-8 w-8" />}
           />
           <FeatureCard
             href={overview.updatesAvailable > 0 ? '/updates' : '/monitoring'}
@@ -266,14 +267,15 @@ export function CasaDesktop({ overview }: { overview: DashboardOverview }) {
             }
             action={home.open}
             tone="cyan"
+            icon={<NAV_ICONS.monitoring className="h-8 w-8" />}
           />
         </div>
 
-        <section aria-label={home.apps}>
-          <div className="mb-3 flex items-center justify-between gap-3">
+        <section aria-label={home.apps} className="relative">
+          <div className="mb-3 flex items-center gap-3">
             <h2 className="text-sm font-medium text-dockora-text">{home.apps}</h2>
             {hint ? (
-              <p className="flex items-center gap-2 rounded-md bg-black/45 px-2 py-1 text-xs text-white">
+              <p className="flex items-center gap-2 rounded-md bg-black/55 px-2 py-1 text-xs text-white">
                 {home.dragHint}
                 <button
                   type="button"
@@ -288,8 +290,15 @@ export function CasaDesktop({ overview }: { overview: DashboardOverview }) {
                 </button>
               </p>
             ) : null}
+            <Link
+              href="/compose/new"
+              className="dockora-glass ml-auto flex h-9 w-9 items-center justify-center text-2xl leading-none text-dockora-muted hover:text-white"
+              aria-label={home.add}
+            >
+              +
+            </Link>
           </div>
-          <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+          <ul className="grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-3">
             {orderedContainers.map((container) => {
               const target = resolveContainerAppHref(container, pageHost);
               const icon = resolveContainerIconUrl(container.labels);
@@ -341,10 +350,20 @@ export function CasaDesktop({ overview }: { overview: DashboardOverview }) {
                       dragged.current = false;
                     }}
                   >
-                    <span className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl bg-white/10">
-                      <ServiceIcon url={icon} alt={container.name} className="h-14 w-14 rounded-2xl" />
+                    <span className="relative">
+                      <ServiceIcon
+                        url={icon}
+                        alt={container.name}
+                        className="h-[4.25rem] w-[4.25rem] rounded-[1.15rem] bg-white/[0.06] object-contain p-1.5 text-2xl"
+                      />
+                      <span
+                        className={cn(
+                          'absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-[#0d0d15]',
+                          runningTile ? 'bg-dockora-success' : 'bg-dockora-muted',
+                        )}
+                      />
                     </span>
-                    <span className="max-w-full truncate text-sm text-dockora-text">{container.name}</span>
+                    <span className="max-w-full truncate text-xs text-dockora-text">{container.name}</span>
                   </ContainerTile>
                 </li>
               );
@@ -356,7 +375,7 @@ export function CasaDesktop({ overview }: { overview: DashboardOverview }) {
           <div className="mb-3 flex items-center justify-between gap-3">
             <h2 className="text-sm font-medium text-dockora-text">{home.suite}</h2>
           </div>
-          <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+          <ul className="flex flex-wrap gap-2">
             {apps.map((app) => {
               const Icon = NAV_ICONS[app.key];
               return (
@@ -398,33 +417,23 @@ export function CasaDesktop({ overview }: { overview: DashboardOverview }) {
                       dragged.current = false;
                     }}
                     className={cn(
-                      'dockora-glass flex h-full flex-col items-center justify-center gap-3 px-3 py-5 text-center transition-transform hover:-translate-y-0.5',
+                      'dockora-glass flex items-center gap-2 rounded-2xl px-2.5 py-2 text-xs transition-transform hover:-translate-y-0.5',
                       dragKey === app.key && 'opacity-50',
                     )}
                   >
                     <span
                       className={cn(
-                        'flex h-14 w-14 items-center justify-center rounded-2xl text-white shadow-neon-soft',
+                        'flex h-8 w-8 items-center justify-center rounded-xl text-white',
                         TILE[app.key],
                       )}
                     >
-                      <Icon className="h-7 w-7" />
+                      <Icon className="h-4 w-4" />
                     </span>
-                    <span className="text-sm text-dockora-text">{t.nav[app.key]}</span>
+                    <span className="text-dockora-text">{t.nav[app.key]}</span>
                   </Link>
                 </li>
               );
             })}
-            <li>
-              <Link
-                href="/compose/new"
-                className="dockora-glass flex h-full min-h-[8.5rem] flex-col items-center justify-center gap-2 px-3 py-5 text-dockora-muted hover:text-white"
-                aria-label={home.add}
-              >
-                <span className="text-3xl leading-none">+</span>
-                <span className="text-xs">{home.add}</span>
-              </Link>
-            </li>
           </ul>
         </section>
       </div>
@@ -458,7 +467,7 @@ function ContainerTile({
   onClick: (event: ReactMouseEvent<HTMLAnchorElement>) => void;
 }) {
   const className = cn(
-    'dockora-glass flex h-full min-h-[8.5rem] flex-col items-center justify-center gap-3 px-3 py-5 text-center transition-transform hover:-translate-y-0.5',
+    'dockora-glass flex aspect-square flex-col items-center justify-center gap-2.5 px-2 py-3 text-center transition-transform hover:-translate-y-0.5 hover:border-dockora-pink/45',
     dimmed && 'opacity-50',
     dragging && 'opacity-50',
   );
@@ -755,6 +764,7 @@ function FeatureCard({
   action,
   tone,
   alert,
+  icon,
 }: {
   href: string;
   title: string;
@@ -762,22 +772,34 @@ function FeatureCard({
   action: string;
   tone: 'pink' | 'cyan';
   alert?: string | null;
+  icon?: ReactNode;
 }) {
   return (
-    <Link href={href} className="dockora-glass flex min-h-[9.5rem] flex-col justify-between px-5 py-4">
-      <div>
+    <Link href={href} className="dockora-glass relative flex min-h-[8.5rem] items-center justify-between gap-3 overflow-hidden px-5 py-4">
+      <div className="relative z-10 min-w-0">
         <h2 className="text-lg font-medium">{title}</h2>
         <p className="mt-1 text-sm text-dockora-muted">{body}</p>
         {alert ? <p className="mt-1 truncate text-xs text-dockora-danger">{alert}</p> : null}
+        <span
+          className={cn(
+            'mt-4 inline-flex w-fit rounded-full px-3 py-1 text-xs font-medium text-white',
+            tone === 'pink' ? 'bg-dockora-pink' : 'bg-dockora-blue',
+          )}
+        >
+          {action}
+        </span>
       </div>
-      <span
-        className={cn(
-          'mt-4 inline-flex w-fit rounded-full px-3 py-1 text-xs font-medium text-white',
-          tone === 'pink' ? 'bg-dockora-pink' : 'bg-dockora-blue',
-        )}
-      >
-        {action}
-      </span>
+      {icon ? (
+        <span
+          className={cn(
+            'pointer-events-none flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-white/5',
+            tone === 'pink' ? 'text-dockora-pink' : 'text-dockora-blue',
+          )}
+          aria-hidden
+        >
+          {icon}
+        </span>
+      ) : null}
     </Link>
   );
 }
