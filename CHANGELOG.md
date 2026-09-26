@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.31] – 2026-09-26
+
+### Changed
+
+- The home dashboard uses the same flat Ora panels, fields, and buttons as the other pages
+
 ## [2.0.30] – 2026-09-26
 
 ### Changed

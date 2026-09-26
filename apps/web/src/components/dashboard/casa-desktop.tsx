@@ -17,7 +17,7 @@ import { HOME_DOCK_KEYS } from '@dockora/shared';
 import { AuthLogoutButton, useAuth } from '@/components/auth/auth-provider';
 import { BrandLogoWide } from '@/components/ui/brand-logo';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { Button } from '@/components/ui/form-controls';
+import { Button, buttonClassName } from '@/components/ui/form-controls';
 import { NAV_ICONS } from '@/components/ui/nav-icons';
 import { ServiceIcon } from '@/components/ui/service-icon';
 import { useLocale } from '@/i18n/locale-provider';
@@ -60,21 +60,6 @@ const APPS = [
 type AppKey = (typeof APPS)[number]['key'];
 const DOCK_KEYS: AppKey[] = [...HOME_DOCK_KEYS];
 type DockKey = AppKey;
-
-const TILE: Record<AppKey, string> = {
-  containers: 'bg-gradient-to-br from-dockora-pink to-dockora-purple',
-  compose: 'bg-gradient-to-br from-dockora-purple to-dockora-blue',
-  images: 'bg-gradient-to-br from-dockora-blue to-dockora-purple',
-  volumes: 'bg-gradient-to-br from-dockora-success to-dockora-blue',
-  updates: 'bg-gradient-to-br from-dockora-pink to-dockora-danger',
-  monitoring: 'bg-gradient-to-br from-dockora-blue to-dockora-success',
-  network: 'bg-gradient-to-br from-dockora-purple to-dockora-pink',
-  backups: 'bg-gradient-to-br from-dockora-blue to-dockora-purple',
-  logs: 'bg-gradient-to-br from-dockora-muted to-dockora-purple',
-  terminal: 'bg-gradient-to-br from-dockora-pink to-dockora-blue',
-  selfUpdate: 'bg-gradient-to-br from-dockora-pink to-dockora-purple',
-  settings: 'bg-gradient-to-br from-dockora-purple to-dockora-surface2',
-};
 
 const HINT_KEY = 'dockora.home.dragHint';
 
@@ -520,7 +505,7 @@ export function CasaDesktop({
         <div className="relative">
           <button
             type="button"
-            className="dockora-glass flex w-full items-center justify-between px-4 py-3 text-sm text-dockora-text"
+            className="dockora-panel flex w-full items-center justify-between px-4 py-3 text-xs font-medium uppercase tracking-wide text-dockora-text"
             onClick={() => setSettingsOpen((open) => !open)}
             aria-expanded={settingsOpen}
           >
@@ -528,7 +513,7 @@ export function CasaDesktop({
             <Chevron />
           </button>
           {settingsOpen ? (
-            <div className="dockora-glass mt-2 space-y-2 px-4 py-3 text-sm">
+            <div className="dockora-panel mt-2 space-y-2 px-4 py-3 text-sm">
               <WidgetToggle
                 label={home.showSystem}
                 checked={widgets.system}
@@ -558,13 +543,13 @@ export function CasaDesktop({
               onChange={(event) => setQuery(event.target.value)}
               placeholder={home.searchPlaceholder}
               aria-label={home.searchPlaceholder}
-              className="dockora-glass w-full rounded-full border-white/10 bg-black/30 px-4 py-3 text-sm outline-none placeholder:text-dockora-muted"
+              className="dockora-field w-full px-3.5"
             />
             {pageHits.length > 0 ? (
-              <ul className="dockora-glass absolute left-0 right-0 z-30 mt-2 overflow-hidden py-1">
+              <ul className="dockora-panel absolute left-0 right-0 z-30 mt-2 overflow-hidden py-1">
                 {pageHits.map((hit) => (
                   <li key={hit.key}>
-                    <Link href={hit.href} className="block px-4 py-2 text-sm hover:bg-white/5" onClick={() => setQuery('')}>
+                    <Link href={hit.href} className="block px-4 py-2 text-sm uppercase tracking-wide hover:bg-dockora-accentSoft" onClick={() => setQuery('')}>
                       {t.nav[hit.key]}
                     </Link>
                   </li>
@@ -574,7 +559,7 @@ export function CasaDesktop({
           </div>
           <select
             aria-label={t.locale.label}
-            className="dockora-glass h-11 shrink-0 bg-transparent px-3 font-mono text-xs"
+            className="dockora-field dockora-select h-10 shrink-0 px-3 font-mono text-xs"
             value={locale}
             onChange={(e) => setLocale(e.target.value as Locale)}
           >
@@ -583,6 +568,7 @@ export function CasaDesktop({
           </select>
           <AuthLogoutButton className="w-auto shrink-0 px-3" />
         </div>
+        <div className="dockora-neon-line" />
 
         <div className="grid gap-3 md:grid-cols-2">
           <FeatureCard
@@ -634,7 +620,7 @@ export function CasaDesktop({
                     type="button"
                     disabled={checking}
                     onClick={() => void checkForUpdates()}
-                    className="rounded-full border border-white/15 px-2 py-0.5 text-dockora-text disabled:opacity-50"
+                    className={buttonClassName({ size: 'sm' })}
                   >
                     {checking ? home.checking : home.checkNow}
                   </button>
@@ -648,9 +634,9 @@ export function CasaDesktop({
 
         <section aria-label={home.apps} className="relative">
           <div className="mb-3 flex items-center gap-3">
-            <h2 className="text-sm font-medium text-dockora-text">{home.apps}</h2>
+            <h2 className="dockora-section-tag">{home.apps}</h2>
             {hint ? (
-              <p className="flex items-center gap-2 rounded-md bg-black/55 px-2 py-1 text-xs text-white">
+              <p className="flex items-center gap-2 border border-dockora-border bg-black/40 px-2 py-1 text-xs text-white">
                 {home.dragHint}
                 <button
                   type="button"
@@ -668,7 +654,7 @@ export function CasaDesktop({
             <div className="relative ml-auto">
               <button
                 type="button"
-                className="dockora-glass flex h-9 w-9 items-center justify-center text-2xl leading-none text-dockora-muted hover:text-white"
+                className={buttonClassName({ size: 'sm', className: 'w-9 px-0 text-base' })}
                 aria-label={home.add}
                 aria-expanded={addMenu}
                 onClick={() => setAddMenu((open) => !open)}
@@ -676,17 +662,17 @@ export function CasaDesktop({
                 +
               </button>
               {addMenu ? (
-                <div className="dockora-glass absolute right-0 z-30 mt-2 w-44 overflow-hidden py-1 text-sm">
+                <div className="dockora-panel absolute right-0 z-30 mt-2 w-44 overflow-hidden py-1 text-sm">
                   <Link
                     href="/compose/new"
-                    className="block px-3 py-2 hover:bg-white/5"
+                    className="block px-3 py-2 uppercase tracking-wide hover:bg-dockora-accentSoft"
                     onClick={() => setAddMenu(false)}
                   >
                     {home.addStack}
                   </Link>
                   <button
                     type="button"
-                    className="block w-full px-3 py-2 text-left hover:bg-white/5"
+                    className="block w-full px-3 py-2 text-left uppercase tracking-wide hover:bg-dockora-accentSoft"
                     onClick={() => {
                       setAddMenu(false);
                       setLinkForm(true);
@@ -701,7 +687,7 @@ export function CasaDesktop({
           </div>
           {linkForm ? (
             <form
-              className="dockora-glass mb-3 grid gap-2 p-3 sm:grid-cols-2"
+              className="dockora-panel mb-3 grid gap-2 p-3 sm:grid-cols-2"
               onSubmit={(event) => {
                 event.preventDefault();
                 const name = linkDraft.name.trim();
@@ -730,7 +716,7 @@ export function CasaDesktop({
                 <input
                   value={linkDraft.name}
                   onChange={(event) => setLinkDraft((draft) => ({ ...draft, name: event.target.value }))}
-                  className="mt-1 w-full rounded-md border border-white/10 bg-black/40 px-2 py-1 text-xs text-dockora-text"
+                  className="dockora-field mt-1 h-8 w-full px-2 text-xs"
                 />
               </label>
               <label className="text-[11px] text-dockora-muted">
@@ -739,7 +725,7 @@ export function CasaDesktop({
                   value={linkDraft.url}
                   onChange={(event) => setLinkDraft((draft) => ({ ...draft, url: event.target.value }))}
                   placeholder="https://"
-                  className="mt-1 w-full rounded-md border border-white/10 bg-black/40 px-2 py-1 text-xs text-dockora-text"
+                  className="dockora-field mt-1 h-8 w-full px-2 text-xs"
                 />
               </label>
               <label className="text-[11px] text-dockora-muted sm:col-span-2">
@@ -748,17 +734,17 @@ export function CasaDesktop({
                   value={linkDraft.icon}
                   onChange={(event) => setLinkDraft((draft) => ({ ...draft, icon: event.target.value }))}
                   placeholder="https://"
-                  className="mt-1 w-full rounded-md border border-white/10 bg-black/40 px-2 py-1 text-xs text-dockora-text"
+                  className="dockora-field mt-1 h-8 w-full px-2 text-xs"
                 />
               </label>
               {linkError ? <p className="text-[11px] text-dockora-danger sm:col-span-2">{linkError}</p> : null}
               <div className="flex gap-2 sm:col-span-2">
-                <button type="submit" className="rounded-full bg-dockora-pink px-3 py-1 text-[11px] text-white">
+                <button type="submit" className={buttonClassName({ variant: 'primary', size: 'sm' })}>
                   {home.linkSave}
                 </button>
                 <button
                   type="button"
-                  className="rounded-full px-3 py-1 text-[11px] text-dockora-muted hover:text-white"
+                  className={buttonClassName({ variant: 'ghost', size: 'sm' })}
                   onClick={() => {
                     setLinkForm(false);
                     setLinkError(null);
@@ -833,7 +819,7 @@ export function CasaDesktop({
                       <ServiceIcon
                         url={link.icon}
                         alt={link.name}
-                        className="h-14 w-14 rounded-2xl bg-white/[0.06] object-contain p-1.5 text-xl sm:h-[4.25rem] sm:w-[4.25rem] sm:rounded-[1.15rem] sm:text-2xl"
+                        className="h-12 w-12 border border-dockora-border bg-black/30 object-contain p-1.5 sm:h-14 sm:w-14"
                       />
                     </ContainerTile>
                   </li>
@@ -961,7 +947,7 @@ export function CasaDesktop({
                               value={draftUrl}
                               onChange={(event) => setDraftUrl(event.target.value)}
                               placeholder="http://"
-                              className="mt-1 w-full rounded-md border border-white/10 bg-black/40 px-2 py-1 text-xs text-dockora-text"
+                              className="dockora-field mt-1 h-8 w-full px-2 text-xs"
                             />
                           </label>
                           <label className="block text-[11px] text-dockora-muted">
@@ -970,7 +956,7 @@ export function CasaDesktop({
                               value={draftPublicUrl}
                               onChange={(event) => setDraftPublicUrl(event.target.value)}
                               placeholder="https://"
-                              className="mt-1 w-full rounded-md border border-white/10 bg-black/40 px-2 py-1 text-xs text-dockora-text"
+                              className="dockora-field mt-1 h-8 w-full px-2 text-xs"
                             />
                           </label>
                           <p className="text-[10px] leading-snug text-dockora-muted">{home.appUrlHint}</p>
@@ -980,7 +966,7 @@ export function CasaDesktop({
                             <button
                               type="submit"
                               disabled={urlBusy}
-                              className="rounded-full bg-dockora-pink px-2 py-1 text-[11px] text-white disabled:opacity-50"
+                              className={buttonClassName({ variant: 'primary', size: 'sm' })}
                             >
                               {home.appUrlSave}
                             </button>
@@ -989,14 +975,14 @@ export function CasaDesktop({
                                 type="button"
                                 disabled={urlBusy}
                                 onClick={() => void recreateSavedService()}
-                                className="rounded-full border border-white/15 px-2 py-1 text-[11px] text-dockora-text disabled:opacity-50"
+                                className={buttonClassName({ size: 'sm' })}
                               >
                                 {urlBusy ? home.appUrlRecreating : home.appUrlRecreate}
                               </button>
                             ) : null}
                             <button
                               type="button"
-                              className="rounded-full px-2 py-1 text-[11px] text-dockora-muted hover:text-white"
+                              className={buttonClassName({ variant: 'ghost', size: 'sm' })}
                               onClick={() => setEditingName(null)}
                             >
                               {t.common.close}
@@ -1010,11 +996,11 @@ export function CasaDesktop({
                       <ServiceIcon
                         url={icon}
                         alt={container.name}
-                        className="h-14 w-14 rounded-2xl bg-white/[0.06] object-contain p-1.5 text-xl sm:h-[4.25rem] sm:w-[4.25rem] sm:rounded-[1.15rem] sm:text-2xl"
+                        className="h-12 w-12 border border-dockora-border bg-black/30 object-contain p-1.5 sm:h-14 sm:w-14"
                       />
                       <span
                         className={cn(
-                          'absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-[#0d0d15]',
+                          'absolute right-0.5 top-0.5 h-2 w-2 rounded-full ring-2 ring-dockora-surface',
                           runningTile ? 'bg-dockora-success' : 'bg-dockora-muted',
                         )}
                       />
@@ -1027,6 +1013,7 @@ export function CasaDesktop({
         </section>
 
         <section aria-label={home.suite}>
+          <h2 className="dockora-section-tag mb-3">{home.suite}</h2>
           <ul className="flex gap-2 overflow-x-auto pb-1 md:flex-wrap md:overflow-visible">
             {apps.map((app) => {
               const Icon = NAV_ICONS[app.key];
@@ -1073,16 +1060,11 @@ export function CasaDesktop({
                     }}
                     title={t.nav[app.key]}
                     className={cn(
-                      'dockora-glass flex shrink-0 items-center gap-2 rounded-2xl px-2.5 py-2 text-xs transition-transform hover:-translate-y-0.5',
+                      'dockora-panel flex shrink-0 items-center gap-2 px-2.5 py-2 text-xs uppercase tracking-wide',
                       dragKey === app.key && 'opacity-50',
                     )}
                   >
-                    <span
-                      className={cn(
-                        'flex h-8 w-8 items-center justify-center rounded-xl text-white',
-                        TILE[app.key],
-                      )}
-                    >
+                    <span className="flex h-8 w-8 items-center justify-center text-dockora-pink">
                       <Icon className="h-4 w-4" />
                     </span>
                     <span className="hidden text-dockora-text sm:inline">{t.nav[app.key]}</span>
@@ -1262,7 +1244,7 @@ function ContainerTile({
   onClick: (event: ReactMouseEvent<HTMLElement>) => void;
 }) {
   const shell = cn(
-    'dockora-glass relative flex flex-col items-center px-2 pb-3 transition-transform hover:-translate-y-0.5 hover:border-dockora-pink/45',
+    'dockora-panel relative flex flex-col items-center px-2 pb-3',
     dimmed && 'opacity-50',
     dragging && 'opacity-50',
   );
@@ -1337,7 +1319,7 @@ function ContainerTile({
             <button
               type="button"
               disabled={updateBusy}
-              className="inline-flex rounded-full bg-dockora-pink px-2.5 py-1 text-[11px] text-white disabled:opacity-50"
+              className={buttonClassName({ variant: 'primary', size: 'sm' })}
               onPointerDown={(event) => event.stopPropagation()}
               onClick={(event) => {
                 event.preventDefault();
@@ -1353,7 +1335,7 @@ function ContainerTile({
               href={publicHref}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex rounded-full border border-white/15 px-2.5 py-1 text-[11px] text-dockora-text hover:border-dockora-pink/50 hover:text-white"
+              className={buttonClassName({ size: 'sm' })}
               onPointerDown={(event) => event.stopPropagation()}
             >
               {publicLabel}
@@ -1363,7 +1345,7 @@ function ContainerTile({
             <button
               type="button"
               aria-label={editLabel}
-              className="inline-flex items-center gap-1 rounded-full border border-white/15 px-2.5 py-1 text-[11px] text-dockora-text hover:border-dockora-pink/50 hover:text-white"
+              className={buttonClassName({ size: 'sm', className: 'gap-1' })}
               onPointerDown={(event) => event.stopPropagation()}
               onClick={(event) => {
                 event.preventDefault();
@@ -1381,7 +1363,7 @@ function ContainerTile({
           {onRemove ? (
             <button
               type="button"
-              className="inline-flex rounded-full border border-white/15 px-2.5 py-1 text-[11px] text-dockora-muted hover:text-white"
+              className={buttonClassName({ variant: 'ghost', size: 'sm' })}
               onPointerDown={(event) => event.stopPropagation()}
               onClick={(event) => {
                 event.preventDefault();
@@ -1406,8 +1388,8 @@ function ClockCard({ locale }: { locale: string }) {
     return () => window.clearInterval(id);
   }, []);
   return (
-    <section className="dockora-glass px-5 py-4">
-      <p className="font-display text-4xl tracking-wide">
+    <section className="dockora-panel px-5 py-4">
+      <p className="dockora-title-gradient text-4xl tracking-wide">
         {now.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}
       </p>
       <p className="mt-1 text-sm capitalize text-dockora-muted">
@@ -1431,13 +1413,13 @@ function SystemCard({
   const mem = usageRatio(overview.resources.memoryUsedBytes, overview.resources.memoryTotalBytes);
   const temp = overview.resources.temperatureC;
   return (
-    <section className="dockora-glass px-4 py-3">
+    <section className="dockora-panel px-4 py-3">
       <CardTitle href="/monitoring">{title}</CardTitle>
       <div className="mt-3 grid grid-cols-2 gap-2">
         <Gauge label="CPU" value={overview.resources.cpuPercent} locale={locale} tone="pink" />
         <Gauge label="RAM" value={mem} locale={locale} tone="cyan" />
       </div>
-      <p className="mt-2 text-center font-mono text-xs text-dockora-muted">
+      <p className="mt-3 font-mono text-xs text-dockora-muted">
         {temp != null ? `${temp.toFixed(0)}°C` : null}
         {temp != null && overview.resources.cpuCores ? ' · ' : null}
         {overview.resources.cpuCores
@@ -1465,25 +1447,15 @@ function StorageCard({
   const ratio = usageRatio(overview.resources.diskUsedBytes, overview.resources.diskTotalBytes);
   const healthy = ratio == null || ratio < 90;
   return (
-    <section className="dockora-glass px-4 py-3">
+    <section className="dockora-panel px-4 py-3">
       <CardTitle href="/monitoring">{labels.storage}</CardTitle>
-      <div className="mt-3 flex items-center gap-3">
-        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-dockora-blue/15 text-dockora-blue">
-          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.75">
-            <ellipse cx="12" cy="7" rx="7" ry="3" />
-            <path d="M5 7v10c0 1.7 3.1 3 7 3s7-1.3 7-3V7" />
-          </svg>
-        </span>
-        <div className="min-w-0">
-          <p className="text-sm">{diskLabel}</p>
-          <p className={cn('text-xs', healthy ? 'text-dockora-success' : 'text-dockora-warning')}>
-            {healthy ? labels.healthy : formatPercent(ratio, locale)}
-          </p>
-        </div>
-      </div>
-      <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
+      <p className="mt-3 text-xs font-medium uppercase tracking-wide text-dockora-muted">{diskLabel}</p>
+      <p className={cn('mt-1 text-2xl', healthy ? 'dockora-stat-gradient' : 'text-dockora-warning')}>
+        {formatPercent(ratio, locale)}
+      </p>
+      <div className="mt-2 h-1 bg-white/10">
         <div
-          className="h-full rounded-full bg-gradient-to-r from-dockora-pink to-dockora-blue"
+          className="h-full bg-gradient-to-r from-dockora-pink to-dockora-purple"
           style={{ width: `${Math.max(2, ratio ?? 0)}%` }}
         />
       </div>
@@ -1518,7 +1490,7 @@ function NetworkCard({
   }, [rx, tx]);
 
   return (
-    <section className="dockora-glass px-4 py-3">
+    <section className="dockora-panel px-4 py-3">
       <CardTitle href="/network">{labels.network}</CardTitle>
       <p className="mt-1 font-mono text-[11px] text-dockora-muted">{overview.resources.networkInterface ?? '—'}</p>
       <RateChart history={history} />
@@ -1584,31 +1556,19 @@ function Gauge({
   tone: 'pink' | 'cyan';
 }) {
   const pct = value == null ? 0 : Math.max(0, Math.min(100, value));
-  const radius = 28;
-  const circ = 2 * Math.PI * radius;
-  const color = tone === 'pink' ? '#ff006e' : '#00b4d8';
   return (
-    <div className="flex flex-col items-center gap-1">
-      <div className="relative h-[4.5rem] w-[4.5rem]">
-        <svg viewBox="0 0 72 72" className="h-full w-full">
-          <circle cx="36" cy="36" r={radius} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="6" />
-          <circle
-            cx="36"
-            cy="36"
-            r={radius}
-            fill="none"
-            stroke={color}
-            strokeWidth="6"
-            strokeLinecap="round"
-            strokeDasharray={`${(pct / 100) * circ} ${circ}`}
-            transform="rotate(-90 36 36)"
-          />
-        </svg>
-        <span className="absolute inset-0 flex items-center justify-center font-mono text-xs">
-          {formatPercent(value, locale)}
-        </span>
+    <div>
+      <p className="text-xs font-medium uppercase tracking-wide text-dockora-muted">{label}</p>
+      <p className="dockora-stat-gradient mt-1 text-2xl">{formatPercent(value, locale)}</p>
+      <div className="mt-2 h-1 bg-white/10">
+        <div
+          className={cn(
+            'h-full bg-gradient-to-r from-dockora-pink',
+            tone === 'pink' ? 'to-dockora-purple' : 'to-dockora-blue',
+          )}
+          style={{ width: `${Math.max(2, pct)}%` }}
+        />
       </div>
-      <span className="text-[11px] uppercase tracking-wide text-dockora-muted">{label}</span>
     </div>
   );
 }
@@ -1616,7 +1576,7 @@ function Gauge({
 function CardTitle({ href, children }: { href: string; children: string }) {
   return (
     <div className="flex items-center justify-between gap-2">
-      <h2 className="text-sm font-medium">{children}</h2>
+      <h2 className="dockora-section-tag">{children}</h2>
       <Link href={href} className="text-dockora-muted hover:text-white" aria-label={children}>
         <Chevron />
       </Link>
@@ -1679,19 +1639,13 @@ function FeatureCard({
   footer?: ReactNode;
 }) {
   return (
-    <div className="dockora-glass relative flex min-h-[8.5rem] items-center justify-between gap-3 overflow-hidden px-5 py-4">
+    <div className="dockora-panel relative flex min-h-[8.5rem] items-center justify-between gap-3 px-5 py-4">
       <div className="relative z-10 min-w-0">
-        <h2 className="text-lg font-medium">{title}</h2>
+        <h2 className="dockora-title-gradient text-xl">{title}</h2>
         <p className="mt-1 text-sm text-dockora-muted">{body}</p>
         {alert ? <p className="mt-1 truncate text-xs text-dockora-danger">{alert}</p> : null}
         <div className="mt-4 flex flex-wrap gap-2">
-          <Link
-            href={href}
-            className={cn(
-              'inline-flex w-fit rounded-full px-3 py-1 text-xs font-medium text-white',
-              tone === 'pink' ? 'bg-dockora-pink' : 'bg-dockora-blue',
-            )}
-          >
+          <Link href={href} className={buttonClassName({ variant: 'primary', size: 'sm' })}>
             {action}
           </Link>
           {updateLabel && onUpdate ? (
@@ -1699,17 +1653,13 @@ function FeatureCard({
               type="button"
               disabled={updateBusy}
               onClick={onUpdate}
-              className="inline-flex rounded-full bg-dockora-pink px-3 py-1 text-xs font-medium text-white disabled:opacity-50"
+              className={buttonClassName({ variant: 'primary', size: 'sm' })}
             >
               {updateLabel}
             </button>
           ) : null}
           {secondaryLabel && onSecondary ? (
-            <button
-              type="button"
-              onClick={onSecondary}
-              className="inline-flex rounded-full border border-white/15 px-3 py-1 text-xs text-dockora-text"
-            >
+            <button type="button" onClick={onSecondary} className={buttonClassName({ size: 'sm' })}>
               {secondaryLabel}
             </button>
           ) : null}
@@ -1719,7 +1669,7 @@ function FeatureCard({
       {icon ? (
         <span
           className={cn(
-            'pointer-events-none flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-white/5',
+            'pointer-events-none flex h-12 w-12 shrink-0 items-center justify-center border border-dockora-border',
             tone === 'pink' ? 'text-dockora-pink' : 'text-dockora-blue',
           )}
           aria-hidden
