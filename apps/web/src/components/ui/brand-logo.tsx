@@ -42,14 +42,21 @@ type BrandLogoWideProps = {
   size?: BrandLogoSize;
 };
 
+const WORDMARK = {
+  sm: { mark: 'text-base', tag: 'mt-1 text-[0.55rem]', gap: 'gap-2' },
+  md: { mark: 'text-[1.35rem]', tag: 'mt-1.5 text-[0.62rem]', gap: 'gap-3' },
+  lg: { mark: 'text-[1.65rem]', tag: 'mt-1.5 text-[0.68rem]', gap: 'gap-3' },
+} as const;
+
 /** Hex mark + HTML wordmark (not a baked lockup image). */
 export function BrandLogoWide({ className, priority = false, size = 'md' }: BrandLogoWideProps) {
+  const text = WORDMARK[size];
   return (
-    <span className={cn('inline-flex items-center gap-3', className)}>
+    <span className={cn('inline-flex shrink-0 items-center', text.gap, className)}>
       <BrandLogo size={size} priority={priority} alt="" />
-      <span className="min-w-0 text-left leading-none">
-        <span className="dockora-logo-gradient block text-[1.35rem]">DOCKORA</span>
-        <span className="dockora-logo-tagline mt-1.5 block text-[0.58rem]">Docker Management Suite</span>
+      <span className="text-left">
+        <span className={cn('dockora-logo-gradient block', text.mark)}>DOCKORA</span>
+        <span className={cn('dockora-logo-tagline block', text.tag)}>Docker Management Suite</span>
       </span>
     </span>
   );

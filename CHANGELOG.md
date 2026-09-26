@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.19] – 2026-09-26
+
+### Fixed
+
+- Wordmark and tagline no longer clip, and the home no longer overlaps the address editor or refetches containers on every dashboard tick
+
 ## [2.0.18] – 2026-09-26
 
 ### Changed

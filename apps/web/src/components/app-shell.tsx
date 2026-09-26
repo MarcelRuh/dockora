@@ -232,12 +232,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <BrandLogo size="sm" priority />
             </Link>
           </div>
-          <div className="hidden min-w-0 flex-1 items-center gap-4 md:flex">
-            <BrandLogoWide size="sm" />
-            <span className="truncate text-sm font-medium text-dockora-muted">
-              {current ? t.nav[current.key] : null}
-            </span>
-          </div>
+          <BrandLogoWide size="sm" className="hidden md:inline-flex" />
+          <span className="hidden min-w-0 flex-1 truncate text-sm font-medium text-dockora-muted md:block">
+            {current ? t.nav[current.key] : null}
+          </span>
           <GlobalSearch compact className="hidden md:inline-flex" />
           <LocaleControls dense search={false} />
           <AuthLogoutButton className="hidden w-auto md:inline-flex" />

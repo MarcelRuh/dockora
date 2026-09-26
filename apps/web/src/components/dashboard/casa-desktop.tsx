@@ -177,6 +177,7 @@ export function CasaDesktop({
   useEffect(() => {
     let cancelled = false;
     const load = () => {
+      if (document.visibilityState === 'hidden') return;
       void fetchContainers()
         .then((list) => {
           if (!cancelled) setContainers(list);
@@ -185,11 +186,25 @@ export function CasaDesktop({
     };
     load();
     const timer = window.setInterval(load, 30_000);
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') load();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
     return () => {
       cancelled = true;
       window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [overview.containers.total, overview.containers.running]);
+  }, []);
+
+  useEffect(() => {
+    if (!editingName) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setEditingName(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [editingName]);
 
   const decoratedContainers = useMemo(
     () => containers.map((container) => withUrlOverride(container, urlOverrides)),
@@ -197,15 +212,15 @@ export function CasaDesktop({
   );
 
   const orderedContainers = useMemo(() => {
-    const byId = new Map(decoratedContainers.map((container) => [container.id, container]));
+    const byName = new Map(decoratedContainers.map((container) => [container.name, container]));
     const next: ContainerSummary[] = [];
-    for (const id of containerOrder) {
-      const container = byId.get(id);
+    for (const name of containerOrder) {
+      const container = byName.get(name);
       if (!container) continue;
       next.push(container);
-      byId.delete(id);
+      byName.delete(name);
     }
-    const rest = [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
+    const rest = [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
     return [...next, ...rest];
   }, [decoratedContainers, containerOrder]);
 
@@ -350,7 +365,7 @@ export function CasaDesktop({
             <Chevron />
           </button>
           {settingsOpen ? (
-            <div className="dockora-glass absolute left-0 right-0 z-20 mt-2 space-y-2 px-4 py-3 text-sm">
+            <div className="dockora-glass mt-2 space-y-2 px-4 py-3 text-sm">
               <WidgetToggle
                 label={home.showSystem}
                 checked={widgets.system}
@@ -473,7 +488,7 @@ export function CasaDesktop({
                     external={target.external}
                     name={container.name}
                     dimmed={!runningTile}
-                    dragging={dragContainer === container.id}
+                    dragging={dragContainer === container.name}
                     onPointerDown={(event) => {
                       const startX = event.clientX;
                       const startY = event.clientY;
@@ -482,22 +497,25 @@ export function CasaDesktop({
                         if (Math.hypot(ev.clientX - startX, ev.clientY - startY) > 8) {
                           dragged.current = true;
                           targetEl.draggable = true;
-                          setDragContainer(container.id);
+                          setDragContainer(container.name);
                         }
                       };
                       const up = () => {
                         window.removeEventListener('pointermove', move);
                         window.removeEventListener('pointerup', up);
+                        window.setTimeout(() => {
+                          dragged.current = false;
+                        }, 0);
                       };
                       window.addEventListener('pointermove', move);
                       window.addEventListener('pointerup', up);
                     }}
                     onDragOver={(event) => event.preventDefault()}
                     onDrop={() => {
-                      if (!dragContainer || dragContainer === container.id) return;
-                      const ids = orderedContainers.map((item) => item.id);
-                      const next = ids.filter((id) => id !== dragContainer);
-                      const index = next.indexOf(container.id);
+                      if (!dragContainer || dragContainer === container.name) return;
+                      const names = orderedContainers.map((item) => item.name);
+                      const next = names.filter((name) => name !== dragContainer);
+                      const index = next.indexOf(container.name);
                       next.splice(index < 0 ? next.length : index, 0, dragContainer);
                       setContainerOrder(next);
                       localStorage.setItem(CONTAINER_ORDER_KEY, JSON.stringify(next));
@@ -518,6 +536,11 @@ export function CasaDesktop({
                     onEdit={
                       canEdit
                         ? () => {
+                            if (editingName === container.name) {
+                              setEditingName(null);
+                              return;
+                            }
+                            const pending = pendingRecreate?.name === container.name;
                             setEditingName(container.name);
                             setDraftUrl(
                               container.labels.url ||
@@ -525,17 +548,17 @@ export function CasaDesktop({
                                 container.labels['homepage.href'] ||
                                 '',
                             );
-                            setUrlMessage(null);
                             setPendingRecreate((current) =>
                               current?.name === container.name ? current : null,
                             );
+                            setUrlMessage(pending ? home.appUrlSavedRecreate : null);
                           }
                         : undefined
                     }
                     editor={
                       editingName === container.name ? (
                         <form
-                          className="dockora-glass absolute left-0 right-0 top-full z-30 mt-2 min-w-[16rem] space-y-2 p-3 text-left"
+                          className="mt-2 w-full space-y-2 border-t border-white/10 pt-2 text-left"
                           onSubmit={(event) => {
                             event.preventDefault();
                             void saveAppUrl(container);
@@ -551,7 +574,7 @@ export function CasaDesktop({
                               className="mt-1 w-full rounded-md border border-white/10 bg-black/40 px-2 py-1 text-xs text-dockora-text"
                             />
                           </label>
-                          <p className="text-[10px] text-dockora-muted">{home.appUrlHint}</p>
+                          <p className="text-[10px] leading-snug text-dockora-muted">{home.appUrlHint}</p>
                           {urlMessage ? <p className="text-[11px] leading-snug text-dockora-text">{urlMessage}</p> : null}
                           <div className="flex flex-wrap gap-2">
                             <button
@@ -571,6 +594,13 @@ export function CasaDesktop({
                                 {urlBusy ? home.appUrlRecreating : home.appUrlRecreate}
                               </button>
                             ) : null}
+                            <button
+                              type="button"
+                              className="rounded-full px-2 py-1 text-[11px] text-dockora-muted hover:text-white"
+                              onClick={() => setEditingName(null)}
+                            >
+                              {t.common.close}
+                            </button>
                           </div>
                         </form>
                       ) : null
@@ -619,6 +649,9 @@ export function CasaDesktop({
                       const up = () => {
                         window.removeEventListener('pointermove', move);
                         window.removeEventListener('pointerup', up);
+                        window.setTimeout(() => {
+                          dragged.current = false;
+                        }, 0);
                       };
                       window.addEventListener('pointermove', move);
                       window.addEventListener('pointerup', up);
@@ -730,7 +763,8 @@ function ContainerTile({
       {open}
       <Link
         href={detailHref}
-        title={detailLabel}
+        title={name}
+        aria-label={`${name}. ${detailLabel}`}
         className="mt-2 max-w-full truncate px-1 text-xs text-dockora-text hover:text-dockora-pink"
         onPointerDown={(event) => event.stopPropagation()}
       >

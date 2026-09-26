@@ -60,11 +60,13 @@ export function NeonParticles() {
       color: COLORS[Math.floor(Math.random() * COLORS.length)]!,
     });
 
-    const draw = () => {
+    let lastFrame = 0;
+    const draw = (now: number) => {
       if (!running) return;
+      raf = window.requestAnimationFrame(draw);
       const w = canvas.clientWidth;
       const h = canvas.clientHeight;
-      ctx.clearRect(0, 0, w, h);
+      if (w === 0 || h === 0) return;
 
       for (const p of particles) {
         p.x += p.speedX;
@@ -72,6 +74,13 @@ export function NeonParticles() {
         if (p.x < 0 || p.x > w || p.y < 0 || p.y > h) {
           Object.assign(p, createParticle(w, h));
         }
+      }
+
+      if (now - lastFrame < 32) return;
+      lastFrame = now;
+      ctx.clearRect(0, 0, w, h);
+
+      for (const p of particles) {
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
         ctx.fillStyle = `${p.color}${p.opacity})`;
@@ -97,7 +106,6 @@ export function NeonParticles() {
         }
       }
 
-      raf = window.requestAnimationFrame(draw);
     };
 
     const onVisibility = () => {
@@ -111,7 +119,7 @@ export function NeonParticles() {
     };
 
     resize();
-    draw();
+    raf = window.requestAnimationFrame(draw);
     window.addEventListener('resize', resize);
     document.addEventListener('visibilitychange', onVisibility);
 

@@ -177,18 +177,20 @@ body {
   font-family: var(--font-display), sans-serif;
   font-weight: 700;
   letter-spacing: 0.08em;
+  line-height: 1.05;
   background: linear-gradient(135deg, var(--dockora-pink), var(--dockora-purple), var(--dockora-blue));
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  filter: drop-shadow(0 0 18px rgba(131, 56, 236, 0.45));
 }
 
 .dockora-logo-tagline {
   font-family: var(--font-display), sans-serif;
-  font-weight: 700;
-  letter-spacing: 0.16em;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  line-height: 1.35;
   text-transform: uppercase;
+  white-space: nowrap;
   color: var(--dockora-muted);
 }
 
@@ -216,7 +218,8 @@ body {
 .dockora-section-tag {
   font-family: var(--font-display), sans-serif;
   font-size: 0.7rem;
-  letter-spacing: 0.28em;
+  letter-spacing: 0.18em;
+  line-height: 1.4;
   text-transform: uppercase;
   color: var(--dockora-blue);
   text-shadow: 0 0 18px rgba(0, 180, 216, 0.45);
@@ -225,6 +228,7 @@ body {
 .dockora-title-gradient {
   font-family: var(--font-display), sans-serif;
   font-weight: 700;
+  line-height: 1.15;
   background: linear-gradient(135deg, #fff, #aaa);
   -webkit-background-clip: text;
   background-clip: text;
