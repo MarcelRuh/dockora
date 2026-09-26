@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.34] – 2026-09-26
+
+### Changed
+
+- Adding a stack or home link opens a centered editor instead of shifting the app grid
+
 ## [2.0.33] – 2026-09-26
 
 ### Fixed

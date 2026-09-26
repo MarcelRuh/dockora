@@ -128,8 +128,7 @@ export function CasaDesktop({
   const [layoutError, setLayoutError] = useState<string | null>(null);
   const [containerOrder, setContainerOrder] = useState<string[]>([]);
   const [homeLinks, setHomeLinks] = useState<HomeLink[]>([]);
-  const [addMenu, setAddMenu] = useState(false);
-  const [linkForm, setLinkForm] = useState(false);
+  const [addEditor, setAddEditor] = useState<null | 'choose' | 'link'>(null);
   const [linkDraft, setLinkDraft] = useState({ name: '', url: '', icon: '' });
   const [linkError, setLinkError] = useState<string | null>(null);
   const [dragContainer, setDragContainer] = useState<string | null>(null);
@@ -240,15 +239,13 @@ export function CasaDesktop({
   }, []);
 
   useEffect(() => {
-    if (!addMenu) return;
-    const close = (event: MouseEvent) => {
-      const target = event.target;
-      if (target instanceof Element && target.closest('[data-add-menu]')) return;
-      setAddMenu(false);
+    if (!addEditor) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setAddEditor(null);
     };
-    window.addEventListener('click', close);
-    return () => window.removeEventListener('click', close);
-  }, [addMenu]);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [addEditor]);
 
   useEffect(() => {
     if (!linkPicker) return;
@@ -685,110 +682,22 @@ export function CasaDesktop({
                 </button>
               </p>
             ) : null}
-            <div className={cn('relative ml-auto', addMenu && 'z-30')} data-add-menu="">
+            <div className="ml-auto">
               <button
                 type="button"
                 className={buttonClassName({ size: 'sm', className: 'w-9 px-0 text-base' })}
                 aria-label={home.add}
-                aria-expanded={addMenu}
-                onClick={() => setAddMenu((open) => !open)}
+                aria-expanded={addEditor !== null}
+                onClick={() => {
+                  setLinkPicker(null);
+                  setAddEditor('choose');
+                  setLinkError(null);
+                }}
               >
                 +
               </button>
-              {addMenu ? (
-                <div className="dockora-panel !absolute right-0 z-30 mt-2 w-44 overflow-hidden py-1 text-sm">
-                  <Link
-                    href="/compose/new"
-                    className="block px-3 py-2 uppercase tracking-wide hover:bg-dockora-accentSoft"
-                    onClick={() => setAddMenu(false)}
-                  >
-                    {home.addStack}
-                  </Link>
-                  <button
-                    type="button"
-                    className="block w-full px-3 py-2 text-left uppercase tracking-wide hover:bg-dockora-accentSoft"
-                    onClick={() => {
-                      setAddMenu(false);
-                      setLinkForm(true);
-                      setLinkError(null);
-                    }}
-                  >
-                    {home.addLink}
-                  </button>
-                </div>
-              ) : null}
             </div>
           </div>
-          {linkForm ? (
-            <form
-              className="dockora-panel mb-3 grid gap-2 p-3 sm:grid-cols-2"
-              onSubmit={(event) => {
-                event.preventDefault();
-                const name = linkDraft.name.trim();
-                const url = linkDraft.url.trim();
-                const icon = linkDraft.icon.trim();
-                if (!name || !/^https?:\/\//i.test(url) || !/^https?:\/\//i.test(icon)) {
-                  setLinkError(home.linkInvalid);
-                  return;
-                }
-                const link = {
-                  id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
-                  name,
-                  url,
-                  icon,
-                };
-                const nextLinks = [...homeLinks, link];
-                const nextOrder = [...containerOrder, linkKey(link.id)];
-                publish({ links: nextLinks, containerOrder: nextOrder });
-                setLinkDraft({ name: '', url: '', icon: '' });
-                setLinkError(null);
-                setLinkForm(false);
-              }}
-            >
-              <label className="text-[11px] text-dockora-muted">
-                {home.linkName}
-                <input
-                  value={linkDraft.name}
-                  onChange={(event) => setLinkDraft((draft) => ({ ...draft, name: event.target.value }))}
-                  className="dockora-field mt-1 h-8 w-full px-2 text-xs"
-                />
-              </label>
-              <label className="text-[11px] text-dockora-muted">
-                {home.linkUrl}
-                <input
-                  value={linkDraft.url}
-                  onChange={(event) => setLinkDraft((draft) => ({ ...draft, url: event.target.value }))}
-                  placeholder="https://"
-                  className="dockora-field mt-1 h-8 w-full px-2 text-xs"
-                />
-              </label>
-              <label className="text-[11px] text-dockora-muted sm:col-span-2">
-                {home.linkIcon}
-                <input
-                  value={linkDraft.icon}
-                  onChange={(event) => setLinkDraft((draft) => ({ ...draft, icon: event.target.value }))}
-                  placeholder="https://"
-                  className="dockora-field mt-1 h-8 w-full px-2 text-xs"
-                />
-              </label>
-              {linkError ? <p className="text-[11px] text-dockora-danger sm:col-span-2">{linkError}</p> : null}
-              <div className="flex gap-2 sm:col-span-2">
-                <button type="submit" className={buttonClassName({ variant: 'primary', size: 'sm' })}>
-                  {home.linkSave}
-                </button>
-                <button
-                  type="button"
-                  className={buttonClassName({ variant: 'ghost', size: 'sm' })}
-                  onClick={() => {
-                    setLinkForm(false);
-                    setLinkError(null);
-                  }}
-                >
-                  {t.common.close}
-                </button>
-              </div>
-            </form>
-          ) : null}
           <ul className="grid grid-cols-[repeat(auto-fill,minmax(7.25rem,1fr))] gap-3 sm:grid-cols-[repeat(auto-fill,minmax(9rem,1fr))]">
             {visibleItems.map((item) => {
               if (item.kind === 'link') {
@@ -1112,6 +1021,133 @@ export function CasaDesktop({
           </ul>
         </section>
       </div>
+      {addEditor
+        ? createPortal(
+            <div
+              className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+              role="presentation"
+              onMouseDown={(event) => {
+                if (event.target === event.currentTarget) setAddEditor(null);
+              }}
+            >
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-label={home.add}
+                className="dockora-panel w-full max-w-lg overflow-hidden"
+              >
+                <div className="flex items-start gap-3 px-5 pt-5">
+                  <div className="min-w-0 flex-1">
+                    <p className="dockora-section-tag">{home.apps}</p>
+                    <h2 className="dockora-title-gradient text-3xl tracking-tight">
+                      {addEditor === 'link' ? home.addLink : home.add}
+                    </h2>
+                  </div>
+                  <Button type="button" size="sm" variant="ghost" onClick={() => setAddEditor(null)}>
+                    {t.common.close}
+                  </Button>
+                </div>
+                <div className="dockora-neon-line mx-5 mt-4" />
+                {addEditor === 'choose' ? (
+                  <ul>
+                    <li className="border-t border-dockora-border/70">
+                      <Link
+                        href="/compose/new"
+                        className="block px-5 py-3 text-sm uppercase tracking-wide hover:bg-white/[0.03]"
+                        onClick={() => setAddEditor(null)}
+                      >
+                        {home.addStack}
+                      </Link>
+                    </li>
+                    <li className="border-t border-dockora-border/70">
+                      <button
+                        type="button"
+                        className="block w-full px-5 py-3 text-left text-sm uppercase tracking-wide hover:bg-white/[0.03]"
+                        onClick={() => {
+                          setLinkError(null);
+                          setAddEditor('link');
+                        }}
+                      >
+                        {home.addLink}
+                      </button>
+                    </li>
+                  </ul>
+                ) : (
+                  <form
+                    className="space-y-3 px-5 py-4"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      const name = linkDraft.name.trim();
+                      const url = linkDraft.url.trim();
+                      const icon = linkDraft.icon.trim();
+                      if (!name || !/^https?:\/\//i.test(url) || !/^https?:\/\//i.test(icon)) {
+                        setLinkError(home.linkInvalid);
+                        return;
+                      }
+                      const link = {
+                        id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+                        name,
+                        url,
+                        icon,
+                      };
+                      publish({
+                        links: [...homeLinks, link],
+                        containerOrder: [...containerOrder, linkKey(link.id)],
+                      });
+                      setLinkDraft({ name: '', url: '', icon: '' });
+                      setLinkError(null);
+                      setAddEditor(null);
+                    }}
+                  >
+                    <label className="block text-xs font-medium uppercase tracking-wide text-dockora-muted">
+                      {home.linkName}
+                      <input
+                        value={linkDraft.name}
+                        onChange={(event) => setLinkDraft((draft) => ({ ...draft, name: event.target.value }))}
+                        className="dockora-field mt-1 w-full px-3"
+                      />
+                    </label>
+                    <label className="block text-xs font-medium uppercase tracking-wide text-dockora-muted">
+                      {home.linkUrl}
+                      <input
+                        value={linkDraft.url}
+                        onChange={(event) => setLinkDraft((draft) => ({ ...draft, url: event.target.value }))}
+                        placeholder="https://"
+                        className="dockora-field mt-1 w-full px-3"
+                      />
+                    </label>
+                    <label className="block text-xs font-medium uppercase tracking-wide text-dockora-muted">
+                      {home.linkIcon}
+                      <input
+                        value={linkDraft.icon}
+                        onChange={(event) => setLinkDraft((draft) => ({ ...draft, icon: event.target.value }))}
+                        placeholder="https://"
+                        className="dockora-field mt-1 w-full px-3"
+                      />
+                    </label>
+                    {linkError ? <p className="text-xs text-dockora-danger">{linkError}</p> : null}
+                    <div className="flex flex-wrap justify-end gap-2 pt-1">
+                      <button
+                        type="button"
+                        className={buttonClassName({ variant: 'ghost', size: 'sm' })}
+                        onClick={() => {
+                          setLinkError(null);
+                          setAddEditor('choose');
+                        }}
+                      >
+                        {t.common.back}
+                      </button>
+                      <button type="submit" className={buttonClassName({ variant: 'primary', size: 'sm' })}>
+                        {home.linkSave}
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
       {linkDialog
         ? createPortal(
             <div
