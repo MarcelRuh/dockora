@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.32] – 2026-09-26
+
+### Changed
+
+- Home tiles, stats, and the module dock are quieter and lined up with the Ora panels
+
 ## [2.0.31] – 2026-09-26
 
 ### Changed

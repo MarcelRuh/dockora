@@ -620,7 +620,7 @@ export function CasaDesktop({
                     type="button"
                     disabled={checking}
                     onClick={() => void checkForUpdates()}
-                    className={buttonClassName({ size: 'sm' })}
+                    className="font-display text-[10px] font-semibold uppercase tracking-[0.12em] text-dockora-pink hover:text-white disabled:opacity-40"
                   >
                     {checking ? home.checking : home.checkNow}
                   </button>
@@ -636,7 +636,7 @@ export function CasaDesktop({
           <div className="mb-3 flex items-center gap-3">
             <h2 className="dockora-section-tag">{home.apps}</h2>
             {hint ? (
-              <p className="flex items-center gap-2 border border-dockora-border bg-black/40 px-2 py-1 text-xs text-white">
+              <p className="flex items-center gap-2 text-xs text-dockora-muted">
                 {home.dragHint}
                 <button
                   type="button"
@@ -755,7 +755,7 @@ export function CasaDesktop({
               </div>
             </form>
           ) : null}
-          <ul className="grid grid-cols-[repeat(auto-fill,minmax(6.75rem,1fr))] gap-2 sm:gap-3 sm:grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))]">
+          <ul className="grid grid-cols-[repeat(auto-fill,minmax(7.25rem,1fr))] gap-3 sm:grid-cols-[repeat(auto-fill,minmax(9rem,1fr))]">
             {visibleItems.map((item) => {
               if (item.kind === 'link') {
                 const { link } = item;
@@ -819,7 +819,7 @@ export function CasaDesktop({
                       <ServiceIcon
                         url={link.icon}
                         alt={link.name}
-                        className="h-12 w-12 border border-dockora-border bg-black/30 object-contain p-1.5 sm:h-14 sm:w-14"
+                        className="h-14 w-14 object-contain sm:h-16 sm:w-16"
                       />
                     </ContainerTile>
                   </li>
@@ -996,7 +996,7 @@ export function CasaDesktop({
                       <ServiceIcon
                         url={icon}
                         alt={container.name}
-                        className="h-12 w-12 border border-dockora-border bg-black/30 object-contain p-1.5 sm:h-14 sm:w-14"
+                        className="h-14 w-14 object-contain sm:h-16 sm:w-16"
                       />
                       <span
                         className={cn(
@@ -1014,7 +1014,7 @@ export function CasaDesktop({
 
         <section aria-label={home.suite}>
           <h2 className="dockora-section-tag mb-3">{home.suite}</h2>
-          <ul className="flex gap-2 overflow-x-auto pb-1 md:flex-wrap md:overflow-visible">
+          <ul className="dockora-panel flex gap-0.5 overflow-x-auto p-1.5 md:flex-wrap md:overflow-visible">
             {apps.map((app) => {
               const Icon = NAV_ICONS[app.key];
               return (
@@ -1060,11 +1060,11 @@ export function CasaDesktop({
                     }}
                     title={t.nav[app.key]}
                     className={cn(
-                      'dockora-panel flex shrink-0 items-center gap-2 px-2.5 py-2 text-xs uppercase tracking-wide',
+                      'flex shrink-0 items-center gap-2 px-2.5 py-2 text-[11px] font-medium uppercase tracking-wide text-dockora-muted hover:bg-dockora-accentSoft hover:text-white',
                       dragKey === app.key && 'opacity-50',
                     )}
                   >
-                    <span className="flex h-8 w-8 items-center justify-center text-dockora-pink">
+                    <span className="flex h-7 w-7 items-center justify-center text-dockora-pink">
                       <Icon className="h-4 w-4" />
                     </span>
                     <span className="hidden text-dockora-text sm:inline">{t.nav[app.key]}</span>
@@ -1297,7 +1297,7 @@ function ContainerTile({
           target="_blank"
           rel="noopener noreferrer"
           title={name}
-          className="mt-2 max-w-full truncate px-1 text-xs text-dockora-text hover:text-dockora-pink"
+          className="mt-2 max-w-full truncate px-2 text-center text-sm text-dockora-text hover:text-dockora-pink"
           onPointerDown={(event) => event.stopPropagation()}
         >
           {name}
@@ -1307,14 +1307,14 @@ function ContainerTile({
           href={detailHref}
           title={name}
           aria-label={`${name}. ${detailLabel}`}
-          className="mt-2 max-w-full truncate px-1 text-xs text-dockora-text hover:text-dockora-pink"
+          className="mt-2 max-w-full truncate px-2 text-center text-sm text-dockora-text hover:text-dockora-pink"
           onPointerDown={(event) => event.stopPropagation()}
         >
           {name}
         </Link>
       )}
       {onUpdate || onEdit || onRemove || publicHref ? (
-        <div className="mt-1.5 flex flex-wrap items-center justify-center gap-1">
+        <div className="mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 border-t border-dockora-border/70 px-2 pt-2">
           {onUpdate ? (
             <button
               type="button"
@@ -1335,7 +1335,7 @@ function ContainerTile({
               href={publicHref}
               target="_blank"
               rel="noopener noreferrer"
-              className={buttonClassName({ size: 'sm' })}
+              className="text-[10px] font-semibold uppercase tracking-[0.12em] text-dockora-muted hover:text-dockora-pink"
               onPointerDown={(event) => event.stopPropagation()}
             >
               {publicLabel}
@@ -1345,7 +1345,7 @@ function ContainerTile({
             <button
               type="button"
               aria-label={editLabel}
-              className={buttonClassName({ size: 'sm', className: 'gap-1' })}
+              className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-dockora-muted hover:text-dockora-pink"
               onPointerDown={(event) => event.stopPropagation()}
               onClick={(event) => {
                 event.preventDefault();
@@ -1353,7 +1353,7 @@ function ContainerTile({
                 onEdit();
               }}
             >
-              <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+              <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
                 <path d="M4 20h4l10-10-4-4L4 16v4Z" />
                 <path d="m12 6 4 4" />
               </svg>
@@ -1363,7 +1363,7 @@ function ContainerTile({
           {onRemove ? (
             <button
               type="button"
-              className={buttonClassName({ variant: 'ghost', size: 'sm' })}
+              className="text-[10px] font-semibold uppercase tracking-[0.12em] text-dockora-muted hover:text-dockora-danger"
               onPointerDown={(event) => event.stopPropagation()}
               onClick={(event) => {
                 event.preventDefault();
@@ -1413,7 +1413,7 @@ function SystemCard({
   const mem = usageRatio(overview.resources.memoryUsedBytes, overview.resources.memoryTotalBytes);
   const temp = overview.resources.temperatureC;
   return (
-    <section className="dockora-panel px-4 py-3">
+    <section className="dockora-panel px-5 py-4">
       <CardTitle href="/monitoring">{title}</CardTitle>
       <div className="mt-3 grid grid-cols-2 gap-2">
         <Gauge label="CPU" value={overview.resources.cpuPercent} locale={locale} tone="pink" />
@@ -1447,10 +1447,10 @@ function StorageCard({
   const ratio = usageRatio(overview.resources.diskUsedBytes, overview.resources.diskTotalBytes);
   const healthy = ratio == null || ratio < 90;
   return (
-    <section className="dockora-panel px-4 py-3">
+    <section className="dockora-panel px-5 py-4">
       <CardTitle href="/monitoring">{labels.storage}</CardTitle>
       <p className="mt-3 text-xs font-medium uppercase tracking-wide text-dockora-muted">{diskLabel}</p>
-      <p className={cn('mt-1 text-2xl', healthy ? 'dockora-stat-gradient' : 'text-dockora-warning')}>
+      <p className={cn('mt-1 text-3xl leading-none', healthy ? 'dockora-stat-gradient' : 'text-dockora-warning')}>
         {formatPercent(ratio, locale)}
       </p>
       <div className="mt-2 h-1 bg-white/10">
@@ -1490,7 +1490,7 @@ function NetworkCard({
   }, [rx, tx]);
 
   return (
-    <section className="dockora-panel px-4 py-3">
+    <section className="dockora-panel px-5 py-4">
       <CardTitle href="/network">{labels.network}</CardTitle>
       <p className="mt-1 font-mono text-[11px] text-dockora-muted">{overview.resources.networkInterface ?? '—'}</p>
       <RateChart history={history} />
@@ -1559,7 +1559,7 @@ function Gauge({
   return (
     <div>
       <p className="text-xs font-medium uppercase tracking-wide text-dockora-muted">{label}</p>
-      <p className="dockora-stat-gradient mt-1 text-2xl">{formatPercent(value, locale)}</p>
+      <p className="dockora-stat-gradient mt-1 whitespace-nowrap text-2xl leading-none">{formatPercent(value, locale)}</p>
       <div className="mt-2 h-1 bg-white/10">
         <div
           className={cn(
@@ -1669,7 +1669,7 @@ function FeatureCard({
       {icon ? (
         <span
           className={cn(
-            'pointer-events-none flex h-12 w-12 shrink-0 items-center justify-center border border-dockora-border',
+            'pointer-events-none flex h-11 w-11 shrink-0 items-center justify-center',
             tone === 'pink' ? 'text-dockora-pink' : 'text-dockora-blue',
           )}
           aria-hidden
