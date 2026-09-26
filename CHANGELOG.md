@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.35] – 2026-09-26
+
+### Changed
+
+- The home editor can reorder apps with up and down controls
+
 ## [2.0.34] – 2026-09-26
 
 ### Changed

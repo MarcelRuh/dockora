@@ -128,7 +128,7 @@ export function CasaDesktop({
   const [layoutError, setLayoutError] = useState<string | null>(null);
   const [containerOrder, setContainerOrder] = useState<string[]>([]);
   const [homeLinks, setHomeLinks] = useState<HomeLink[]>([]);
-  const [addEditor, setAddEditor] = useState<null | 'choose' | 'link'>(null);
+  const [addEditor, setAddEditor] = useState<null | 'choose' | 'link' | 'order'>(null);
   const [linkDraft, setLinkDraft] = useState({ name: '', url: '', icon: '' });
   const [linkError, setLinkError] = useState<string | null>(null);
   const [dragContainer, setDragContainer] = useState<string | null>(null);
@@ -355,6 +355,17 @@ export function CasaDesktop({
 
   const saveOrder = (next: DockKey[]) => {
     publish({ appOrder: next });
+  };
+
+  const moveApp = (key: string, direction: -1 | 1) => {
+    const keys = gridItems.map((entry) => entry.key);
+    const index = keys.indexOf(key);
+    const target = index + direction;
+    if (index < 0 || target < 0 || target >= keys.length) return;
+    const next = [...keys];
+    const [moved] = next.splice(index, 1);
+    next.splice(target, 0, moved!);
+    publish({ containerOrder: next });
   };
 
   const dropOn = (target: DockKey) => {
@@ -1040,7 +1051,7 @@ export function CasaDesktop({
                   <div className="min-w-0 flex-1">
                     <p className="dockora-section-tag">{home.apps}</p>
                     <h2 className="dockora-title-gradient text-3xl tracking-tight">
-                      {addEditor === 'link' ? home.addLink : home.add}
+                      {addEditor === 'link' ? home.addLink : addEditor === 'order' ? home.arrange : home.add}
                     </h2>
                   </div>
                   <Button type="button" size="sm" variant="ghost" onClick={() => setAddEditor(null)}>
@@ -1071,7 +1082,59 @@ export function CasaDesktop({
                         {home.addLink}
                       </button>
                     </li>
+                    <li className="border-t border-dockora-border/70">
+                      <button
+                        type="button"
+                        className="block w-full px-5 py-3 text-left text-sm uppercase tracking-wide hover:bg-white/[0.03]"
+                        onClick={() => setAddEditor('order')}
+                      >
+                        {home.arrange}
+                      </button>
+                    </li>
                   </ul>
+                ) : addEditor === 'order' ? (
+                  <>
+                  <ul className="max-h-[min(24rem,60vh)] overflow-y-auto">
+                    {gridItems.map((item, index) => {
+                      const name = item.kind === 'link' ? item.link.name : item.container.name;
+                      return (
+                        <li
+                          key={item.key}
+                          className="flex items-center gap-3 border-t border-dockora-border/70 px-5 py-2"
+                        >
+                          <span className="min-w-0 flex-1 truncate text-sm">{name}</span>
+                          <button
+                            type="button"
+                            className={buttonClassName({ size: 'sm', className: 'w-9 px-0' })}
+                            aria-label={home.moveUp}
+                            disabled={index === 0}
+                            onClick={() => moveApp(item.key, -1)}
+                          >
+                            ↑
+                          </button>
+                          <button
+                            type="button"
+                            className={buttonClassName({ size: 'sm', className: 'w-9 px-0' })}
+                            aria-label={home.moveDown}
+                            disabled={index === gridItems.length - 1}
+                            onClick={() => moveApp(item.key, 1)}
+                          >
+                            ↓
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                  <div className="flex justify-end border-t border-dockora-border/70 px-5 py-3">
+                    <button
+                      type="button"
+                      className={buttonClassName({ variant: 'ghost', size: 'sm' })}
+                      onClick={() => setAddEditor('choose')}
+                    >
+                      {t.common.back}
+                    </button>
+                  </div>
+                  </>
                 ) : (
                   <form
                     className="space-y-3 px-5 py-4"

@@ -1,5 +1,5 @@
 export const APP_NAME = 'Dockora';
-export const APP_VERSION = '2.0.34';
+export const APP_VERSION = '2.0.35';
 
 /** Minimum length for user passwords (create/update). */
 export const MIN_PASSWORD_LENGTH = 12;
