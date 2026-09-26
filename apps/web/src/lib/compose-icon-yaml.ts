@@ -45,6 +45,52 @@ export function setComposeServiceIcon(yaml: string, service: string, url: string
   return [...lines.slice(0, start), ...filtered, ...lines.slice(end)].join('\n');
 }
 
+/**
+ * Insert or replace `url=` under a Compose service.
+ * Empty value removes the url label. Icon labels stay untouched.
+ */
+export function setComposeServiceUrl(yaml: string, service: string, url: string): string {
+  const lines = yaml.split(/\r?\n/);
+  const start = lines.findIndex((line) => {
+    const match = SERVICE_RE.exec(line.replace(/\t/g, '  '));
+    return match?.[1] === service;
+  });
+  if (start < 0) throw new Error(`Service "${service}" not found`);
+
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i++) {
+    const line = lines[i]!.replace(/\t/g, '  ');
+    if (NEXT_BLOCK.test(line) && !line.startsWith('    ')) {
+      end = i;
+      break;
+    }
+  }
+
+  const block = lines.slice(start, end);
+  const urlList = /^\s{4,}-\s+url=/i;
+  const urlMap = /^\s{4,}url\s*:/i;
+  const labelsHeader = /^\s{4}labels:\s*(?:#.*)?$/;
+  const nextUrl = url.trim();
+  const filtered = block.filter((line) => !urlList.test(line) && !urlMap.test(line));
+
+  if (!nextUrl) {
+    return [...lines.slice(0, start), ...filtered, ...lines.slice(end)].join('\n');
+  }
+  if (!/^https?:\/\//i.test(nextUrl)) {
+    throw new Error('URL must start with http:// or https://');
+  }
+
+  const labelIdx = filtered.findIndex((line) => labelsHeader.test(line.replace(/\t/g, '  ')));
+  const urlLine = `      - url=${nextUrl}`;
+  if (labelIdx >= 0) {
+    filtered.splice(labelIdx + 1, 0, urlLine);
+  } else {
+    filtered.splice(1, 0, '    labels:', urlLine);
+  }
+
+  return [...lines.slice(0, start), ...filtered, ...lines.slice(end)].join('\n');
+}
+
 export function selfhstIconUrl(slug: string): string {
   return `https://cdn.jsdelivr.net/gh/selfhst/icons/png/${slug}.png`;
 }

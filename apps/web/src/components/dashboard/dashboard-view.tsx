@@ -1,12 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import Link from 'next/link';
 import type { DashboardOverview } from '@dockora/shared';
 import { useAuth } from '@/components/auth/auth-provider';
 import { useLocale } from '@/i18n/locale-provider';
 import { ApiError, applyDockerHostUpdate, fetchDockerHostUpdateStatus } from '@/lib/api';
-import { formatRelativeTime } from '@/lib/format';
 import { canAdmin } from '@/lib/roles';
 import { cn } from '@/lib/utils';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -24,6 +22,7 @@ export function DashboardView({
 }: UseDashboardResult) {
   const { t, locale } = useLocale();
   const loc = locale === 'de' ? 'de-DE' : 'en-US';
+  const [engineOpen, setEngineOpen] = useState(false);
 
   return (
     <div className="space-y-6 animate-in fade-in">
@@ -39,20 +38,27 @@ export function DashboardView({
 
       {data ? (
         <div className="space-y-6">
-          <CasaDesktop overview={data} />
-          <details className="dockora-glass px-4 py-3">
-            <summary className="cursor-pointer text-sm text-dockora-muted">{t.dashboard.home.more}</summary>
-            <div className="mt-4 space-y-4">
-              <EngineStrip overview={data} onUpdated={() => void refresh()} />
-              <LifetimeStrip overview={data} labels={t.dashboard.lifetime} locale={loc} />
-              <AsideColumn
-                notifications={data.notifications}
-                updatesAvailable={data.updatesAvailable}
-                labels={t.dashboard}
-                locale={loc}
+          <CasaDesktop overview={data} onOpenEngine={() => setEngineOpen(true)} />
+          {engineOpen ? (
+            <div className="fixed inset-0 z-[70]" role="dialog" aria-modal="true" aria-label={t.dashboard.home.more}>
+              <button
+                type="button"
+                className="absolute inset-0 bg-black/70"
+                aria-label={t.common.close}
+                onClick={() => setEngineOpen(false)}
               />
+              <div className="dockora-glass absolute left-1/2 top-[8vh] max-h-[80vh] w-[min(56rem,94vw)] -translate-x-1/2 space-y-4 overflow-y-auto p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="text-sm font-medium">{t.dashboard.home.more}</h2>
+                  <button type="button" className="text-sm text-dockora-muted" onClick={() => setEngineOpen(false)}>
+                    {t.common.close}
+                  </button>
+                </div>
+                <EngineStrip overview={data} onUpdated={() => void refresh()} />
+                <LifetimeStrip overview={data} labels={t.dashboard.lifetime} locale={loc} />
+              </div>
             </div>
-          </details>
+          ) : null}
           {error ? (
             <p className="text-xs text-dockora-warning">
               {t.dashboard.staleWarning}: {error}
@@ -411,70 +417,3 @@ function VersionUpdateCard({
   );
 }
 
-function AsideColumn({
-  notifications,
-  updatesAvailable,
-  labels,
-  locale,
-}: {
-  notifications: DashboardOverview['notifications'];
-  updatesAvailable: number;
-  labels: {
-    notifications: { title: string; empty: string };
-    updates: { title: string; none: string; available: string };
-  };
-  locale: string;
-}) {
-  const latestNotes = notifications.slice(0, 4);
-
-  return (
-    <div className="grid gap-3 lg:grid-cols-2">
-      <Link
-        href="/updates"
-        className="dockora-panel px-4 py-3 transition-colors hover:border-dockora-pink/40"
-      >
-        <h2 className="text-xs font-medium uppercase tracking-wide text-dockora-muted">
-          {labels.updates.title}
-        </h2>
-        <p
-          className={cn(
-            'mt-2 text-sm',
-            updatesAvailable > 0 ? 'text-dockora-warning' : 'text-dockora-muted',
-          )}
-        >
-          {updatesAvailable > 0
-            ? labels.updates.available.replace('{count}', String(updatesAvailable))
-            : labels.updates.none}
-        </p>
-      </Link>
-
-      <section className="dockora-panel px-4 py-3">
-        <h2 className="text-xs font-medium uppercase tracking-wide text-dockora-muted">
-          {labels.notifications.title}
-        </h2>
-        {latestNotes.length === 0 ? (
-          <p className="mt-2 text-sm text-dockora-muted">{labels.notifications.empty}</p>
-        ) : (
-          <ul className="mt-2 space-y-2">
-            {latestNotes.map((n) => (
-              <li
-                key={n.id}
-                className="border border-dockora-border bg-dockora-surface2/40 px-3 py-2"
-              >
-                <div className="flex items-baseline justify-between gap-3">
-                  <p className="truncate text-sm font-medium">{n.title}</p>
-                  <time className="shrink-0 font-mono text-[11px] text-dockora-muted">
-                    {formatRelativeTime(n.timestamp, locale)}
-                  </time>
-                </div>
-                {n.message ? (
-                  <p className="mt-0.5 line-clamp-2 text-xs text-dockora-muted">{n.message}</p>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-    </div>
-  );
-}

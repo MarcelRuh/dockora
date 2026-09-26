@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.16] – 2026-09-26
+
+### Changed
+
+- Home search filters apps and pages, container tiles can store an address, and engine history opens from the engine card
+
 ## [2.0.15] – 2026-09-26
 
 ### Changed

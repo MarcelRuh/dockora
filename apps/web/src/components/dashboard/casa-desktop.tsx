@@ -12,15 +12,16 @@ import {
   type ReactNode,
 } from 'react';
 import type { ContainerSummary, DashboardOverview, Locale } from '@dockora/shared';
-import { AuthLogoutButton } from '@/components/auth/auth-provider';
-import { GlobalSearch } from '@/components/global-search';
+import { AuthLogoutButton, useAuth } from '@/components/auth/auth-provider';
 import { NAV_ICONS } from '@/components/ui/nav-icons';
 import { ServiceIcon } from '@/components/ui/service-icon';
 import { useLocale } from '@/i18n/locale-provider';
-import { fetchContainers } from '@/lib/api';
+import { fetchComposeProject, fetchComposeProjects, fetchContainers, saveComposeYaml } from '@/lib/api';
 import { resolveContainerAppHref } from '@/lib/container-app-link';
 import { resolveContainerIconUrl } from '@/lib/container-icon';
+import { setComposeServiceUrl } from '@/lib/compose-icon-yaml';
 import { formatBytes, formatPercent, usageRatio } from '@/lib/format';
+import { canOperate } from '@/lib/roles';
 import { cn } from '@/lib/utils';
 
 const APPS = [
@@ -39,6 +40,8 @@ const APPS = [
 ] as const;
 
 type AppKey = (typeof APPS)[number]['key'];
+const DOCK_KEYS = ['containers', 'compose', 'terminal', 'settings'] as const;
+type DockKey = (typeof DOCK_KEYS)[number];
 
 const TILE: Record<AppKey, string> = {
   containers: 'bg-gradient-to-br from-dockora-pink to-dockora-purple',
@@ -57,6 +60,7 @@ const TILE: Record<AppKey, string> = {
 
 const ORDER_KEY = 'dockora.home.appOrder';
 const CONTAINER_ORDER_KEY = 'dockora.home.containerOrder';
+const URL_KEY = 'dockora.home.appUrls';
 const WIDGET_KEY = 'dockora.home.widgets';
 const HINT_KEY = 'dockora.home.dragHint';
 
@@ -64,16 +68,42 @@ type Widgets = { system: boolean; storage: boolean; network: boolean };
 
 const DEFAULT_WIDGETS: Widgets = { system: true, storage: true, network: true };
 
-function readOrder(): AppKey[] {
-  const known = new Set<string>(APPS.map((app) => app.key));
+function readOrder(): DockKey[] {
+  const known = new Set<string>(DOCK_KEYS);
   try {
     const raw = JSON.parse(localStorage.getItem(ORDER_KEY) ?? '[]') as unknown;
-    const saved = Array.isArray(raw) ? raw.filter((key): key is AppKey => known.has(String(key))) : [];
-    const missing = APPS.map((app) => app.key).filter((key) => !saved.includes(key));
+    const saved = Array.isArray(raw) ? raw.filter((key): key is DockKey => known.has(String(key))) : [];
+    const missing = DOCK_KEYS.filter((key) => !saved.includes(key));
     return [...saved, ...missing];
   } catch {
-    return APPS.map((app) => app.key);
+    return [...DOCK_KEYS];
   }
+}
+
+function readUrlOverrides(): Record<string, string> {
+  try {
+    const raw = JSON.parse(localStorage.getItem(URL_KEY) ?? '{}') as unknown;
+    if (!raw || typeof raw !== 'object') return {};
+    return Object.fromEntries(
+      Object.entries(raw).filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
+    );
+  } catch {
+    return {};
+  }
+}
+
+function withUrlOverride(container: ContainerSummary, overrides: Record<string, string>): ContainerSummary {
+  if (!Object.prototype.hasOwnProperty.call(overrides, container.name)) return container;
+  const stored = overrides[container.name] ?? '';
+  if (!stored) {
+    const labels = { ...container.labels };
+    delete labels.url;
+    delete labels['dockora.url'];
+    delete labels['homepage.href'];
+    delete labels['net.unraid.docker.webui'];
+    return { ...container, labels };
+  }
+  return { ...container, labels: { ...container.labels, url: stored } };
 }
 
 function readWidgets(): Widgets {
@@ -89,15 +119,29 @@ function readWidgets(): Widgets {
   }
 }
 
-export function CasaDesktop({ overview }: { overview: DashboardOverview }) {
+export function CasaDesktop({
+  overview,
+  onOpenEngine,
+}: {
+  overview: DashboardOverview;
+  onOpenEngine: () => void;
+}) {
   const { t, locale, setLocale } = useLocale();
+  const { authEnabled, user } = useAuth();
+  const canEdit = canOperate(user?.role, authEnabled);
   const loc = locale === 'de' ? 'de-DE' : 'en-US';
   const home = t.dashboard.home;
-  const [order, setOrder] = useState<AppKey[]>(() => APPS.map((app) => app.key));
+  const [order, setOrder] = useState<DockKey[]>(() => [...DOCK_KEYS]);
   const [widgets, setWidgets] = useState<Widgets>(DEFAULT_WIDGETS);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [hint, setHint] = useState(true);
-  const [dragKey, setDragKey] = useState<AppKey | null>(null);
+  const [dragKey, setDragKey] = useState<DockKey | null>(null);
+  const [query, setQuery] = useState('');
+  const [urlOverrides, setUrlOverrides] = useState<Record<string, string>>({});
+  const [editingName, setEditingName] = useState<string | null>(null);
+  const [draftUrl, setDraftUrl] = useState('');
+  const [urlMessage, setUrlMessage] = useState<string | null>(null);
+  const [urlBusy, setUrlBusy] = useState(false);
   const [containers, setContainers] = useState<ContainerSummary[]>([]);
   const [containerOrder, setContainerOrder] = useState<string[]>([]);
   const [dragContainer, setDragContainer] = useState<string | null>(null);
@@ -109,6 +153,7 @@ export function CasaDesktop({ overview }: { overview: DashboardOverview }) {
     setWidgets(readWidgets());
     setHint(localStorage.getItem(HINT_KEY) !== '0');
     setPageHost(window.location.hostname);
+    setUrlOverrides(readUrlOverrides());
     try {
       const raw = JSON.parse(localStorage.getItem(CONTAINER_ORDER_KEY) ?? '[]') as unknown;
       setContainerOrder(Array.isArray(raw) ? raw.filter((id): id is string => typeof id === 'string') : []);
@@ -134,8 +179,13 @@ export function CasaDesktop({ overview }: { overview: DashboardOverview }) {
     };
   }, [overview.containers.total, overview.containers.running]);
 
+  const decoratedContainers = useMemo(
+    () => containers.map((container) => withUrlOverride(container, urlOverrides)),
+    [containers, urlOverrides],
+  );
+
   const orderedContainers = useMemo(() => {
-    const byId = new Map(containers.map((container) => [container.id, container]));
+    const byId = new Map(decoratedContainers.map((container) => [container.id, container]));
     const next: ContainerSummary[] = [];
     for (const id of containerOrder) {
       const container = byId.get(id);
@@ -145,25 +195,85 @@ export function CasaDesktop({ overview }: { overview: DashboardOverview }) {
     }
     const rest = [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
     return [...next, ...rest];
-  }, [containers, containerOrder]);
+  }, [decoratedContainers, containerOrder]);
 
   const apps = useMemo(
-    () => order.map((key) => APPS.find((app) => app.key === key)).filter((app) => app != null),
+    () =>
+      order.flatMap((key) => {
+        const app = APPS.find((item) => item.key === key);
+        return app ? [{ key, href: app.href }] : [];
+      }),
     [order],
   );
 
-  const saveOrder = (next: AppKey[]) => {
+  const needle = query.trim().toLowerCase();
+  const visibleContainers = needle
+    ? orderedContainers.filter(
+        (container) =>
+          container.name.toLowerCase().includes(needle) || container.image.toLowerCase().includes(needle),
+      )
+    : orderedContainers;
+  const pageHits = needle
+    ? APPS.filter((app) => t.nav[app.key].toLowerCase().includes(needle))
+    : [];
+
+  const saveOrder = (next: DockKey[]) => {
     setOrder(next);
     localStorage.setItem(ORDER_KEY, JSON.stringify(next));
   };
 
-  const dropOn = (target: AppKey) => {
+  const dropOn = (target: DockKey) => {
     if (!dragKey || dragKey === target) return;
     const next = order.filter((key) => key !== dragKey);
     const index = next.indexOf(target);
     next.splice(index < 0 ? next.length : index, 0, dragKey);
     saveOrder(next);
     setDragKey(null);
+  };
+
+  const persistUrl = (name: string, url: string) => {
+    const next = { ...urlOverrides, [name]: url };
+    setUrlOverrides(next);
+    localStorage.setItem(URL_KEY, JSON.stringify(next));
+  };
+
+  const saveAppUrl = async (container: ContainerSummary) => {
+    const url = draftUrl.trim();
+    if (url && !/^https?:\/\//i.test(url)) {
+      setUrlMessage(home.appUrlHint);
+      return;
+    }
+    setUrlBusy(true);
+    setUrlMessage(null);
+    const service = container.labels['com.docker.compose.service']?.trim();
+    const workingDir = container.labels['com.docker.compose.project.working_dir']?.trim();
+    const projectName = container.labels['com.docker.compose.project']?.trim() || container.composeProject;
+    try {
+      if (service) {
+        const projects = await fetchComposeProjects();
+        const project = projects.find((item) => {
+          const path = item.path.replace(/\/+$/, '');
+          return (workingDir && path === workingDir.replace(/\/+$/, '')) || item.name === projectName;
+        });
+        if (!project) {
+          persistUrl(container.name, url);
+          setUrlMessage(home.appUrlComposeMissing);
+          return;
+        }
+        const details = await fetchComposeProject(project.id);
+        const nextYaml = setComposeServiceUrl(details.yaml, service, url);
+        await saveComposeYaml(project.id, nextYaml);
+        persistUrl(container.name, url);
+        setUrlMessage(home.appUrlSaved);
+      } else {
+        persistUrl(container.name, url);
+        setUrlMessage(home.appUrlComposeMissing);
+      }
+    } catch (error) {
+      setUrlMessage(error instanceof Error ? error.message : t.common.failed);
+    } finally {
+      setUrlBusy(false);
+    }
   };
 
   const setWidget = (key: keyof Widgets, value: boolean) => {
@@ -232,7 +342,26 @@ export function CasaDesktop({ overview }: { overview: DashboardOverview }) {
 
       <div className="flex min-w-0 flex-col gap-4">
         <div className="flex items-center gap-2">
-          <GlobalSearch className="rounded-full border-white/10 bg-black/30 px-4 py-3 font-sans text-sm normal-case tracking-normal" />
+          <div className="relative min-w-0 flex-1">
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={home.searchPlaceholder}
+              aria-label={home.searchPlaceholder}
+              className="dockora-glass w-full rounded-full border-white/10 bg-black/30 px-4 py-3 text-sm outline-none placeholder:text-dockora-muted"
+            />
+            {pageHits.length > 0 ? (
+              <ul className="dockora-glass absolute left-0 right-0 z-30 mt-2 overflow-hidden py-1">
+                {pageHits.map((hit) => (
+                  <li key={hit.key}>
+                    <Link href={hit.href} className="block px-4 py-2 text-sm hover:bg-white/5" onClick={() => setQuery('')}>
+                      {t.nav[hit.key]}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
           <select
             aria-label={t.locale.label}
             className="dockora-glass h-11 shrink-0 bg-transparent px-3 font-mono text-xs"
@@ -268,6 +397,8 @@ export function CasaDesktop({ overview }: { overview: DashboardOverview }) {
             action={home.open}
             tone="cyan"
             icon={<NAV_ICONS.monitoring className="h-8 w-8" />}
+            secondaryLabel={home.more}
+            onSecondary={onOpenEngine}
           />
         </div>
 
@@ -299,7 +430,7 @@ export function CasaDesktop({ overview }: { overview: DashboardOverview }) {
             </Link>
           </div>
           <ul className="grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-3">
-            {orderedContainers.map((container) => {
+            {visibleContainers.map((container) => {
               const target = resolveContainerAppHref(container, pageHost);
               const icon = resolveContainerIconUrl(container.labels);
               const runningTile = container.status === 'running';
@@ -349,6 +480,54 @@ export function CasaDesktop({ overview }: { overview: DashboardOverview }) {
                       event.preventDefault();
                       dragged.current = false;
                     }}
+                    detailHref={`/containers/${encodeURIComponent(container.id)}`}
+                    detailLabel={home.openInDockora}
+                    editLabel={home.appUrl}
+                    onEdit={
+                      canEdit
+                        ? () => {
+                            setEditingName(container.name);
+                            setDraftUrl(
+                              container.labels.url ||
+                                container.labels['dockora.url'] ||
+                                container.labels['homepage.href'] ||
+                                '',
+                            );
+                            setUrlMessage(null);
+                          }
+                        : undefined
+                    }
+                    editor={
+                      editingName === container.name ? (
+                        <form
+                          className="dockora-glass absolute left-0 right-0 top-full z-30 mt-2 space-y-2 p-3 text-left"
+                          onSubmit={(event) => {
+                            event.preventDefault();
+                            void saveAppUrl(container);
+                          }}
+                          onPointerDown={(event) => event.stopPropagation()}
+                        >
+                          <label className="block text-[11px] text-dockora-muted">
+                            {home.appUrl}
+                            <input
+                              value={draftUrl}
+                              onChange={(event) => setDraftUrl(event.target.value)}
+                              placeholder="http://"
+                              className="mt-1 w-full rounded-md border border-white/10 bg-black/40 px-2 py-1 text-xs text-dockora-text"
+                            />
+                          </label>
+                          <p className="text-[10px] text-dockora-muted">{home.appUrlHint}</p>
+                          {urlMessage ? <p className="text-[10px] text-dockora-text">{urlMessage}</p> : null}
+                          <button
+                            type="submit"
+                            disabled={urlBusy}
+                            className="rounded-full bg-dockora-pink px-2 py-1 text-[11px] text-white disabled:opacity-50"
+                          >
+                            {home.appUrlSave}
+                          </button>
+                        </form>
+                      ) : null
+                    }
                   >
                     <span className="relative">
                       <ServiceIcon
@@ -448,6 +627,11 @@ function ContainerTile({
   dimmed,
   dragging,
   children,
+  detailHref,
+  detailLabel,
+  editLabel,
+  onEdit,
+  editor,
   onPointerDown,
   onDragOver,
   onDrop,
@@ -460,50 +644,80 @@ function ContainerTile({
   dimmed: boolean;
   dragging: boolean;
   children: ReactNode;
-  onPointerDown: (event: ReactPointerEvent<HTMLAnchorElement>) => void;
-  onDragOver: (event: ReactDragEvent<HTMLAnchorElement>) => void;
+  detailHref: string;
+  detailLabel: string;
+  editLabel?: string;
+  onEdit?: () => void;
+  editor?: ReactNode;
+  onPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  onDragOver: (event: ReactDragEvent<HTMLDivElement>) => void;
   onDrop: () => void;
-  onDragEnd: (event: ReactDragEvent<HTMLAnchorElement>) => void;
+  onDragEnd: (event: ReactDragEvent<HTMLDivElement>) => void;
   onClick: (event: ReactMouseEvent<HTMLAnchorElement>) => void;
 }) {
-  const className = cn(
-    'dockora-glass flex aspect-square flex-col items-center justify-center gap-2.5 px-2 py-3 text-center transition-transform hover:-translate-y-0.5 hover:border-dockora-pink/45',
+  const shell = cn(
+    'dockora-glass relative aspect-square transition-transform hover:-translate-y-0.5 hover:border-dockora-pink/45',
     dimmed && 'opacity-50',
     dragging && 'opacity-50',
   );
-  if (external) {
-    return (
-      <a
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        title={name}
-        draggable={dragging}
-        className={className}
-        onPointerDown={onPointerDown}
-        onDragOver={onDragOver}
-        onDrop={onDrop}
-        onDragEnd={onDragEnd}
-        onClick={onClick}
-      >
-        {children}
-      </a>
-    );
-  }
+  const face = 'flex h-full w-full flex-col items-center justify-center gap-2.5 px-2 py-3 text-center';
+  const open = external ? (
+    <a href={href} target="_blank" rel="noopener noreferrer" title={name} className={face} onClick={onClick}>
+      {children}
+    </a>
+  ) : (
+    <Link href={href} title={name} className={face} onClick={onClick}>
+      {children}
+    </Link>
+  );
   return (
-    <Link
-      href={href}
-      title={name}
+    <div
+      className={shell}
       draggable={dragging}
-      className={className}
       onPointerDown={onPointerDown}
       onDragOver={onDragOver}
       onDrop={onDrop}
       onDragEnd={onDragEnd}
-      onClick={onClick}
+      onContextMenu={(event) => {
+        if (!onEdit) return;
+        event.preventDefault();
+        onEdit();
+      }}
     >
-      {children}
-    </Link>
+      {open}
+      <Link
+        href={detailHref}
+        aria-label={detailLabel}
+        title={detailLabel}
+        className="absolute bottom-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded-md bg-black/55 text-dockora-muted hover:text-white"
+        onPointerDown={(event) => event.stopPropagation()}
+      >
+        <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+          <path d="M8 6h12M8 12h12M8 18h12" />
+          <path d="M4 6h.01M4 12h.01M4 18h.01" />
+        </svg>
+      </Link>
+      {onEdit ? (
+        <button
+          type="button"
+          aria-label={editLabel}
+          title={editLabel}
+          className="absolute left-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-md bg-black/55 text-[10px] text-dockora-muted hover:text-white"
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onEdit();
+          }}
+        >
+          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+            <path d="M4 20h4l10-10-4-4L4 16v4Z" />
+            <path d="m12 6 4 4" />
+          </svg>
+        </button>
+      ) : null}
+      {editor}
+    </div>
   );
 }
 
@@ -765,6 +979,8 @@ function FeatureCard({
   tone,
   alert,
   icon,
+  secondaryLabel,
+  onSecondary,
 }: {
   href: string;
   title: string;
@@ -773,21 +989,35 @@ function FeatureCard({
   tone: 'pink' | 'cyan';
   alert?: string | null;
   icon?: ReactNode;
+  secondaryLabel?: string;
+  onSecondary?: () => void;
 }) {
   return (
-    <Link href={href} className="dockora-glass relative flex min-h-[8.5rem] items-center justify-between gap-3 overflow-hidden px-5 py-4">
+    <div className="dockora-glass relative flex min-h-[8.5rem] items-center justify-between gap-3 overflow-hidden px-5 py-4">
       <div className="relative z-10 min-w-0">
         <h2 className="text-lg font-medium">{title}</h2>
         <p className="mt-1 text-sm text-dockora-muted">{body}</p>
         {alert ? <p className="mt-1 truncate text-xs text-dockora-danger">{alert}</p> : null}
-        <span
-          className={cn(
-            'mt-4 inline-flex w-fit rounded-full px-3 py-1 text-xs font-medium text-white',
-            tone === 'pink' ? 'bg-dockora-pink' : 'bg-dockora-blue',
-          )}
-        >
-          {action}
-        </span>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Link
+            href={href}
+            className={cn(
+              'inline-flex w-fit rounded-full px-3 py-1 text-xs font-medium text-white',
+              tone === 'pink' ? 'bg-dockora-pink' : 'bg-dockora-blue',
+            )}
+          >
+            {action}
+          </Link>
+          {secondaryLabel && onSecondary ? (
+            <button
+              type="button"
+              onClick={onSecondary}
+              className="inline-flex rounded-full border border-white/15 px-3 py-1 text-xs text-dockora-text"
+            >
+              {secondaryLabel}
+            </button>
+          ) : null}
+        </div>
       </div>
       {icon ? (
         <span
@@ -800,6 +1030,6 @@ function FeatureCard({
           {icon}
         </span>
       ) : null}
-    </Link>
+    </div>
   );
 }
