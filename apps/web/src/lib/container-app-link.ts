@@ -1,6 +1,7 @@
 import { publishedPortHref, uniquePublishedPorts } from './published-ports';
 
 const URL_LABELS = ['url', 'dockora.url', 'homepage.href', 'net.unraid.docker.webui'] as const;
+const PUBLIC_LABELS = ['public_url', 'dockora.publicUrl'] as const;
 
 /** Host ports that are almost never the web UI (DNS, NTP, SSH, NFS). */
 const NON_WEB_HOST_PORTS = new Set(['22', '53', '67', '68', '123', '873', '1900', '2049', '5353']);
@@ -25,6 +26,31 @@ export function resolveContainerAppHref(
   if (chosen?.href) return { href: chosen.href, external: true };
 
   return { href: `/containers/${encodeURIComponent(input.id)}`, external: false };
+}
+
+/**
+ * Public address: a saved override wins, including an empty string that hides
+ * a URL discovered from the Compose .env. Otherwise labels, then discovery.
+ */
+export function resolvePublicAppUrl(
+  name: string,
+  labels: Record<string, string> | null | undefined,
+  overrides: Record<string, string>,
+  discovered: Record<string, string>,
+): string | null {
+  if (Object.prototype.hasOwnProperty.call(overrides, name)) {
+    return httpUrl(overrides[name]);
+  }
+  for (const key of PUBLIC_LABELS) {
+    const labeled = httpUrl(labels?.[key]);
+    if (labeled) return labeled;
+  }
+  return httpUrl(discovered[name]);
+}
+
+function httpUrl(value: string | undefined): string | null {
+  const trimmed = value?.trim() ?? '';
+  return /^https?:\/\//i.test(trimmed) ? trimmed : null;
 }
 
 function pickWebPort<T extends { port: string; href: string | null; hostPort: string | null }>(

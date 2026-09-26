@@ -3,6 +3,7 @@ import { HOME_DOCK_KEYS, type HomeLayout, type HomeLink, type HomeWidgets } from
 const ORDER_KEY = 'dockora.home.appOrder';
 const CONTAINER_ORDER_KEY = 'dockora.home.containerOrder';
 const URL_KEY = 'dockora.home.appUrls';
+const PUBLIC_URL_KEY = 'dockora.home.appPublicUrls';
 const LINKS_KEY = 'dockora.home.links';
 const WIDGET_KEY = 'dockora.home.widgets';
 
@@ -10,6 +11,7 @@ export const EMPTY_HOME_LAYOUT: HomeLayout = {
   appOrder: [],
   containerOrder: [],
   appUrls: {},
+  appPublicUrls: {},
   links: [],
   widgets: { system: true, storage: true, network: true },
 };
@@ -27,6 +29,7 @@ export function homeLayoutHasData(layout: HomeLayout): boolean {
     layout.containerOrder.length > 0 ||
     layout.links.length > 0 ||
     Object.keys(layout.appUrls).length > 0 ||
+    Object.keys(layout.appPublicUrls).length > 0 ||
     !layout.widgets.system ||
     !layout.widgets.storage ||
     !layout.widgets.network
@@ -51,7 +54,8 @@ export function readHomeLayoutCache(): HomeLayout {
   return {
     appOrder: readStringList(ORDER_KEY),
     containerOrder: readStringList(CONTAINER_ORDER_KEY),
-    appUrls: readUrlMap(),
+    appUrls: readUrlMap(URL_KEY),
+    appPublicUrls: readUrlMap(PUBLIC_URL_KEY),
     links: readLinks(),
     widgets: readWidgets(),
   };
@@ -61,6 +65,7 @@ export function writeHomeLayoutCache(layout: HomeLayout): void {
   localStorage.setItem(ORDER_KEY, JSON.stringify(layout.appOrder));
   localStorage.setItem(CONTAINER_ORDER_KEY, JSON.stringify(layout.containerOrder));
   localStorage.setItem(URL_KEY, JSON.stringify(layout.appUrls));
+  localStorage.setItem(PUBLIC_URL_KEY, JSON.stringify(layout.appPublicUrls));
   localStorage.setItem(LINKS_KEY, JSON.stringify(layout.links));
   localStorage.setItem(WIDGET_KEY, JSON.stringify(layout.widgets));
 }
@@ -74,9 +79,9 @@ function readStringList(key: string): string[] {
   }
 }
 
-function readUrlMap(): Record<string, string> {
+function readUrlMap(key: string): Record<string, string> {
   try {
-    const raw = JSON.parse(localStorage.getItem(URL_KEY) ?? '{}') as unknown;
+    const raw = JSON.parse(localStorage.getItem(key) ?? '{}') as unknown;
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
     return Object.fromEntries(
       Object.entries(raw).filter((entry): entry is [string, string] => typeof entry[1] === 'string'),

@@ -15,6 +15,7 @@ export function emptyHomeLayout(): HomeLayout {
     appOrder: [],
     containerOrder: [],
     appUrls: {},
+    appPublicUrls: {},
     links: [],
     widgets: { system: true, storage: true, network: true },
   };
@@ -26,6 +27,7 @@ export function normalizeHomeLayout(input: unknown): HomeLayout {
     appOrder: stringList(source.appOrder, MAX_ORDER).filter((key) => DOCK.has(key)),
     containerOrder: stringList(source.containerOrder, MAX_ORDER).filter((key) => safeText(key)),
     appUrls: normalizeUrls(source.appUrls),
+    appPublicUrls: normalizeUrls(source.appPublicUrls),
     links: normalizeLinks(source.links),
     widgets: normalizeWidgets(source.widgets),
   };

@@ -25,6 +25,7 @@ import {
   fetchComposeProject,
   fetchComposeProjects,
   fetchContainers,
+  fetchDiscoveredAppUrls,
   fetchHomeLayout,
   fetchUpdates,
   pullUpdate,
@@ -32,9 +33,9 @@ import {
   saveHomeLayout,
 } from '@/lib/api';
 import { pickHomeLayout, readHomeLayoutCache, withDockDefaults, writeHomeLayoutCache } from '@/lib/home-layout';
-import { resolveContainerAppHref } from '@/lib/container-app-link';
+import { resolveContainerAppHref, resolvePublicAppUrl } from '@/lib/container-app-link';
 import { resolveContainerIconUrl } from '@/lib/container-icon';
-import { setComposeServiceUrl } from '@/lib/compose-icon-yaml';
+import { setComposeServicePublicUrl, setComposeServiceUrl } from '@/lib/compose-icon-yaml';
 import { formatBytes, formatPercent, formatRelativeTime, usageRatio } from '@/lib/format';
 import { canOperate } from '@/lib/roles';
 import { cn } from '@/lib/utils';
@@ -116,8 +117,11 @@ export function CasaDesktop({
   const [dragKey, setDragKey] = useState<DockKey | null>(null);
   const [query, setQuery] = useState('');
   const [urlOverrides, setUrlOverrides] = useState<Record<string, string>>({});
+  const [publicUrlOverrides, setPublicUrlOverrides] = useState<Record<string, string>>({});
+  const [discoveredUrls, setDiscoveredUrls] = useState<Record<string, string>>({});
   const [editingName, setEditingName] = useState<string | null>(null);
   const [draftUrl, setDraftUrl] = useState('');
+  const [draftPublicUrl, setDraftPublicUrl] = useState('');
   const [urlMessage, setUrlMessage] = useState<string | null>(null);
   const [urlBusy, setUrlBusy] = useState(false);
   const [pendingRecreate, setPendingRecreate] = useState<{
@@ -152,7 +156,8 @@ export function CasaDesktop({
     layoutRef.current = layout;
     setOrder(withDockDefaults(layout.appOrder) as DockKey[]);
     setWidgets(layout.widgets);
-    setUrlOverrides(layout.appUrls);
+    setUrlOverrides(layout.appUrls ?? {});
+    setPublicUrlOverrides(layout.appPublicUrls ?? {});
     setHomeLinks(layout.links);
     setContainerOrder(layout.containerOrder);
   };
@@ -221,10 +226,12 @@ export function CasaDesktop({
       void Promise.all([
         fetchContainers().catch(() => null),
         fetchUpdates().catch(() => null),
-      ]).then(([list, checks]) => {
+        fetchDiscoveredAppUrls().catch(() => null),
+      ]).then(([list, checks, discovered]) => {
         if (cancelled) return;
         if (list) setContainers(list);
         if (checks) setUpdates(checks);
+        if (discovered) setDiscoveredUrls(discovered);
       });
     };
     load();
@@ -338,8 +345,13 @@ export function CasaDesktop({
     setDragKey(null);
   };
 
-  const persistUrl = (name: string, url: string) => {
-    publish({ appUrls: { ...layoutRef.current.appUrls, [name]: url } });
+  const persistUrls = (name: string, internal: string, publicUrl: string | undefined) => {
+    const appPublicUrls = { ...(layoutRef.current.appPublicUrls ?? {}) };
+    if (publicUrl !== undefined) appPublicUrls[name] = publicUrl;
+    publish({
+      appUrls: { ...layoutRef.current.appUrls, [name]: internal },
+      appPublicUrls,
+    });
   };
 
   const checkForUpdates = async () => {
@@ -356,10 +368,21 @@ export function CasaDesktop({
 
   const saveAppUrl = async (container: ContainerSummary) => {
     const url = draftUrl.trim();
-    if (url && !/^https?:\/\//i.test(url)) {
+    const publicUrl = draftPublicUrl.trim();
+    if ((url && !/^https?:\/\//i.test(url)) || (publicUrl && !/^https?:\/\//i.test(publicUrl))) {
       setUrlMessage(home.appUrlHint);
       return;
     }
+    const hadPublicOverride = Object.prototype.hasOwnProperty.call(
+      layoutRef.current.appPublicUrls ?? {},
+      container.name,
+    );
+    const discoveredPublic = discoveredUrls[container.name] ?? '';
+    const publicToStore = publicUrl
+      ? publicUrl
+      : hadPublicOverride || discoveredPublic
+        ? ''
+        : undefined;
     setUrlBusy(true);
     setUrlMessage(null);
     setPendingRecreate(null);
@@ -374,18 +397,21 @@ export function CasaDesktop({
           return (workingDir && path === workingDir.replace(/\/+$/, '')) || item.name === projectName;
         });
         if (!project) {
-          persistUrl(container.name, url);
+          persistUrls(container.name, url, publicToStore);
           setUrlMessage(home.appUrlComposeMissing);
           return;
         }
         const details = await fetchComposeProject(project.id);
-        const nextYaml = setComposeServiceUrl(details.yaml, service, url);
+        let nextYaml = setComposeServiceUrl(details.yaml, service, url);
+        if (publicToStore !== undefined) {
+          nextYaml = setComposeServicePublicUrl(nextYaml, service, publicToStore);
+        }
         await saveComposeYaml(project.id, nextYaml);
-        persistUrl(container.name, url);
+        persistUrls(container.name, url, publicToStore);
         setPendingRecreate({ name: container.name, projectId: project.id, service });
         setUrlMessage(home.appUrlSavedRecreate);
       } else {
-        persistUrl(container.name, url);
+        persistUrls(container.name, url, publicToStore);
         setUrlMessage(home.appUrlComposeMissing);
       }
     } catch (error) {
@@ -791,14 +817,25 @@ export function CasaDesktop({
               }
               const container = item.container;
               const target = resolveContainerAppHref(container, pageHost);
+              const publicHref = resolvePublicAppUrl(
+                container.name,
+                container.labels,
+                publicUrlOverrides,
+                discoveredUrls,
+              );
+              const primary =
+                target.external || !publicHref ? target : { href: publicHref, external: true as const };
+              const extraPublic = Boolean(publicHref && publicHref !== primary.href);
               const icon = resolveContainerIconUrl(container.labels);
               const runningTile = container.status === 'running';
               return (
                 <li key={container.id}>
                   <ContainerTile
-                    href={target.href}
-                    external={target.external}
+                    href={primary.href}
+                    external={primary.external}
                     name={container.name}
+                    publicHref={extraPublic ? publicHref ?? undefined : undefined}
+                    publicLabel={home.appUrlPublic}
                     dimmed={!runningTile}
                     dragging={dragContainer === container.name}
                     onPointerDown={(event) => {
@@ -868,6 +905,14 @@ export function CasaDesktop({
                                 container.labels['homepage.href'] ||
                                 '',
                             );
+                            setDraftPublicUrl(
+                              resolvePublicAppUrl(
+                                container.name,
+                                container.labels,
+                                publicUrlOverrides,
+                                discoveredUrls,
+                              ) ?? '',
+                            );
                             setPendingRecreate((current) =>
                               current?.name === container.name ? current : null,
                             );
@@ -886,7 +931,7 @@ export function CasaDesktop({
                           onPointerDown={(event) => event.stopPropagation()}
                         >
                           <label className="block text-[11px] text-dockora-muted">
-                            {home.appUrl}
+                            {home.appUrlInternal}
                             <input
                               value={draftUrl}
                               onChange={(event) => setDraftUrl(event.target.value)}
@@ -894,7 +939,17 @@ export function CasaDesktop({
                               className="mt-1 w-full rounded-md border border-white/10 bg-black/40 px-2 py-1 text-xs text-dockora-text"
                             />
                           </label>
+                          <label className="block text-[11px] text-dockora-muted">
+                            {home.appUrlPublic}
+                            <input
+                              value={draftPublicUrl}
+                              onChange={(event) => setDraftPublicUrl(event.target.value)}
+                              placeholder="https://"
+                              className="mt-1 w-full rounded-md border border-white/10 bg-black/40 px-2 py-1 text-xs text-dockora-text"
+                            />
+                          </label>
                           <p className="text-[10px] leading-snug text-dockora-muted">{home.appUrlHint}</p>
+                          <p className="text-[10px] leading-snug text-dockora-muted">{home.appUrlPublicHint}</p>
                           {urlMessage ? <p className="text-[11px] leading-snug text-dockora-text">{urlMessage}</p> : null}
                           <div className="flex flex-wrap gap-2">
                             <button
@@ -1053,6 +1108,8 @@ function ContainerTile({
   detailLabel,
   editLabel,
   onEdit,
+  publicHref,
+  publicLabel,
   removeLabel,
   onRemove,
   updateLabel,
@@ -1075,6 +1132,8 @@ function ContainerTile({
   detailLabel: string;
   editLabel?: string;
   onEdit?: () => void;
+  publicHref?: string;
+  publicLabel?: string;
   removeLabel?: string;
   onRemove?: () => void;
   updateLabel?: string;
@@ -1139,7 +1198,7 @@ function ContainerTile({
           {name}
         </Link>
       )}
-      {onUpdate || onEdit || onRemove ? (
+      {onUpdate || onEdit || onRemove || publicHref ? (
         <div className="mt-1.5 flex flex-wrap items-center justify-center gap-1">
           {onUpdate ? (
             <button
@@ -1155,6 +1214,17 @@ function ContainerTile({
             >
               {updateLabel}
             </button>
+          ) : null}
+          {publicHref && publicLabel ? (
+            <a
+              href={publicHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex rounded-full border border-white/15 px-2.5 py-1 text-[11px] text-dockora-text hover:border-dockora-pink/50 hover:text-white"
+              onPointerDown={(event) => event.stopPropagation()}
+            >
+              {publicLabel}
+            </a>
           ) : null}
           {onEdit ? (
             <button

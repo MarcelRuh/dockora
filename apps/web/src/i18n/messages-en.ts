@@ -109,8 +109,11 @@ export const en = {
         more: 'Engine and history',
         openInDockora: 'Open in Dockora',
         appUrl: 'Address',
+        appUrlInternal: 'Internal',
+        appUrlPublic: 'Public',
         appUrlSave: 'Save',
         appUrlHint: 'http://… – leave empty to use the detected port',
+        appUrlPublicHint: 'Empty: APP_URL or SEERR_APP_URL from .env, when the service uses it.',
         appUrlSaved: 'Address saved',
         appUrlSavedRecreate:
           'Address saved. The link works now. Recreate the service to store it on the container too.',

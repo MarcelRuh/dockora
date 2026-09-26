@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { setComposeServiceIcon, setComposeServiceUrl } from './compose-icon-yaml';
+import { setComposeServiceIcon, setComposeServicePublicUrl, setComposeServiceUrl } from './compose-icon-yaml';
 
 const YAML = `services:
   seerr:
@@ -33,5 +33,12 @@ describe('setComposeServiceUrl', () => {
 
   it('rejects a value that is not http(s)', () => {
     expect(() => setComposeServiceUrl(YAML, 'sonarr', '8989')).toThrow(/http/);
+  });
+
+  it('adds a public url without removing the internal one', () => {
+    const withInternal = setComposeServiceUrl(YAML, 'seerr', 'http://192.168.1.10:5055');
+    const next = setComposeServicePublicUrl(withInternal, 'seerr', 'https://requests.example');
+    expect(next).toContain('- url=http://192.168.1.10:5055');
+    expect(next).toContain('- public_url=https://requests.example');
   });
 });

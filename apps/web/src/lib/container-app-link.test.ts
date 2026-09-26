@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveContainerAppHref } from './container-app-link';
+import { resolveContainerAppHref, resolvePublicAppUrl } from './container-app-link';
 
 describe('resolveContainerAppHref', () => {
   it('prefers an explicit url label', () => {
@@ -61,6 +61,16 @@ describe('resolveContainerAppHref', () => {
         '192.168.1.10',
       ),
     ).toEqual({ href: 'http://192.168.1.10:8989', external: true });
+  });
+
+  it('uses a discovered public URL until an override is stored', () => {
+    expect(resolvePublicAppUrl('seerr', {}, {}, { seerr: 'https://requests.example' })).toBe(
+      'https://requests.example',
+    );
+    expect(resolvePublicAppUrl('seerr', {}, { seerr: '' }, { seerr: 'https://requests.example' })).toBeNull();
+    expect(
+      resolvePublicAppUrl('seerr', { public_url: 'https://from-label.example' }, {}, {}),
+    ).toBe('https://from-label.example');
   });
 
   it('opens the detail page when nothing is published', () => {

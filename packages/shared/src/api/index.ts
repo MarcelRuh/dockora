@@ -296,6 +296,8 @@ export interface HomeLayout {
   appOrder: string[];
   containerOrder: string[];
   appUrls: Record<string, string>;
+  /** Public address. Empty string hides a discovered .env URL. */
+  appPublicUrls: Record<string, string>;
   links: HomeLink[];
   widgets: HomeWidgets;
 }

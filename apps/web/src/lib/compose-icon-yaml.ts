@@ -50,6 +50,15 @@ export function setComposeServiceIcon(yaml: string, service: string, url: string
  * Empty value removes the url label. Icon labels stay untouched.
  */
 export function setComposeServiceUrl(yaml: string, service: string, url: string): string {
+  return setComposeServiceLabel(yaml, service, 'url', url);
+}
+
+/** Public address label. Does not touch the internal `url=` label. */
+export function setComposeServicePublicUrl(yaml: string, service: string, url: string): string {
+  return setComposeServiceLabel(yaml, service, 'public_url', url);
+}
+
+function setComposeServiceLabel(yaml: string, service: string, key: string, url: string): string {
   const lines = yaml.split(/\r?\n/);
   const start = lines.findIndex((line) => {
     const match = SERVICE_RE.exec(line.replace(/\t/g, '  '));
@@ -67,11 +76,14 @@ export function setComposeServiceUrl(yaml: string, service: string, url: string)
   }
 
   const block = lines.slice(start, end);
-  const urlList = /^\s{4,}-\s+url=/i;
-  const urlMap = /^\s{4,}url\s*:/i;
+  const list = new RegExp(`^\\s{4,}-\\s+${key}=`, 'i');
+  const map = new RegExp(`^\\s{4,}${key}\\s*:`, 'i');
   const labelsHeader = /^\s{4}labels:\s*(?:#.*)?$/;
   const nextUrl = url.trim();
-  const filtered = block.filter((line) => !urlList.test(line) && !urlMap.test(line));
+  const filtered = block.filter((line) => {
+    const normalized = line.replace(/\t/g, '  ');
+    return !list.test(normalized) && !map.test(normalized);
+  });
 
   if (!nextUrl) {
     return [...lines.slice(0, start), ...filtered, ...lines.slice(end)].join('\n');
@@ -81,7 +93,7 @@ export function setComposeServiceUrl(yaml: string, service: string, url: string)
   }
 
   const labelIdx = filtered.findIndex((line) => labelsHeader.test(line.replace(/\t/g, '  ')));
-  const urlLine = `      - url=${nextUrl}`;
+  const urlLine = `      - ${key}=${nextUrl}`;
   if (labelIdx >= 0) {
     filtered.splice(labelIdx + 1, 0, urlLine);
   } else {

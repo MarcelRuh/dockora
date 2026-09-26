@@ -126,6 +126,11 @@ export async function saveHomeLayout(layout: HomeLayout): Promise<HomeLayoutResp
   });
 }
 
+export async function fetchDiscoveredAppUrls(): Promise<Record<string, string>> {
+  const body = await request<{ urls: Record<string, string> }>('/home/discovered-urls');
+  return body.urls ?? {};
+}
+
 // Containers
 export async function fetchContainers(filter?: ContainerFilter): Promise<ContainerSummary[]> {
   return request<ContainerSummary[]>(

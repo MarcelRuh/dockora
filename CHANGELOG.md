@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.25] – 2026-09-26
+
+### Added
+
+- Each home app can store an internal and a public address, and the public one is read from the Compose .env when the service uses APP_URL
+
 ## [2.0.24] – 2026-09-26
 
 ### Changed

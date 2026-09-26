@@ -107,8 +107,11 @@ export const de = {
         more: 'Engine und Verlauf',
         openInDockora: 'In Dockora öffnen',
         appUrl: 'Adresse',
+        appUrlInternal: 'Intern',
+        appUrlPublic: 'Öffentlich',
         appUrlSave: 'Speichern',
         appUrlHint: 'http://… – leer lassen nutzt den erkannten Port',
+        appUrlPublicHint: 'Leer: APP_URL oder SEERR_APP_URL aus der .env, wenn der Service sie nutzt.',
         appUrlSaved: 'Adresse gespeichert',
         appUrlSavedRecreate:
           'Adresse gespeichert. Der Link gilt sofort. Service neu erstellen, damit sie auch am Container hängt.',
