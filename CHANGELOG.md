@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.18] – 2026-09-26
+
+### Changed
+
+- A saved app address offers a service recreate, the home wordmark appears once, and tile names open the container page
+
 ## [2.0.17] – 2026-09-26
 
 ### Changed

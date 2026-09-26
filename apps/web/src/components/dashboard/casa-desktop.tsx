@@ -17,7 +17,13 @@ import { BrandLogoWide } from '@/components/ui/brand-logo';
 import { NAV_ICONS } from '@/components/ui/nav-icons';
 import { ServiceIcon } from '@/components/ui/service-icon';
 import { useLocale } from '@/i18n/locale-provider';
-import { fetchComposeProject, fetchComposeProjects, fetchContainers, saveComposeYaml } from '@/lib/api';
+import {
+  composeAction,
+  fetchComposeProject,
+  fetchComposeProjects,
+  fetchContainers,
+  saveComposeYaml,
+} from '@/lib/api';
 import { resolveContainerAppHref } from '@/lib/container-app-link';
 import { resolveContainerIconUrl } from '@/lib/container-icon';
 import { setComposeServiceUrl } from '@/lib/compose-icon-yaml';
@@ -143,6 +149,11 @@ export function CasaDesktop({
   const [draftUrl, setDraftUrl] = useState('');
   const [urlMessage, setUrlMessage] = useState<string | null>(null);
   const [urlBusy, setUrlBusy] = useState(false);
+  const [pendingRecreate, setPendingRecreate] = useState<{
+    name: string;
+    projectId: string;
+    service: string;
+  } | null>(null);
   const [containers, setContainers] = useState<ContainerSummary[]>([]);
   const [containerOrder, setContainerOrder] = useState<string[]>([]);
   const [dragContainer, setDragContainer] = useState<string | null>(null);
@@ -246,6 +257,7 @@ export function CasaDesktop({
     }
     setUrlBusy(true);
     setUrlMessage(null);
+    setPendingRecreate(null);
     const service = container.labels['com.docker.compose.service']?.trim();
     const workingDir = container.labels['com.docker.compose.project.working_dir']?.trim();
     const projectName = container.labels['com.docker.compose.project']?.trim() || container.composeProject;
@@ -265,11 +277,29 @@ export function CasaDesktop({
         const nextYaml = setComposeServiceUrl(details.yaml, service, url);
         await saveComposeYaml(project.id, nextYaml);
         persistUrl(container.name, url);
-        setUrlMessage(home.appUrlSaved);
+        setPendingRecreate({ name: container.name, projectId: project.id, service });
+        setUrlMessage(home.appUrlSavedRecreate);
       } else {
         persistUrl(container.name, url);
         setUrlMessage(home.appUrlComposeMissing);
       }
+    } catch (error) {
+      setUrlMessage(error instanceof Error ? error.message : t.common.failed);
+    } finally {
+      setUrlBusy(false);
+    }
+  };
+
+  const recreateSavedService = async () => {
+    if (!pendingRecreate) return;
+    setUrlBusy(true);
+    setUrlMessage(null);
+    try {
+      await composeAction(pendingRecreate.projectId, 'recreate', pendingRecreate.service);
+      const list = await fetchContainers();
+      setContainers(list);
+      setUrlMessage(home.appUrlRecreated);
+      setPendingRecreate(null);
     } catch (error) {
       setUrlMessage(error instanceof Error ? error.message : t.common.failed);
     } finally {
@@ -496,13 +526,16 @@ export function CasaDesktop({
                                 '',
                             );
                             setUrlMessage(null);
+                            setPendingRecreate((current) =>
+                              current?.name === container.name ? current : null,
+                            );
                           }
                         : undefined
                     }
                     editor={
                       editingName === container.name ? (
                         <form
-                          className="dockora-glass absolute left-0 right-0 top-full z-30 mt-2 space-y-2 p-3 text-left"
+                          className="dockora-glass absolute left-0 right-0 top-full z-30 mt-2 min-w-[16rem] space-y-2 p-3 text-left"
                           onSubmit={(event) => {
                             event.preventDefault();
                             void saveAppUrl(container);
@@ -519,14 +552,26 @@ export function CasaDesktop({
                             />
                           </label>
                           <p className="text-[10px] text-dockora-muted">{home.appUrlHint}</p>
-                          {urlMessage ? <p className="text-[10px] text-dockora-text">{urlMessage}</p> : null}
-                          <button
-                            type="submit"
-                            disabled={urlBusy}
-                            className="rounded-full bg-dockora-pink px-2 py-1 text-[11px] text-white disabled:opacity-50"
-                          >
-                            {home.appUrlSave}
-                          </button>
+                          {urlMessage ? <p className="text-[11px] leading-snug text-dockora-text">{urlMessage}</p> : null}
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="submit"
+                              disabled={urlBusy}
+                              className="rounded-full bg-dockora-pink px-2 py-1 text-[11px] text-white disabled:opacity-50"
+                            >
+                              {home.appUrlSave}
+                            </button>
+                            {pendingRecreate?.name === container.name ? (
+                              <button
+                                type="button"
+                                disabled={urlBusy}
+                                onClick={() => void recreateSavedService()}
+                                className="rounded-full border border-white/15 px-2 py-1 text-[11px] text-dockora-text disabled:opacity-50"
+                              >
+                                {urlBusy ? home.appUrlRecreating : home.appUrlRecreate}
+                              </button>
+                            ) : null}
+                          </div>
                         </form>
                       ) : null
                     }
@@ -544,7 +589,6 @@ export function CasaDesktop({
                         )}
                       />
                     </span>
-                    <span className="max-w-full truncate text-xs text-dockora-text">{container.name}</span>
                   </ContainerTile>
                 </li>
               );
@@ -553,10 +597,6 @@ export function CasaDesktop({
         </section>
 
         <section aria-label={home.suite}>
-          <div className="mb-3">
-            <h2 className="dockora-logo-gradient text-sm">{home.suite}</h2>
-            <p className="dockora-logo-tagline mt-1 text-[0.58rem]">{t.tagline}</p>
-          </div>
           <ul className="flex flex-wrap gap-2">
             {apps.map((app) => {
               const Icon = NAV_ICONS[app.key];
@@ -659,11 +699,11 @@ function ContainerTile({
   onClick: (event: ReactMouseEvent<HTMLAnchorElement>) => void;
 }) {
   const shell = cn(
-    'dockora-glass relative aspect-square transition-transform hover:-translate-y-0.5 hover:border-dockora-pink/45',
+    'dockora-glass relative flex flex-col items-center px-2 pb-3 transition-transform hover:-translate-y-0.5 hover:border-dockora-pink/45',
     dimmed && 'opacity-50',
     dragging && 'opacity-50',
   );
-  const face = 'flex h-full w-full flex-col items-center justify-center gap-2.5 px-2 py-3 text-center';
+  const face = 'flex w-full items-center justify-center px-2 pt-3';
   const open = external ? (
     <a href={href} target="_blank" rel="noopener noreferrer" title={name} className={face} onClick={onClick}>
       {children}
@@ -690,22 +730,17 @@ function ContainerTile({
       {open}
       <Link
         href={detailHref}
-        aria-label={detailLabel}
         title={detailLabel}
-        className="absolute bottom-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded-md bg-black/55 text-dockora-muted hover:text-white"
+        className="mt-2 max-w-full truncate px-1 text-xs text-dockora-text hover:text-dockora-pink"
         onPointerDown={(event) => event.stopPropagation()}
       >
-        <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-          <path d="M8 6h12M8 12h12M8 18h12" />
-          <path d="M4 6h.01M4 12h.01M4 18h.01" />
-        </svg>
+        {name}
       </Link>
       {onEdit ? (
         <button
           type="button"
           aria-label={editLabel}
-          title={editLabel}
-          className="absolute left-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-md bg-black/55 text-[10px] text-dockora-muted hover:text-white"
+          className="mt-1.5 inline-flex items-center gap-1 rounded-full border border-white/15 px-2.5 py-1 text-[11px] text-dockora-text hover:border-dockora-pink/50 hover:text-white"
           onPointerDown={(event) => event.stopPropagation()}
           onClick={(event) => {
             event.preventDefault();
@@ -717,6 +752,7 @@ function ContainerTile({
             <path d="M4 20h4l10-10-4-4L4 16v4Z" />
             <path d="m12 6 4 4" />
           </svg>
+          {editLabel}
         </button>
       ) : null}
       {editor}

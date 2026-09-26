@@ -94,6 +94,11 @@ export const de = {
         appUrlSave: 'Speichern',
         appUrlHint: 'http://… – leer lassen nutzt den erkannten Port',
         appUrlSaved: 'Adresse gespeichert',
+        appUrlSavedRecreate:
+          'Adresse gespeichert. Service neu erstellen, damit sie am Container hängt.',
+        appUrlRecreate: 'Service neu erstellen',
+        appUrlRecreating: 'Erstelle neu…',
+        appUrlRecreated: 'Service neu erstellt',
         appUrlComposeMissing: 'Kein Compose-Service. Die Adresse gilt nur in diesem Browser.',
         searchPlaceholder: 'Apps und Seiten suchen',
         rx: 'Empfang',
