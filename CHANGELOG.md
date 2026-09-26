@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.24] – 2026-09-26
+
+### Changed
+
+- Home links, addresses, order and widgets are stored for the instance, a saved address opens immediately, and the dashboard shows when image updates were last checked
+
 ## [2.0.23] – 2026-09-26
 
 ### Changed

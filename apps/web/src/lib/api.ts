@@ -17,6 +17,8 @@ import type {
   ContainerSummary,
   DashboardNotification,
   DashboardOverview,
+  HomeLayout,
+  HomeLayoutResponse,
   HealthResponse,
   ImageSummary,
   VolumeBrowseEntry,
@@ -111,6 +113,17 @@ export async function fetchHealth(): Promise<HealthResponse> {
 
 export async function fetchDashboard(): Promise<DashboardOverview> {
   return request<DashboardOverview>('/dashboard');
+}
+
+export async function fetchHomeLayout(): Promise<HomeLayoutResponse> {
+  return request<HomeLayoutResponse>('/home/layout');
+}
+
+export async function saveHomeLayout(layout: HomeLayout): Promise<HomeLayoutResponse> {
+  return request<HomeLayoutResponse>('/home/layout', {
+    method: 'PUT',
+    body: JSON.stringify(layout),
+  });
 }
 
 // Containers

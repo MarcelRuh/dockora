@@ -19,6 +19,7 @@ import { schedulerModule } from './scheduler/index.js';
 import { terminalModule } from './terminal/index.js';
 import { pluginsModule } from './plugins/index.js';
 import { auditModule } from './audit/index.js';
+import { homeModule } from './home/index.js';
 
 export async function registerModules(app: FastifyInstance): Promise<void> {
   await app.register(openApiModule);
@@ -33,6 +34,7 @@ export async function registerModules(app: FastifyInstance): Promise<void> {
   await app.register(imagesModule);
   await app.register(volumesModule);
   await app.register(settingsModule);
+  await app.register(homeModule);
   await app.register(updatesModule);
   await app.register(backupsModule);
   await app.register(notificationsModule);

@@ -1,5 +1,5 @@
 export const APP_NAME = 'Dockora';
-export const APP_VERSION = '2.0.23';
+export const APP_VERSION = '2.0.24';
 
 /** Minimum length for user passwords (create/update). */
 export const MIN_PASSWORD_LENGTH = 12;
@@ -22,6 +22,22 @@ export const COMPOSE_FILENAMES = [
 
 /** API-Basispfad */
 export const API_PREFIX = '/api/v1';
+
+/** Dock entries on the home screen. Order in the UI may differ. */
+export const HOME_DOCK_KEYS = [
+  'containers',
+  'compose',
+  'images',
+  'volumes',
+  'updates',
+  'monitoring',
+  'network',
+  'backups',
+  'logs',
+  'terminal',
+  'selfUpdate',
+  'settings',
+] as const;
 
 /** WebSocket-Events (vorbereitet für Live-Updates) */
 export const WS_EVENTS = {

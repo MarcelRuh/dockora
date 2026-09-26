@@ -278,6 +278,33 @@ export interface AppSettings {
   authEnabled: boolean;
 }
 
+export interface HomeLink {
+  id: string;
+  name: string;
+  url: string;
+  icon: string;
+}
+
+export interface HomeWidgets {
+  system: boolean;
+  storage: boolean;
+  network: boolean;
+}
+
+/** Shared home screen: one layout for the whole Dockora instance. */
+export interface HomeLayout {
+  appOrder: string[];
+  containerOrder: string[];
+  appUrls: Record<string, string>;
+  links: HomeLink[];
+  widgets: HomeWidgets;
+}
+
+export interface HomeLayoutResponse {
+  stored: boolean;
+  layout: HomeLayout;
+}
+
 export interface AuthUser {
   id: string;
   email: string;

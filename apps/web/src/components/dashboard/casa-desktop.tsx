@@ -11,7 +11,8 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from 'react';
-import type { ContainerSummary, DashboardOverview, Locale, UpdateCheckResult } from '@dockora/shared';
+import type { ContainerSummary, DashboardOverview, HomeLayout, HomeLink, Locale, UpdateCheckResult } from '@dockora/shared';
+import { HOME_DOCK_KEYS } from '@dockora/shared';
 import { AuthLogoutButton, useAuth } from '@/components/auth/auth-provider';
 import { BrandLogoWide } from '@/components/ui/brand-logo';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -19,18 +20,22 @@ import { NAV_ICONS } from '@/components/ui/nav-icons';
 import { ServiceIcon } from '@/components/ui/service-icon';
 import { useLocale } from '@/i18n/locale-provider';
 import {
+  checkUpdates,
   composeAction,
   fetchComposeProject,
   fetchComposeProjects,
   fetchContainers,
+  fetchHomeLayout,
   fetchUpdates,
   pullUpdate,
   saveComposeYaml,
+  saveHomeLayout,
 } from '@/lib/api';
+import { pickHomeLayout, readHomeLayoutCache, withDockDefaults, writeHomeLayoutCache } from '@/lib/home-layout';
 import { resolveContainerAppHref } from '@/lib/container-app-link';
 import { resolveContainerIconUrl } from '@/lib/container-icon';
 import { setComposeServiceUrl } from '@/lib/compose-icon-yaml';
-import { formatBytes, formatPercent, usageRatio } from '@/lib/format';
+import { formatBytes, formatPercent, formatRelativeTime, usageRatio } from '@/lib/format';
 import { canOperate } from '@/lib/roles';
 import { cn } from '@/lib/utils';
 
@@ -50,7 +55,7 @@ const APPS = [
 ] as const;
 
 type AppKey = (typeof APPS)[number]['key'];
-const DOCK_KEYS: AppKey[] = APPS.map((app) => app.key);
+const DOCK_KEYS: AppKey[] = [...HOME_DOCK_KEYS];
 type DockKey = AppKey;
 
 const TILE: Record<AppKey, string> = {
@@ -68,40 +73,11 @@ const TILE: Record<AppKey, string> = {
   settings: 'bg-gradient-to-br from-dockora-purple to-dockora-surface2',
 };
 
-const ORDER_KEY = 'dockora.home.appOrder';
-const CONTAINER_ORDER_KEY = 'dockora.home.containerOrder';
-const URL_KEY = 'dockora.home.appUrls';
-const LINKS_KEY = 'dockora.home.links';
-const WIDGET_KEY = 'dockora.home.widgets';
 const HINT_KEY = 'dockora.home.dragHint';
 
 type Widgets = { system: boolean; storage: boolean; network: boolean };
 
 const DEFAULT_WIDGETS: Widgets = { system: true, storage: true, network: true };
-
-function readOrder(): DockKey[] {
-  const known = new Set<string>(DOCK_KEYS);
-  try {
-    const raw = JSON.parse(localStorage.getItem(ORDER_KEY) ?? '[]') as unknown;
-    const saved = Array.isArray(raw) ? raw.filter((key): key is DockKey => known.has(String(key))) : [];
-    const missing = DOCK_KEYS.filter((key) => !saved.includes(key));
-    return [...saved, ...missing];
-  } catch {
-    return [...DOCK_KEYS];
-  }
-}
-
-function readUrlOverrides(): Record<string, string> {
-  try {
-    const raw = JSON.parse(localStorage.getItem(URL_KEY) ?? '{}') as unknown;
-    if (!raw || typeof raw !== 'object') return {};
-    return Object.fromEntries(
-      Object.entries(raw).filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
-    );
-  } catch {
-    return {};
-  }
-}
 
 function withUrlOverride(container: ContainerSummary, overrides: Record<string, string>): ContainerSummary {
   if (!Object.prototype.hasOwnProperty.call(overrides, container.name)) return container;
@@ -117,41 +93,8 @@ function withUrlOverride(container: ContainerSummary, overrides: Record<string, 
   return { ...container, labels: { ...container.labels, url: stored } };
 }
 
-type HomeLink = { id: string; name: string; url: string; icon: string };
-
 function linkKey(id: string) {
   return `link:${id}`;
-}
-
-function readLinks(): HomeLink[] {
-  try {
-    const raw = JSON.parse(localStorage.getItem(LINKS_KEY) ?? '[]') as unknown;
-    if (!Array.isArray(raw)) return [];
-    return raw.filter(
-      (item): item is HomeLink =>
-        Boolean(item) &&
-        typeof item === 'object' &&
-        typeof (item as HomeLink).id === 'string' &&
-        typeof (item as HomeLink).name === 'string' &&
-        typeof (item as HomeLink).url === 'string' &&
-        typeof (item as HomeLink).icon === 'string',
-    );
-  } catch {
-    return [];
-  }
-}
-
-function readWidgets(): Widgets {
-  try {
-    const raw = JSON.parse(localStorage.getItem(WIDGET_KEY) ?? '{}') as Partial<Widgets>;
-    return {
-      system: raw.system !== false,
-      storage: raw.storage !== false,
-      network: raw.network !== false,
-    };
-  } catch {
-    return DEFAULT_WIDGETS;
-  }
 }
 
 export function CasaDesktop({
@@ -187,6 +130,8 @@ export function CasaDesktop({
   const [updateConfirm, setUpdateConfirm] = useState<string[] | null>(null);
   const [updateBusy, setUpdateBusy] = useState<string | null>(null);
   const [updateError, setUpdateError] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [layoutError, setLayoutError] = useState<string | null>(null);
   const [containerOrder, setContainerOrder] = useState<string[]>([]);
   const [homeLinks, setHomeLinks] = useState<HomeLink[]>([]);
   const [addMenu, setAddMenu] = useState(false);
@@ -196,20 +141,77 @@ export function CasaDesktop({
   const [dragContainer, setDragContainer] = useState<string | null>(null);
   const dragged = useRef(false);
   const [pageHost, setPageHost] = useState('');
+  const layoutRef = useRef<HomeLayout>(readHomeLayoutCache());
+  const dirtyRef = useRef(false);
+  const hydratedRef = useRef(false);
+  const saveTimer = useRef<number | null>(null);
+  const canEditRef = useRef(canEdit);
+  canEditRef.current = canEdit;
+
+  const applyLayout = (layout: HomeLayout) => {
+    layoutRef.current = layout;
+    setOrder(withDockDefaults(layout.appOrder) as DockKey[]);
+    setWidgets(layout.widgets);
+    setUrlOverrides(layout.appUrls);
+    setHomeLinks(layout.links);
+    setContainerOrder(layout.containerOrder);
+  };
+
+  const publish = (patch: Partial<HomeLayout>) => {
+    const next = { ...layoutRef.current, ...patch };
+    if (!hydratedRef.current) dirtyRef.current = true;
+    applyLayout(next);
+    writeHomeLayoutCache(next);
+    if (!hydratedRef.current || !canEditRef.current) return;
+    if (saveTimer.current) window.clearTimeout(saveTimer.current);
+    saveTimer.current = window.setTimeout(() => {
+      saveTimer.current = null;
+      void saveHomeLayout(layoutRef.current).catch(() => setLayoutError(home.layoutSaveFailed));
+    }, 400);
+  };
 
   useEffect(() => {
-    setOrder(readOrder());
-    setWidgets(readWidgets());
+    const local = readHomeLayoutCache();
+    applyLayout(local);
     setHint(localStorage.getItem(HINT_KEY) !== '0');
     setPageHost(window.location.hostname);
-    setUrlOverrides(readUrlOverrides());
-    setHomeLinks(readLinks());
-    try {
-      const raw = JSON.parse(localStorage.getItem(CONTAINER_ORDER_KEY) ?? '[]') as unknown;
-      setContainerOrder(Array.isArray(raw) ? raw.filter((id): id is string => typeof id === 'string') : []);
-    } catch {
-      setContainerOrder([]);
-    }
+    let cancelled = false;
+    void fetchHomeLayout()
+      .then(async (remote) => {
+        if (cancelled) return;
+        const choice = pickHomeLayout({
+          remoteStored: remote.stored,
+          remote: remote.layout,
+          local: dirtyRef.current ? layoutRef.current : local,
+          dirty: dirtyRef.current,
+          canEdit,
+        });
+        applyLayout(choice.layout);
+        writeHomeLayoutCache(choice.layout);
+        if (choice.upload) {
+          await saveHomeLayout(choice.layout).catch(() => {
+            if (!cancelled) setLayoutError(home.layoutSaveFailed);
+          });
+        }
+        if (!cancelled) hydratedRef.current = true;
+      })
+      .catch(() => {
+        if (!cancelled) hydratedRef.current = true;
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [canEdit, home.layoutSaveFailed]);
+
+  useEffect(() => {
+    return () => {
+      if (!saveTimer.current) return;
+      window.clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+      if (hydratedRef.current && canEditRef.current) {
+        void saveHomeLayout(layoutRef.current).catch(() => undefined);
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -315,10 +317,16 @@ export function CasaDesktop({
     [updates],
   );
   const updateCount = updates.length > 0 ? pendingUpdates.length : overview.updatesAvailable;
+  const checkedAt = useMemo(() => {
+    let latest = '';
+    for (const item of updates) {
+      if (item.checkedAt > latest) latest = item.checkedAt;
+    }
+    return latest || null;
+  }, [updates]);
 
   const saveOrder = (next: DockKey[]) => {
-    setOrder(next);
-    localStorage.setItem(ORDER_KEY, JSON.stringify(next));
+    publish({ appOrder: next });
   };
 
   const dropOn = (target: DockKey) => {
@@ -331,9 +339,19 @@ export function CasaDesktop({
   };
 
   const persistUrl = (name: string, url: string) => {
-    const next = { ...urlOverrides, [name]: url };
-    setUrlOverrides(next);
-    localStorage.setItem(URL_KEY, JSON.stringify(next));
+    publish({ appUrls: { ...layoutRef.current.appUrls, [name]: url } });
+  };
+
+  const checkForUpdates = async () => {
+    setChecking(true);
+    setUpdateError(null);
+    try {
+      setUpdates(await checkUpdates());
+    } catch (error) {
+      setUpdateError(error instanceof Error ? error.message : t.common.failed);
+    } finally {
+      setChecking(false);
+    }
   };
 
   const saveAppUrl = async (container: ContainerSummary) => {
@@ -419,9 +437,7 @@ export function CasaDesktop({
   };
 
   const setWidget = (key: keyof Widgets, value: boolean) => {
-    const next = { ...widgets, [key]: value };
-    setWidgets(next);
-    localStorage.setItem(WIDGET_KEY, JSON.stringify(next));
+    publish({ widgets: { ...layoutRef.current.widgets, [key]: value } });
   };
 
   const running = overview.containers.running;
@@ -558,9 +574,27 @@ export function CasaDesktop({
                 ? () => setUpdateConfirm(pendingUpdates.map((item) => item.containerId))
                 : undefined
             }
+            footer={
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-dockora-muted">
+                <span>
+                  {home.checkedAt}: {checkedAt ? formatRelativeTime(checkedAt, loc) : home.neverChecked}
+                </span>
+                {canEdit ? (
+                  <button
+                    type="button"
+                    disabled={checking}
+                    onClick={() => void checkForUpdates()}
+                    className="rounded-full border border-white/15 px-2 py-0.5 text-dockora-text disabled:opacity-50"
+                  >
+                    {checking ? home.checking : home.checkNow}
+                  </button>
+                ) : null}
+              </div>
+            }
           />
         </div>
         {updateError ? <p className="text-xs text-dockora-danger">{updateError}</p> : null}
+        {layoutError ? <p className="text-xs text-dockora-danger">{layoutError}</p> : null}
 
         <section aria-label={home.apps} className="relative">
           <div className="mb-3 flex items-center gap-3">
@@ -635,10 +669,7 @@ export function CasaDesktop({
                 };
                 const nextLinks = [...homeLinks, link];
                 const nextOrder = [...containerOrder, linkKey(link.id)];
-                setHomeLinks(nextLinks);
-                setContainerOrder(nextOrder);
-                localStorage.setItem(LINKS_KEY, JSON.stringify(nextLinks));
-                localStorage.setItem(CONTAINER_ORDER_KEY, JSON.stringify(nextOrder));
+                publish({ links: nextLinks, containerOrder: nextOrder });
                 setLinkDraft({ name: '', url: '', icon: '' });
                 setLinkError(null);
                 setLinkForm(false);
@@ -688,7 +719,7 @@ export function CasaDesktop({
               </div>
             </form>
           ) : null}
-          <ul className="grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-3">
+          <ul className="grid grid-cols-[repeat(auto-fill,minmax(6.75rem,1fr))] gap-2 sm:gap-3 sm:grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))]">
             {visibleItems.map((item) => {
               if (item.kind === 'link') {
                 const { link } = item;
@@ -706,10 +737,7 @@ export function CasaDesktop({
                       onRemove={() => {
                         const nextLinks = homeLinks.filter((entry) => entry.id !== link.id);
                         const nextOrder = containerOrder.filter((key) => key !== item.key);
-                        setHomeLinks(nextLinks);
-                        setContainerOrder(nextOrder);
-                        localStorage.setItem(LINKS_KEY, JSON.stringify(nextLinks));
-                        localStorage.setItem(CONTAINER_ORDER_KEY, JSON.stringify(nextOrder));
+                        publish({ links: nextLinks, containerOrder: nextOrder });
                       }}
                       onPointerDown={(event) => {
                         const startX = event.clientX;
@@ -739,8 +767,7 @@ export function CasaDesktop({
                         const next = keys.filter((key) => key !== dragContainer);
                         const index = next.indexOf(item.key);
                         next.splice(index < 0 ? next.length : index, 0, dragContainer);
-                        setContainerOrder(next);
-                        localStorage.setItem(CONTAINER_ORDER_KEY, JSON.stringify(next));
+                        publish({ containerOrder: next });
                         setDragContainer(null);
                       }}
                       onDragEnd={(event) => {
@@ -756,7 +783,7 @@ export function CasaDesktop({
                       <ServiceIcon
                         url={link.icon}
                         alt={link.name}
-                        className="h-[4.25rem] w-[4.25rem] rounded-[1.15rem] bg-white/[0.06] object-contain p-1.5 text-2xl"
+                        className="h-14 w-14 rounded-2xl bg-white/[0.06] object-contain p-1.5 text-xl sm:h-[4.25rem] sm:w-[4.25rem] sm:rounded-[1.15rem] sm:text-2xl"
                       />
                     </ContainerTile>
                   </li>
@@ -802,8 +829,7 @@ export function CasaDesktop({
                       const next = keys.filter((key) => key !== dragContainer);
                       const index = next.indexOf(container.name);
                       next.splice(index < 0 ? next.length : index, 0, dragContainer);
-                      setContainerOrder(next);
-                      localStorage.setItem(CONTAINER_ORDER_KEY, JSON.stringify(next));
+                      publish({ containerOrder: next });
                       setDragContainer(null);
                     }}
                     onDragEnd={(event) => {
@@ -904,7 +930,7 @@ export function CasaDesktop({
                       <ServiceIcon
                         url={icon}
                         alt={container.name}
-                        className="h-[4.25rem] w-[4.25rem] rounded-[1.15rem] bg-white/[0.06] object-contain p-1.5 text-2xl"
+                        className="h-14 w-14 rounded-2xl bg-white/[0.06] object-contain p-1.5 text-xl sm:h-[4.25rem] sm:w-[4.25rem] sm:rounded-[1.15rem] sm:text-2xl"
                       />
                       <span
                         className={cn(
@@ -921,7 +947,7 @@ export function CasaDesktop({
         </section>
 
         <section aria-label={home.suite}>
-          <ul className="flex flex-wrap gap-2">
+          <ul className="flex gap-2 overflow-x-auto pb-1 md:flex-wrap md:overflow-visible">
             {apps.map((app) => {
               const Icon = NAV_ICONS[app.key];
               return (
@@ -965,8 +991,9 @@ export function CasaDesktop({
                       event.preventDefault();
                       dragged.current = false;
                     }}
+                    title={t.nav[app.key]}
                     className={cn(
-                      'dockora-glass flex items-center gap-2 rounded-2xl px-2.5 py-2 text-xs transition-transform hover:-translate-y-0.5',
+                      'dockora-glass flex shrink-0 items-center gap-2 rounded-2xl px-2.5 py-2 text-xs transition-transform hover:-translate-y-0.5',
                       dragKey === app.key && 'opacity-50',
                     )}
                   >
@@ -978,7 +1005,7 @@ export function CasaDesktop({
                     >
                       <Icon className="h-4 w-4" />
                     </span>
-                    <span className="text-dockora-text">{t.nav[app.key]}</span>
+                    <span className="hidden text-dockora-text sm:inline">{t.nav[app.key]}</span>
                   </Link>
                 </li>
               );
@@ -1432,6 +1459,7 @@ function FeatureCard({
   updateLabel,
   onUpdate,
   updateBusy,
+  footer,
 }: {
   href: string;
   title: string;
@@ -1445,6 +1473,7 @@ function FeatureCard({
   updateLabel?: string;
   onUpdate?: () => void;
   updateBusy?: boolean;
+  footer?: ReactNode;
 }) {
   return (
     <div className="dockora-glass relative flex min-h-[8.5rem] items-center justify-between gap-3 overflow-hidden px-5 py-4">
@@ -1482,6 +1511,7 @@ function FeatureCard({
             </button>
           ) : null}
         </div>
+        {footer}
       </div>
       {icon ? (
         <span
