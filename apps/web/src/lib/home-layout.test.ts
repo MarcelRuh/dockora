@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  clampDepartmentBox,
   completeHomeLayout,
+  departmentPixelSpan,
+  departmentVisualBox,
   EMPTY_HOME_LAYOUT,
   homeLayoutHasData,
   normalizeStoredDepartments,
@@ -74,6 +77,31 @@ describe('home layout helpers', () => {
         departments: [{ id: 'media1', name: 'Medien', x: 0, y: 0, width: 440, height: 300 }],
       }),
     ).toBe(true);
+  });
+
+  it('scales a wide pixel layout down to the current canvas', () => {
+    const wide = { id: 'wide1', name: 'Breit', x: 1400, y: 0, width: 800, height: 300 };
+    expect(departmentPixelSpan([wide])).toBe(2200);
+    expect(departmentVisualBox(wide, 1100, 2200)).toMatchObject({ x: 700, width: 400 });
+    expect(departmentVisualBox({ x: 0.2, y: 0, width: 0.5, height: 300 }, 1100, 0)).toMatchObject({
+      x: 220,
+      width: 550,
+    });
+  });
+
+  it('stores a dragged box as a fraction that stays inside the canvas', () => {
+    expect(clampDepartmentBox({ x: 100, y: 40, width: 400, height: 300 }, 1000)).toEqual({
+      x: 0.1,
+      y: 40,
+      width: 0.4,
+      height: 300,
+    });
+    expect(clampDepartmentBox({ x: 900, y: 40, width: 700, height: 300 }, 1200)).toEqual({
+      x: 0.75,
+      y: 40,
+      width: 0.25,
+      height: 300,
+    });
   });
 
   it('treats the default widgets as empty', () => {

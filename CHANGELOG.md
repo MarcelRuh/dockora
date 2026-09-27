@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.43] – 2026-09-27
+
+### Changed
+
+- Department layouts scale with the screen, so an arrangement made on a wide display stays inside the window on a smaller one
+
 ## [2.0.42] – 2026-09-27
 
 ### Changed

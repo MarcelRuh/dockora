@@ -43,7 +43,11 @@ import {
   saveHomeLayout,
 } from '@/lib/api';
 import {
+  clampDepartmentBox,
   completeHomeLayout,
+  departmentPixelSpan,
+  departmentUsesFraction,
+  departmentVisualBox,
   pickHomeLayout,
   readHomeLayoutCache,
   withDockDefaults,
@@ -99,6 +103,26 @@ function linkKey(id: string) {
   return `link:${id}`;
 }
 
+function departmentFrameStyle(
+  section: { x: number; y: number; width: number; height: number },
+  canvasWidth: number,
+  pixelSpan: number,
+): { left: number | string; top: number; width: number | string; height: number } {
+  if (departmentUsesFraction(section)) {
+    return {
+      left: `${section.x * 100}%`,
+      top: section.y,
+      width: `${section.width * 100}%`,
+      height: section.height,
+    };
+  }
+  if (canvasWidth <= 0) {
+    return { left: 0, top: section.y, width: '100%', height: section.height };
+  }
+  const visual = departmentVisualBox(section, canvasWidth, pixelSpan);
+  return { left: visual.x, top: visual.y, width: visual.width, height: visual.height };
+}
+
 export function CasaDesktop({
   overview,
   onOpenEngine,
@@ -145,6 +169,25 @@ export function CasaDesktop({
   const [appDepartments, setAppDepartments] = useState<Record<string, string>>({});
   const [departmentDraft, setDepartmentDraft] = useState('');
   const [raisedDepartment, setRaisedDepartment] = useState<string | null>(null);
+  const [canvasWidth, setCanvasWidth] = useState(0);
+  const appsSectionRef = useRef<HTMLElement>(null);
+  const departmentCanvasRef = useRef<HTMLDivElement>(null);
+  const canvasWidthRef = useRef(0);
+  canvasWidthRef.current = canvasWidth;
+
+  useEffect(() => {
+    const node = appsSectionRef.current;
+    if (!node) return;
+    const measure = () => {
+      const width = node.clientWidth;
+      canvasWidthRef.current = width;
+      setCanvasWidth((current) => (current === width ? current : width));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
   const [renameId, setRenameId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState('');
   const [addEditor, setAddEditor] = useState<null | 'choose' | 'link' | 'department'>(null);
@@ -514,19 +557,13 @@ export function CasaDesktop({
     window.addEventListener('pointercancel', up);
   };
 
-  const updateDepartmentBox = (
-    id: string,
-    patch: Partial<Pick<HomeDepartment, 'x' | 'y' | 'width' | 'height'>>,
-  ) => {
+  const departmentCanvasWidth = () =>
+    canvasWidthRef.current || departmentCanvasRef.current?.clientWidth || appsSectionRef.current?.clientWidth || 1;
+
+  const updateDepartmentBox = (id: string, visual: Pick<HomeDepartment, 'x' | 'y' | 'width' | 'height'>) => {
     const current = layoutRef.current.departments.find((item) => item.id === id);
     if (!current) return;
-    const next = {
-      ...current,
-      x: Math.min(2400, Math.max(0, patch.x ?? current.x)),
-      y: Math.min(2400, Math.max(0, patch.y ?? current.y)),
-      width: Math.min(1600, Math.max(200, patch.width ?? current.width)),
-      height: Math.min(1200, Math.max(160, patch.height ?? current.height)),
-    };
+    const next = { ...current, ...clampDepartmentBox(visual, departmentCanvasWidth()) };
     if (next.x === current.x && next.y === current.y && next.width === current.width && next.height === current.height) {
       return;
     }
@@ -546,7 +583,10 @@ export function CasaDesktop({
     event.stopPropagation();
     const current = layoutRef.current.departments.find((item) => item.id === id);
     if (!current) return;
-    const origin = { x: event.clientX, y: event.clientY, box: current };
+    const canvas = departmentCanvasWidth();
+    const span = departmentPixelSpan(layoutRef.current.departments);
+    const box = departmentVisualBox(current, canvas, span);
+    const origin = { x: event.clientX, y: event.clientY, box };
     setRaisedDepartment(id);
     const blockSelect = (ev: Event) => ev.preventDefault();
     document.body.style.userSelect = 'none';
@@ -558,10 +598,12 @@ export function CasaDesktop({
       const dx = snap(ev.clientX - origin.x);
       const dy = snap(ev.clientY - origin.y);
       if (mode === 'move') {
-        updateDepartmentBox(id, { x: origin.box.x + dx, y: origin.box.y + dy });
+        updateDepartmentBox(id, { x: origin.box.x + dx, y: origin.box.y + dy, width: origin.box.width, height: origin.box.height });
         return;
       }
       updateDepartmentBox(id, {
+        x: origin.box.x,
+        y: origin.box.y,
         width: mode === 'height' ? origin.box.width : origin.box.width + dx,
         height: mode === 'width' ? origin.box.height : origin.box.height + dy,
       });
@@ -916,7 +958,7 @@ export function CasaDesktop({
         raisedDepartment === section.id && 'z-30',
         dropDepartment === section.id && 'border-dockora-pink',
       )}
-      style={{ left: section.x, top: section.y, width: section.width, height: section.height }}
+      style={departmentFrameStyle(section, canvasWidth, departmentPixelSpan(departments))}
     >
       <div
         aria-label={home.departmentMove}
@@ -1200,7 +1242,7 @@ export function CasaDesktop({
         {updateError ? <p className="text-xs text-dockora-danger">{updateError}</p> : null}
         {layoutError ? <p className="text-xs text-dockora-danger">{layoutError}</p> : null}
 
-        <section aria-label={home.apps} data-app-grid="" className="relative">
+        <section ref={appsSectionRef} aria-label={home.apps} data-app-grid="" className="relative min-w-0">
           <div
             data-department-drop="loose"
             className={cn(
@@ -1246,7 +1288,8 @@ export function CasaDesktop({
           </ul>
           {departmentSections.length > 0 ? (
             <div
-              className="relative mt-6"
+              ref={departmentCanvasRef}
+              className="relative mt-6 w-full overflow-x-hidden"
               style={{
                 height: departmentSections.reduce((max, section) => Math.max(max, section.y + section.height), 0) + 8,
               }}
@@ -1416,8 +1459,16 @@ export function CasaDesktop({
                         const bottom = item.y + item.height;
                         return Number.isFinite(bottom) ? Math.max(max, bottom + 16) : max;
                       }, 0);
+                      const canvas = appsSectionRef.current?.clientWidth || 960;
                       publish({
-                        departments: [...departments, { id, name, x: 0, y, width: 440, height: 300 }],
+                        departments: [
+                          ...departments,
+                          {
+                            id,
+                            name,
+                            ...clampDepartmentBox({ x: 0, y, width: Math.min(440, canvas), height: 300 }, canvas),
+                          },
+                        ],
                       });
                       setDepartmentDraft('');
                       setLinkError(null);

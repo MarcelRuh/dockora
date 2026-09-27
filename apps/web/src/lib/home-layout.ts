@@ -149,6 +149,55 @@ function readRawDepartments(): unknown {
   }
 }
 
+export function departmentUsesFraction(box: { x: number; width: number }): boolean {
+  return box.x >= 0 && box.x <= 1 && box.width > 0 && box.width <= 1;
+}
+
+export function departmentPixelSpan(departments: Array<{ x: number; width: number }>): number {
+  return departments.reduce((max, item) => {
+    if (departmentUsesFraction(item)) return max;
+    return Math.max(max, item.x + item.width);
+  }, 0);
+}
+
+/** Pixel box on the current canvas. Legacy pixel layouts shrink so the right edge stays inside. */
+export function departmentVisualBox(
+  box: Pick<HomeDepartment, 'x' | 'y' | 'width' | 'height'>,
+  canvasWidth: number,
+  pixelSpan: number,
+): Pick<HomeDepartment, 'x' | 'y' | 'width' | 'height'> {
+  if (canvasWidth > 0 && departmentUsesFraction(box)) {
+    return { x: box.x * canvasWidth, y: box.y, width: box.width * canvasWidth, height: box.height };
+  }
+  if (canvasWidth > 0 && !departmentUsesFraction(box)) {
+    const scale = canvasWidth / Math.max(canvasWidth, pixelSpan);
+    return { x: box.x * scale, y: box.y, width: box.width * scale, height: box.height };
+  }
+  return box;
+}
+
+/** Stores x and width as fractions of the canvas so the same layout fits a narrower screen. */
+export function clampDepartmentBox(
+  visual: Pick<HomeDepartment, 'x' | 'y' | 'width' | 'height'>,
+  canvasWidth: number,
+): Pick<HomeDepartment, 'x' | 'y' | 'width' | 'height'> {
+  const canvas = Math.max(canvasWidth, 1);
+  const minWidth = Math.min(1, 200 / canvas);
+  let x = Math.min(1, Math.max(0, visual.x / canvas));
+  let width = Math.min(1, Math.max(minWidth, visual.width / canvas));
+  if (x + width > 1) width = 1 - x;
+  if (width < minWidth) {
+    width = minWidth;
+    x = 1 - minWidth;
+  }
+  return {
+    x: Math.round(x * 10000) / 10000,
+    y: Math.min(2400, Math.max(0, Math.round(visual.y))),
+    width: Math.round(width * 10000) / 10000,
+    height: Math.min(1200, Math.max(160, Math.round(visual.height))),
+  };
+}
+
 export function normalizeStoredDepartments(input: unknown): HomeDepartment[] {
   if (!Array.isArray(input)) return [];
   return input.flatMap((item, index) => {

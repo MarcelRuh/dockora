@@ -294,8 +294,10 @@ export interface HomeWidgets {
 export interface HomeDepartment {
   id: string;
   name: string;
+  /** Horizontal start as a fraction of the department canvas (0–1). Values above 1 are legacy pixels. */
   x: number;
   y: number;
+  /** Width as a fraction of the department canvas (0–1). Values above 1 are legacy pixels. */
   width: number;
   height: number;
 }

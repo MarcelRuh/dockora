@@ -64,6 +64,13 @@ describe('normalizeHomeLayout', () => {
     expect(layout.departments[0]).toMatchObject({ x: 13, y: 0, width: 1600, height: 160 });
   });
 
+  it('keeps fractional department boxes inside the canvas', () => {
+    const layout = normalizeHomeLayout({
+      departments: [{ id: 'box002', name: 'Filme', x: 0.25, y: 12, width: 0.9, height: 280 }],
+    });
+    expect(layout.departments[0]).toMatchObject({ x: 0.25, y: 12, width: 0.75, height: 280 });
+  });
+
   it('preserves hidden widgets', () => {
     expect(normalizeHomeLayout({ widgets: { system: false, storage: true } }).widgets).toEqual({
       system: false,

@@ -96,16 +96,38 @@ function normalizeDepartments(input: unknown): HomeDepartment[] {
 }
 
 function departmentBox(item: Record<string, unknown>, index: number): Pick<HomeDepartment, 'x' | 'y' | 'width' | 'height'> {
-  const axis = (value: unknown, max: number) =>
-    typeof value === 'number' && Number.isFinite(value) ? Math.min(max, Math.max(0, Math.round(value))) : null;
-  const size = (value: unknown, min: number, max: number) =>
-    typeof value === 'number' && Number.isFinite(value) ? Math.min(max, Math.max(min, Math.round(value))) : null;
-  const x = axis(item.x, 2400);
-  const y = axis(item.y, 2400);
-  const width = size(item.width, 200, 1600);
-  const height = size(item.height, 160, 1200);
-  if (x !== null && y !== null && width !== null && height !== null) return { x, y, width, height };
-  return { x: 0, y: index * 316, width: 440, height: 300 };
+  const num = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) ? value : null);
+  const x = num(item.x);
+  const y = num(item.y);
+  const width = num(item.width);
+  const height = num(item.height);
+  if (x === null || y === null || width === null || height === null) {
+    return { x: 0, y: index * 316, width: 440, height: 300 };
+  }
+  const yClamped = Math.min(2400, Math.max(0, Math.round(y)));
+  const heightClamped = Math.min(1200, Math.max(160, Math.round(height)));
+  if (x >= 0 && x <= 1 && width > 0 && width <= 1) {
+    const minWidth = 0.08;
+    let nextX = Math.min(1, Math.max(0, x));
+    let nextWidth = Math.min(1, Math.max(minWidth, width));
+    if (nextX + nextWidth > 1) nextWidth = 1 - nextX;
+    if (nextWidth < minWidth) {
+      nextWidth = minWidth;
+      nextX = 1 - minWidth;
+    }
+    return {
+      x: Math.round(nextX * 10000) / 10000,
+      y: yClamped,
+      width: Math.round(nextWidth * 10000) / 10000,
+      height: heightClamped,
+    };
+  }
+  return {
+    x: Math.min(2400, Math.max(0, Math.round(x))),
+    y: yClamped,
+    width: Math.min(1600, Math.max(200, Math.round(width))),
+    height: heightClamped,
+  };
 }
 
 function normalizeAppDepartments(input: unknown, departments: HomeDepartment[]): Record<string, string> {
