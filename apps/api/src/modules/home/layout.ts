@@ -27,6 +27,7 @@ export function emptyHomeLayout(): HomeLayout {
     widgets: { system: true, storage: true, network: true },
     departments: [],
     appDepartments: {},
+    departmentSplit: 50,
   };
 }
 
@@ -42,6 +43,7 @@ export function normalizeHomeLayout(input: unknown): HomeLayout {
     widgets: normalizeWidgets(source.widgets),
     departments,
     appDepartments: normalizeAppDepartments(source.appDepartments, departments),
+    departmentSplit: normalizeSplit(source.departmentSplit),
   };
 }
 
@@ -94,6 +96,12 @@ function normalizeDepartments(input: unknown): HomeDepartment[] {
     departments.push({ id, name, column });
   }
   return departments;
+}
+
+function normalizeSplit(input: unknown): number {
+  const value = typeof input === 'number' ? input : Number.NaN;
+  if (!Number.isFinite(value)) return 50;
+  return Math.min(80, Math.max(20, Math.round(value)));
 }
 
 function normalizeAppDepartments(input: unknown, departments: HomeDepartment[]): Record<string, string> {

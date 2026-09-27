@@ -68,6 +68,13 @@ describe('normalizeHomeLayout', () => {
     expect(layout.departments.map((item) => item.column)).toEqual(['left', 'right', 'wide']);
   });
 
+  it('keeps a column split between 20 and 80', () => {
+    expect(normalizeHomeLayout({ departmentSplit: 63 }).departmentSplit).toBe(63);
+    expect(normalizeHomeLayout({ departmentSplit: 5 }).departmentSplit).toBe(20);
+    expect(normalizeHomeLayout({ departmentSplit: 99 }).departmentSplit).toBe(80);
+    expect(normalizeHomeLayout({ departmentSplit: 'wide' }).departmentSplit).toBe(50);
+  });
+
   it('preserves hidden widgets', () => {
     expect(normalizeHomeLayout({ widgets: { system: false, storage: true } }).widgets).toEqual({
       system: false,

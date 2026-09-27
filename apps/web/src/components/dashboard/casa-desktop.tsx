@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
   type MouseEvent as ReactMouseEvent,
+  type CSSProperties,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from 'react';
@@ -145,6 +146,7 @@ export function CasaDesktop({
   const [appDepartments, setAppDepartments] = useState<Record<string, string>>({});
   const [departmentDraft, setDepartmentDraft] = useState('');
   const [departmentColumn, setDepartmentColumn] = useState<'left' | 'right' | 'wide'>('left');
+  const [departmentSplit, setDepartmentSplit] = useState(50);
   const [renameId, setRenameId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState('');
   const [addEditor, setAddEditor] = useState<null | 'choose' | 'link' | 'department'>(null);
@@ -173,6 +175,7 @@ export function CasaDesktop({
     setContainerOrder(layout.containerOrder ?? []);
     setDepartments(layout.departments ?? []);
     setAppDepartments(layout.appDepartments ?? {});
+    setDepartmentSplit(layout.departmentSplit ?? 50);
   };
 
   const publish = (patch: Partial<HomeLayout>) => {
@@ -511,6 +514,36 @@ export function CasaDesktop({
     };
     document.body.style.userSelect = 'none';
     document.addEventListener('selectstart', blockSelect);
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+  };
+
+  const startSplitResize = (event: ReactPointerEvent<HTMLElement>) => {
+    if (event.button !== 0 || !canEdit) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const row = event.currentTarget.closest('[data-department-split]');
+    if (!(row instanceof HTMLElement)) return;
+    const blockSelect = (ev: Event) => ev.preventDefault();
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'col-resize';
+    document.addEventListener('selectstart', blockSelect);
+    const move = (ev: PointerEvent) => {
+      const rect = row.getBoundingClientRect();
+      const usable = Math.max(1, rect.width - 24);
+      const next = Math.min(80, Math.max(20, Math.round(((ev.clientX - rect.left) / usable) * 100)));
+      if (layoutRef.current.departmentSplit === next) return;
+      publish({ departmentSplit: next });
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+      document.removeEventListener('selectstart', blockSelect);
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
     window.addEventListener('pointercancel', up);
@@ -1178,13 +1211,67 @@ export function CasaDesktop({
             {looseItems.map((item) => renderGridItem(item))}
           </ul>
           {leftDepartments.length > 0 || rightDepartments.length > 0 ? (
-            <div className="mt-6 grid items-start gap-6 lg:grid-cols-2">
-              {leftDepartments.length > 0 ? (
-                <div className="flex min-w-0 flex-col gap-6">{leftDepartments.map((section) => renderDepartment(section))}</div>
-              ) : null}
-              {rightDepartments.length > 0 ? (
-                <div className={cn('flex min-w-0 flex-col gap-6', leftDepartments.length === 0 && 'lg:col-start-2')}>
-                  {rightDepartments.map((section) => renderDepartment(section))}
+            <div data-department-split="" className="relative mt-6">
+              <div
+                className={cn(
+                  'grid items-start gap-6',
+                  leftDepartments.length > 0 && rightDepartments.length > 0 && 'dockora-department-split',
+                )}
+                style={
+                  leftDepartments.length > 0 && rightDepartments.length > 0
+                    ? ({
+                        '--dept-left': `${departmentSplit}fr`,
+                        '--dept-right': `${100 - departmentSplit}fr`,
+                      } as CSSProperties)
+                    : undefined
+                }
+              >
+                {leftDepartments.length > 0 ? (
+                  <div
+                    className={cn('flex min-w-0 flex-col gap-6', rightDepartments.length === 0 && 'lg:w-[var(--dept-only)]')}
+                    style={
+                      rightDepartments.length === 0
+                        ? ({ '--dept-only': `${departmentSplit}%` } as CSSProperties)
+                        : undefined
+                    }
+                  >
+                    {leftDepartments.map((section) => renderDepartment(section))}
+                  </div>
+                ) : null}
+                {rightDepartments.length > 0 ? (
+                  <div
+                    className={cn(
+                      'flex min-w-0 flex-col gap-6',
+                      leftDepartments.length === 0 && 'lg:ml-auto lg:w-[var(--dept-only)]',
+                    )}
+                    style={
+                      leftDepartments.length === 0
+                        ? ({ '--dept-only': `${100 - departmentSplit}%` } as CSSProperties)
+                        : undefined
+                    }
+                  >
+                    {rightDepartments.map((section) => renderDepartment(section))}
+                  </div>
+                ) : null}
+              </div>
+              {canEdit ? (
+                <div
+                  role="separator"
+                  aria-orientation="vertical"
+                  aria-valuemin={20}
+                  aria-valuemax={80}
+                  aria-valuenow={departmentSplit}
+                  aria-label={home.departmentResize}
+                  className="absolute top-0 z-20 hidden h-full w-4 -translate-x-1/2 cursor-col-resize lg:block"
+                  style={{
+                    left:
+                      leftDepartments.length > 0 && rightDepartments.length > 0
+                        ? `calc((100% - 1.5rem) * ${departmentSplit / 100} + 0.75rem)`
+                        : `${departmentSplit}%`,
+                  }}
+                  onPointerDown={startSplitResize}
+                >
+                  <span className="pointer-events-none absolute left-1/2 top-1/2 h-12 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-dockora-pink" />
                 </div>
               ) : null}
             </div>

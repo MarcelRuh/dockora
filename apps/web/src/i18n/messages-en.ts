@@ -93,6 +93,7 @@ export const en = {
         departmentLeft: 'Left',
         departmentRight: 'Right',
         departmentWide: 'Wide',
+        departmentResize: 'Drag to resize',
         suite: 'Dockora',
         add: 'Add',
         addStack: 'Add stack',

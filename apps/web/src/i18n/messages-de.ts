@@ -91,6 +91,7 @@ export const de = {
         departmentLeft: 'Links',
         departmentRight: 'Rechts',
         departmentWide: 'Breit',
+        departmentResize: 'Breite ziehen',
         suite: 'Dockora',
         add: 'Hinzufügen',
         addStack: 'Stack anlegen',

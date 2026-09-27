@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.41] – 2026-09-27
+
+### Added
+
+- The divider between left and right departments can be dragged to resize them
+
 ## [2.0.40] – 2026-09-27
 
 ### Added

@@ -312,6 +312,8 @@ export interface HomeLayout {
   departments: HomeDepartment[];
   /** App or custom-link key. Missing key means the app stays in the main list. */
   appDepartments: Record<string, string>;
+  /** Left column share when departments sit side by side. 20–80, 50 is even. */
+  departmentSplit: number;
 }
 
 export interface HomeLayoutResponse {

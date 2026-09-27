@@ -58,6 +58,7 @@ describe('home layout helpers', () => {
     expect(layout.departments).toEqual([]);
     expect(layout.appDepartments).toEqual({});
     expect(layout.appOrder).toEqual(['settings']);
+    expect(layout.departmentSplit).toBe(50);
     expect(
       homeLayoutHasData({
         ...EMPTY_HOME_LAYOUT,
