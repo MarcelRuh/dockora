@@ -4,6 +4,7 @@ import {
   completeHomeLayout,
   departmentPixelSpan,
   departmentVisualBox,
+  fitDepartmentLayout,
   EMPTY_HOME_LAYOUT,
   homeLayoutHasData,
   normalizeStoredDepartments,
@@ -102,6 +103,20 @@ describe('home layout helpers', () => {
       width: 0.25,
       height: 300,
     });
+  });
+
+  it('grows a department to its apps and keeps the row beside it', () => {
+    const fitted = fitDepartmentLayout(
+      [
+        { id: 'left', x: 0, y: 0, width: 400, height: 300 },
+        { id: 'right', x: 420, y: 0, width: 400, height: 300 },
+        { id: 'below', x: 0, y: 316, width: 400, height: 300 },
+      ],
+      { left: 520, right: 360 },
+    );
+    expect(fitted.find((item) => item.id === 'left')).toMatchObject({ y: 0, height: 520 });
+    expect(fitted.find((item) => item.id === 'right')).toMatchObject({ y: 0, height: 360 });
+    expect(fitted.find((item) => item.id === 'below')).toMatchObject({ y: 536, height: 300 });
   });
 
   it('treats the default widgets as empty', () => {

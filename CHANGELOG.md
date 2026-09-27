@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.44] – 2026-09-27
+
+### Changed
+
+- Departments grow to fit their apps when the screen gets narrower, so none of the apps are clipped
+
 ## [2.0.43] – 2026-09-27
 
 ### Changed

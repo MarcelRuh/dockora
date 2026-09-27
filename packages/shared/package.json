@@ -1,6 +1,6 @@
 {
   "name": "@dockora/shared",
-  "version": "2.0.43",
+  "version": "2.0.44",
   "private": true,
   "type": "module",
   "main": "./dist/index.js",

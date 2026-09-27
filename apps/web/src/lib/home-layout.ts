@@ -176,6 +176,51 @@ export function departmentVisualBox(
   return box;
 }
 
+export interface DepartmentFrame {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * Grows a department to its apps and shifts departments that were placed below it.
+ * Side-by-side departments stay on their row.
+ */
+export function fitDepartmentLayout(
+  boxes: DepartmentFrame[],
+  contentHeights: Record<string, number>,
+): DepartmentFrame[] {
+  const heightOf = (box: DepartmentFrame) => Math.max(box.height, contentHeights[box.id] ?? 0);
+  const tops = new Map(boxes.map((box) => [box.id, box.y]));
+  const ordered = [...boxes].sort((a, b) => a.y - b.y || a.x - b.x);
+  for (let pass = 0; pass < ordered.length; pass += 1) {
+    let moved = false;
+    for (const above of ordered) {
+      const aboveTop = tops.get(above.id) ?? above.y;
+      const aboveBottom = aboveTop + heightOf(above);
+      for (const below of ordered) {
+        if (below.id === above.id) continue;
+        if (below.y + 1 < above.y + above.height) continue;
+        const gap = Math.max(0, below.y - (above.y + above.height));
+        const minTop = aboveBottom + gap;
+        const current = tops.get(below.id) ?? below.y;
+        if (current + 0.5 < minTop) {
+          tops.set(below.id, minTop);
+          moved = true;
+        }
+      }
+    }
+    if (!moved) break;
+  }
+  return boxes.map((box) => ({
+    ...box,
+    y: tops.get(box.id) ?? box.y,
+    height: heightOf(box),
+  }));
+}
+
 /** Stores x and width as fractions of the canvas so the same layout fits a narrower screen. */
 export function clampDepartmentBox(
   visual: Pick<HomeDepartment, 'x' | 'y' | 'width' | 'height'>,

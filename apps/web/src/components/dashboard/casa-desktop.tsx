@@ -48,6 +48,7 @@ import {
   departmentPixelSpan,
   departmentUsesFraction,
   departmentVisualBox,
+  fitDepartmentLayout,
   pickHomeLayout,
   readHomeLayoutCache,
   withDockDefaults,
@@ -170,6 +171,7 @@ export function CasaDesktop({
   const [departmentDraft, setDepartmentDraft] = useState('');
   const [raisedDepartment, setRaisedDepartment] = useState<string | null>(null);
   const [canvasWidth, setCanvasWidth] = useState(0);
+  const [contentHeights, setContentHeights] = useState<Record<string, number>>({});
   const appsSectionRef = useRef<HTMLElement>(null);
   const departmentCanvasRef = useRef<HTMLDivElement>(null);
   const canvasWidthRef = useRef(0);
@@ -420,6 +422,41 @@ export function CasaDesktop({
       items: visibleItems.filter((item) => appDepartments[item.key] === dept.id),
     }))
     .filter((section) => !needle || section.items.length > 0);
+  const departmentMeasureKey = departmentSections.map((section) => `${section.id}:${section.items.length}`).join('|');
+  const departmentSpan = departmentPixelSpan(departments);
+  const fittedDepartments = fitDepartmentLayout(
+    departmentSections.map((section) => ({
+      id: section.id,
+      ...departmentVisualBox(section, canvasWidth, departmentSpan),
+    })),
+    contentHeights,
+  );
+
+  useEffect(() => {
+    const canvas = departmentCanvasRef.current;
+    if (!canvas) return;
+    const measure = () => {
+      const next: Record<string, number> = {};
+      for (const node of canvas.querySelectorAll<HTMLElement>(':scope > [data-department-drop]')) {
+        const id = node.getAttribute('data-department-drop');
+        if (!id) continue;
+        next[id] = node.offsetHeight;
+      }
+      setContentHeights((current) => {
+        const ids = Object.keys(next);
+        const same =
+          ids.length === Object.keys(current).length &&
+          ids.every((id) => Math.abs((current[id] ?? 0) - (next[id] ?? 0)) < 2);
+        return same ? current : next;
+      });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(canvas);
+    for (const node of canvas.querySelectorAll(':scope > [data-department-drop]')) observer.observe(node);
+    return () => observer.disconnect();
+  }, [departmentMeasureKey, canvasWidth]);
+
   const pageHits = needle
     ? APPS.filter((app) => t.nav[app.key].toLowerCase().includes(needle))
     : [];
@@ -958,7 +995,12 @@ export function CasaDesktop({
         raisedDepartment === section.id && 'z-30',
         dropDepartment === section.id && 'border-dockora-pink',
       )}
-      style={departmentFrameStyle(section, canvasWidth, departmentPixelSpan(departments))}
+      style={{
+        ...departmentFrameStyle(section, canvasWidth, departmentSpan),
+        top: fittedDepartments.find((frame) => frame.id === section.id)?.y ?? section.y,
+        height: 'auto',
+        minHeight: departmentVisualBox(section, canvasWidth, departmentSpan).height,
+      }}
     >
       <div
         aria-label={home.departmentMove}
@@ -1031,7 +1073,7 @@ export function CasaDesktop({
           </button>
         ) : null}
       </div>
-      <ul className="grid min-h-0 flex-1 auto-rows-min grid-cols-[repeat(auto-fill,minmax(7.25rem,1fr))] content-start gap-3 overflow-auto p-3">
+      <ul className="grid auto-rows-min grid-cols-[repeat(auto-fill,minmax(7.25rem,1fr))] content-start gap-3 p-3">
         {section.items.map((item) => renderGridItem(item))}
         {section.items.length === 0 ? (
           <li
@@ -1289,9 +1331,10 @@ export function CasaDesktop({
           {departmentSections.length > 0 ? (
             <div
               ref={departmentCanvasRef}
-              className="relative mt-6 w-full overflow-x-hidden"
+              className="relative mt-6 w-full"
               style={{
-                height: departmentSections.reduce((max, section) => Math.max(max, section.y + section.height), 0) + 8,
+                height:
+                  fittedDepartments.reduce((max, frame) => Math.max(max, frame.y + frame.height), 0) + 8,
               }}
             >
               {departmentSections.map((section) => renderDepartment(section))}
