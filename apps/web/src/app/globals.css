@@ -215,12 +215,6 @@ body {
   text-shadow: var(--dockora-glow-pink);
 }
 
-@media (min-width: 1024px) {
-  .dockora-department-split {
-    grid-template-columns: minmax(0, var(--dept-left)) minmax(0, var(--dept-right));
-  }
-}
-
 .dockora-section-tag {
   font-family: var(--font-display), sans-serif;
   font-size: 0.7rem;

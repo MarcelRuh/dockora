@@ -14,7 +14,6 @@ const LINKS_KEY = 'dockora.home.links';
 const WIDGET_KEY = 'dockora.home.widgets';
 const DEPARTMENT_KEY = 'dockora.home.departments';
 const APP_DEPARTMENT_KEY = 'dockora.home.appDepartments';
-const DEPARTMENT_SPLIT_KEY = 'dockora.home.departmentSplit';
 
 export const EMPTY_HOME_LAYOUT: HomeLayout = {
   appOrder: [],
@@ -25,7 +24,6 @@ export const EMPTY_HOME_LAYOUT: HomeLayout = {
   widgets: { system: true, storage: true, network: true },
   departments: [],
   appDepartments: {},
-  departmentSplit: 50,
 };
 
 export function completeHomeLayout(layout: Partial<HomeLayout> | null | undefined): HomeLayout {
@@ -39,9 +37,8 @@ export function completeHomeLayout(layout: Partial<HomeLayout> | null | undefine
     appPublicUrls: source.appPublicUrls ?? {},
     links: source.links ?? [],
     widgets: { ...EMPTY_HOME_LAYOUT.widgets, ...source.widgets },
-    departments: source.departments ?? [],
+    departments: normalizeStoredDepartments(source.departments),
     appDepartments: source.appDepartments ?? {},
-    departmentSplit: clampDepartmentSplit(source.departmentSplit),
   };
 }
 
@@ -61,7 +58,6 @@ export function homeLayoutHasData(layout: HomeLayout): boolean {
     Object.keys(layout.appPublicUrls).length > 0 ||
     layout.departments.length > 0 ||
     Object.keys(layout.appDepartments).length > 0 ||
-    layout.departmentSplit !== 50 ||
     !layout.widgets.system ||
     !layout.widgets.storage ||
     !layout.widgets.network
@@ -90,9 +86,8 @@ export function readHomeLayoutCache(): HomeLayout {
     appPublicUrls: readUrlMap(PUBLIC_URL_KEY),
     links: readLinks(),
     widgets: readWidgets(),
-    departments: readDepartments(),
+    departments: normalizeStoredDepartments(readRawDepartments()),
     appDepartments: readUrlMap(APP_DEPARTMENT_KEY),
-    departmentSplit: readDepartmentSplit(),
   };
 }
 
@@ -105,7 +100,6 @@ export function writeHomeLayoutCache(layout: HomeLayout): void {
   localStorage.setItem(WIDGET_KEY, JSON.stringify(layout.widgets));
   localStorage.setItem(DEPARTMENT_KEY, JSON.stringify(layout.departments));
   localStorage.setItem(APP_DEPARTMENT_KEY, JSON.stringify(layout.appDepartments));
-  localStorage.setItem(DEPARTMENT_SPLIT_KEY, String(layout.departmentSplit));
 }
 
 function readStringList(key: string): string[] {
@@ -147,31 +141,32 @@ function readLinks(): HomeLink[] {
   }
 }
 
-function clampDepartmentSplit(value: unknown): number {
-  const split = typeof value === 'number' ? value : Number.NaN;
-  if (!Number.isFinite(split)) return 50;
-  return Math.min(80, Math.max(20, Math.round(split)));
-}
-
-function readDepartmentSplit(): number {
-  const raw = Number(localStorage.getItem(DEPARTMENT_SPLIT_KEY));
-  return clampDepartmentSplit(raw);
-}
-
-function readDepartments(): HomeDepartment[] {
+function readRawDepartments(): unknown {
   try {
-    const raw = JSON.parse(localStorage.getItem(DEPARTMENT_KEY) ?? '[]') as unknown;
-    if (!Array.isArray(raw)) return [];
-    return raw.flatMap((item) => {
-      if (!item || typeof item !== 'object') return [];
-      const entry = item as Partial<HomeDepartment>;
-      if (typeof entry.id !== 'string' || typeof entry.name !== 'string') return [];
-      const column = entry.column === 'left' || entry.column === 'right' || entry.column === 'wide' ? entry.column : 'wide';
-      return [{ id: entry.id, name: entry.name, column }];
-    });
+    return JSON.parse(localStorage.getItem(DEPARTMENT_KEY) ?? '[]') as unknown;
   } catch {
     return [];
   }
+}
+
+export function normalizeStoredDepartments(input: unknown): HomeDepartment[] {
+  if (!Array.isArray(input)) return [];
+  return input.flatMap((item, index) => {
+    if (!item || typeof item !== 'object') return [];
+    const entry = item as Partial<HomeDepartment>;
+    if (typeof entry.id !== 'string' || typeof entry.name !== 'string') return [];
+    const finite = (value: unknown) => typeof value === 'number' && Number.isFinite(value);
+    const box =
+      finite(entry.x) && finite(entry.y) && finite(entry.width) && finite(entry.height)
+        ? {
+            x: entry.x as number,
+            y: entry.y as number,
+            width: entry.width as number,
+            height: entry.height as number,
+          }
+        : { x: 0, y: index * 316, width: 440, height: 300 };
+    return [{ id: entry.id, name: entry.name, ...box }];
+  });
 }
 
 function readWidgets(): HomeWidgets {

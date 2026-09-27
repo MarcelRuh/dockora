@@ -291,13 +291,13 @@ export interface HomeWidgets {
   network: boolean;
 }
 
-export type HomeDepartmentColumn = 'left' | 'right' | 'wide';
-
 export interface HomeDepartment {
   id: string;
   name: string;
-  /** wide sits under the apps. left and right share one row. */
-  column: HomeDepartmentColumn;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 }
 
 /** Shared home screen: one layout for the whole Dockora instance. */
@@ -312,8 +312,6 @@ export interface HomeLayout {
   departments: HomeDepartment[];
   /** App or custom-link key. Missing key means the app stays in the main list. */
   appDepartments: Record<string, string>;
-  /** Left column share when departments sit side by side. 20–80, 50 is even. */
-  departmentSplit: number;
 }
 
 export interface HomeLayoutResponse {

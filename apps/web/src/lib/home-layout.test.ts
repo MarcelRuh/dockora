@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { completeHomeLayout, EMPTY_HOME_LAYOUT, homeLayoutHasData, pickHomeLayout, withDockDefaults } from './home-layout';
+import {
+  completeHomeLayout,
+  EMPTY_HOME_LAYOUT,
+  homeLayoutHasData,
+  normalizeStoredDepartments,
+  pickHomeLayout,
+  withDockDefaults,
+} from './home-layout';
 
 const local = {
   ...EMPTY_HOME_LAYOUT,
@@ -58,11 +65,13 @@ describe('home layout helpers', () => {
     expect(layout.departments).toEqual([]);
     expect(layout.appDepartments).toEqual({});
     expect(layout.appOrder).toEqual(['settings']);
-    expect(layout.departmentSplit).toBe(50);
+    expect(normalizeStoredDepartments([{ id: 'abc1', name: 'Alt' }])).toEqual([
+      { id: 'abc1', name: 'Alt', x: 0, y: 0, width: 440, height: 300 },
+    ]);
     expect(
       homeLayoutHasData({
         ...EMPTY_HOME_LAYOUT,
-        departments: [{ id: 'media1', name: 'Medien', column: 'wide' }],
+        departments: [{ id: 'media1', name: 'Medien', x: 0, y: 0, width: 440, height: 300 }],
       }),
     ).toBe(true);
   });

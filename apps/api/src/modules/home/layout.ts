@@ -27,7 +27,6 @@ export function emptyHomeLayout(): HomeLayout {
     widgets: { system: true, storage: true, network: true },
     departments: [],
     appDepartments: {},
-    departmentSplit: 50,
   };
 }
 
@@ -43,7 +42,6 @@ export function normalizeHomeLayout(input: unknown): HomeLayout {
     widgets: normalizeWidgets(source.widgets),
     departments,
     appDepartments: normalizeAppDepartments(source.appDepartments, departments),
-    departmentSplit: normalizeSplit(source.departmentSplit),
   };
 }
 
@@ -91,17 +89,23 @@ function normalizeDepartments(input: unknown): HomeDepartment[] {
     const name = typeof item.name === 'string' ? item.name.trim() : '';
     if (!/^[a-z0-9-]{4,40}$/i.test(id) || seen.has(id) || id.toLowerCase() === 'loose') continue;
     if (!name || name.length > 40 || /[\u0000-\u001f]/.test(name)) continue;
-    const column = item.column === 'left' || item.column === 'right' || item.column === 'wide' ? item.column : 'wide';
     seen.add(id);
-    departments.push({ id, name, column });
+    departments.push({ id, name, ...departmentBox(item, departments.length) });
   }
   return departments;
 }
 
-function normalizeSplit(input: unknown): number {
-  const value = typeof input === 'number' ? input : Number.NaN;
-  if (!Number.isFinite(value)) return 50;
-  return Math.min(80, Math.max(20, Math.round(value)));
+function departmentBox(item: Record<string, unknown>, index: number): Pick<HomeDepartment, 'x' | 'y' | 'width' | 'height'> {
+  const axis = (value: unknown, max: number) =>
+    typeof value === 'number' && Number.isFinite(value) ? Math.min(max, Math.max(0, Math.round(value))) : null;
+  const size = (value: unknown, min: number, max: number) =>
+    typeof value === 'number' && Number.isFinite(value) ? Math.min(max, Math.max(min, Math.round(value))) : null;
+  const x = axis(item.x, 2400);
+  const y = axis(item.y, 2400);
+  const width = size(item.width, 200, 1600);
+  const height = size(item.height, 160, 1200);
+  if (x !== null && y !== null && width !== null && height !== null) return { x, y, width, height };
+  return { x: 0, y: index * 316, width: 440, height: 300 };
 }
 
 function normalizeAppDepartments(input: unknown, departments: HomeDepartment[]): Record<string, string> {

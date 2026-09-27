@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.42] – 2026-09-27
+
+### Changed
+
+- Departments are dragged into place and resized freely instead of using left, right, or full width
+
 ## [2.0.41] – 2026-09-27
 
 ### Added

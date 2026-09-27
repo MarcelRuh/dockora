@@ -53,26 +53,15 @@ describe('normalizeHomeLayout', () => {
       ],
       appDepartments: { plex: 'media1', sonarr: 'missing', radarr: 'media1' },
     });
-    expect(layout.departments).toEqual([{ id: 'media1', name: 'Medien', column: 'wide' }]);
+    expect(layout.departments).toEqual([{ id: 'media1', name: 'Medien', x: 0, y: 0, width: 440, height: 300 }]);
     expect(layout.appDepartments).toEqual({ plex: 'media1', radarr: 'media1' });
   });
 
-  it('keeps a left or right column and treats anything else as full width', () => {
+  it('keeps a custom department box and clamps it', () => {
     const layout = normalizeHomeLayout({
-      departments: [
-        { id: 'left01', name: 'Links', column: 'left' },
-        { id: 'right1', name: 'Rechts', column: 'right' },
-        { id: 'other1', name: 'Mitte', column: 'top' },
-      ],
+      departments: [{ id: 'box001', name: 'Filme', x: 12.6, y: -8, width: 4000, height: 40 }],
     });
-    expect(layout.departments.map((item) => item.column)).toEqual(['left', 'right', 'wide']);
-  });
-
-  it('keeps a column split between 20 and 80', () => {
-    expect(normalizeHomeLayout({ departmentSplit: 63 }).departmentSplit).toBe(63);
-    expect(normalizeHomeLayout({ departmentSplit: 5 }).departmentSplit).toBe(20);
-    expect(normalizeHomeLayout({ departmentSplit: 99 }).departmentSplit).toBe(80);
-    expect(normalizeHomeLayout({ departmentSplit: 'wide' }).departmentSplit).toBe(50);
+    expect(layout.departments[0]).toMatchObject({ x: 13, y: 0, width: 1600, height: 160 });
   });
 
   it('preserves hidden widgets', () => {

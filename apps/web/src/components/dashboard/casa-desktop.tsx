@@ -7,7 +7,6 @@ import {
   useRef,
   useState,
   type MouseEvent as ReactMouseEvent,
-  type CSSProperties,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from 'react';
@@ -145,8 +144,7 @@ export function CasaDesktop({
   const [departments, setDepartments] = useState<HomeDepartment[]>([]);
   const [appDepartments, setAppDepartments] = useState<Record<string, string>>({});
   const [departmentDraft, setDepartmentDraft] = useState('');
-  const [departmentColumn, setDepartmentColumn] = useState<'left' | 'right' | 'wide'>('left');
-  const [departmentSplit, setDepartmentSplit] = useState(50);
+  const [raisedDepartment, setRaisedDepartment] = useState<string | null>(null);
   const [renameId, setRenameId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState('');
   const [addEditor, setAddEditor] = useState<null | 'choose' | 'link' | 'department'>(null);
@@ -175,7 +173,6 @@ export function CasaDesktop({
     setContainerOrder(layout.containerOrder ?? []);
     setDepartments(layout.departments ?? []);
     setAppDepartments(layout.appDepartments ?? {});
-    setDepartmentSplit(layout.departmentSplit ?? 50);
   };
 
   const publish = (patch: Partial<HomeLayout>) => {
@@ -376,9 +373,7 @@ export function CasaDesktop({
   });
   const departmentSections = departments
     .map((dept) => ({
-      id: dept.id,
-      name: dept.name,
-      column: dept.column === 'left' || dept.column === 'right' ? dept.column : ('wide' as const),
+      ...dept,
       items: visibleItems.filter((item) => appDepartments[item.key] === dept.id),
     }))
     .filter((section) => !needle || section.items.length > 0);
@@ -519,22 +514,57 @@ export function CasaDesktop({
     window.addEventListener('pointercancel', up);
   };
 
-  const startSplitResize = (event: ReactPointerEvent<HTMLElement>) => {
-    if (event.button !== 0 || !canEdit) return;
+  const updateDepartmentBox = (
+    id: string,
+    patch: Partial<Pick<HomeDepartment, 'x' | 'y' | 'width' | 'height'>>,
+  ) => {
+    const current = layoutRef.current.departments.find((item) => item.id === id);
+    if (!current) return;
+    const next = {
+      ...current,
+      x: Math.min(2400, Math.max(0, patch.x ?? current.x)),
+      y: Math.min(2400, Math.max(0, patch.y ?? current.y)),
+      width: Math.min(1600, Math.max(200, patch.width ?? current.width)),
+      height: Math.min(1200, Math.max(160, patch.height ?? current.height)),
+    };
+    if (next.x === current.x && next.y === current.y && next.width === current.width && next.height === current.height) {
+      return;
+    }
+    publish({
+      departments: layoutRef.current.departments.map((item) => (item.id === id ? next : item)),
+    });
+  };
+
+  const startDepartmentGesture = (
+    id: string,
+    mode: 'move' | 'both' | 'width' | 'height',
+    event: ReactPointerEvent<HTMLElement>,
+  ) => {
+    if (event.button !== 0 || !canEditRef.current) return;
+    if (mode === 'move' && event.target instanceof Element && event.target.closest('button, input, a')) return;
     event.preventDefault();
     event.stopPropagation();
-    const row = event.currentTarget.closest('[data-department-split]');
-    if (!(row instanceof HTMLElement)) return;
+    const current = layoutRef.current.departments.find((item) => item.id === id);
+    if (!current) return;
+    const origin = { x: event.clientX, y: event.clientY, box: current };
+    setRaisedDepartment(id);
     const blockSelect = (ev: Event) => ev.preventDefault();
     document.body.style.userSelect = 'none';
-    document.body.style.cursor = 'col-resize';
+    document.body.style.cursor =
+      mode === 'move' ? 'grabbing' : mode === 'height' ? 'ns-resize' : mode === 'width' ? 'ew-resize' : 'nwse-resize';
     document.addEventListener('selectstart', blockSelect);
+    const snap = (value: number) => Math.round(value / 8) * 8;
     const move = (ev: PointerEvent) => {
-      const rect = row.getBoundingClientRect();
-      const usable = Math.max(1, rect.width - 24);
-      const next = Math.min(80, Math.max(20, Math.round(((ev.clientX - rect.left) / usable) * 100)));
-      if (layoutRef.current.departmentSplit === next) return;
-      publish({ departmentSplit: next });
+      const dx = snap(ev.clientX - origin.x);
+      const dy = snap(ev.clientY - origin.y);
+      if (mode === 'move') {
+        updateDepartmentBox(id, { x: origin.box.x + dx, y: origin.box.y + dy });
+        return;
+      }
+      updateDepartmentBox(id, {
+        width: mode === 'height' ? origin.box.width : origin.box.width + dx,
+        height: mode === 'width' ? origin.box.height : origin.box.height + dy,
+      });
     };
     const up = () => {
       window.removeEventListener('pointermove', move);
@@ -543,6 +573,7 @@ export function CasaDesktop({
       document.removeEventListener('selectstart', blockSelect);
       document.body.style.userSelect = '';
       document.body.style.cursor = '';
+      setRaisedDepartment(null);
     };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
@@ -877,13 +908,20 @@ export function CasaDesktop({
   };
 
   const renderDepartment = (section: (typeof departmentSections)[number]) => (
-    <div key={section.id}>
+    <div
+      key={section.id}
+      data-department-drop={section.id}
+      className={cn(
+        'dockora-panel !absolute flex flex-col',
+        raisedDepartment === section.id && 'z-30',
+        dropDepartment === section.id && 'border-dockora-pink',
+      )}
+      style={{ left: section.x, top: section.y, width: section.width, height: section.height }}
+    >
       <div
-        data-department-drop={section.id}
-        className={cn(
-          'mb-3 flex flex-wrap items-center gap-3',
-          dropDepartment === section.id && 'border border-dashed border-dockora-pink px-2 py-1',
-        )}
+        aria-label={home.departmentMove}
+        className="flex cursor-grab items-center gap-3 px-3 py-2 active:cursor-grabbing"
+        onPointerDown={(event) => startDepartmentGesture(section.id, 'move', event)}
       >
         {renameId === section.id ? (
           <input
@@ -932,47 +970,26 @@ export function CasaDesktop({
           <h3 className="dockora-section-tag">{section.name}</h3>
         )}
         {canEdit ? (
-          <>
-            {(['left', 'right', 'wide'] as const).map((column) => (
-              <button
-                key={column}
-                type="button"
-                className={cn(
-                  'text-[10px] font-semibold uppercase tracking-[0.12em]',
-                  section.column === column ? 'text-dockora-pink' : 'text-dockora-muted hover:text-white',
-                )}
-                onClick={() => {
-                  if (section.column === column) return;
-                  publish({
-                    departments: departments.map((entry) =>
-                      entry.id === section.id ? { ...entry, column } : entry,
-                    ),
-                  });
-                }}
-              >
-                {column === 'left' ? home.departmentLeft : column === 'right' ? home.departmentRight : home.departmentWide}
-              </button>
-            ))}
-            <button
-              type="button"
-              className="text-[10px] font-semibold uppercase tracking-[0.12em] text-dockora-muted hover:text-white"
-              onClick={() => {
-                const nextMap = { ...appDepartments };
-                for (const [key, value] of Object.entries(nextMap)) {
-                  if (value === section.id) delete nextMap[key];
-                }
-                publish({
-                  departments: departments.filter((entry) => entry.id !== section.id),
-                  appDepartments: nextMap,
-                });
-              }}
-            >
-              {home.departmentRemove}
-            </button>
-          </>
+          <button
+            type="button"
+            className="ml-auto text-[10px] font-semibold uppercase tracking-[0.12em] text-dockora-muted hover:text-white"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={() => {
+              const nextMap = { ...appDepartments };
+              for (const [key, value] of Object.entries(nextMap)) {
+                if (value === section.id) delete nextMap[key];
+              }
+              publish({
+                departments: departments.filter((entry) => entry.id !== section.id),
+                appDepartments: nextMap,
+              });
+            }}
+          >
+            {home.departmentRemove}
+          </button>
         ) : null}
       </div>
-      <ul className="grid grid-cols-[repeat(auto-fill,minmax(7.25rem,1fr))] gap-3">
+      <ul className="grid min-h-0 flex-1 auto-rows-min grid-cols-[repeat(auto-fill,minmax(7.25rem,1fr))] content-start gap-3 overflow-auto p-3">
         {section.items.map((item) => renderGridItem(item))}
         {section.items.length === 0 ? (
           <li
@@ -986,12 +1003,29 @@ export function CasaDesktop({
           </li>
         ) : null}
       </ul>
+      {canEdit ? (
+        <>
+          <div
+            aria-label={home.departmentResize}
+            className="absolute bottom-3 right-0 top-10 z-10 w-2 cursor-ew-resize"
+            onPointerDown={(event) => startDepartmentGesture(section.id, 'width', event)}
+          />
+          <div
+            aria-label={home.departmentResize}
+            className="absolute bottom-0 left-2 right-3 z-10 h-2 cursor-ns-resize"
+            onPointerDown={(event) => startDepartmentGesture(section.id, 'height', event)}
+          />
+          <div
+            aria-label={home.departmentResize}
+            className="absolute bottom-0 right-0 z-20 h-4 w-4 cursor-nwse-resize"
+            onPointerDown={(event) => startDepartmentGesture(section.id, 'both', event)}
+          >
+            <span className="pointer-events-none absolute bottom-1 right-1 h-2 w-2 border-b-2 border-r-2 border-dockora-pink" />
+          </div>
+        </>
+      ) : null}
     </div>
   );
-
-  const leftDepartments = departmentSections.filter((section) => section.column === 'left');
-  const rightDepartments = departmentSections.filter((section) => section.column === 'right');
-  const wideDepartments = departmentSections.filter((section) => section.column === 'wide');
 
   const engineLabel =
     overview.docker.engineStatus === 'online'
@@ -1210,74 +1244,15 @@ export function CasaDesktop({
           <ul className="grid grid-cols-[repeat(auto-fill,minmax(7.25rem,1fr))] gap-3 sm:grid-cols-[repeat(auto-fill,minmax(9rem,1fr))]">
             {looseItems.map((item) => renderGridItem(item))}
           </ul>
-          {leftDepartments.length > 0 || rightDepartments.length > 0 ? (
-            <div data-department-split="" className="relative mt-6">
-              <div
-                className={cn(
-                  'grid items-start gap-6',
-                  leftDepartments.length > 0 && rightDepartments.length > 0 && 'dockora-department-split',
-                )}
-                style={
-                  leftDepartments.length > 0 && rightDepartments.length > 0
-                    ? ({
-                        '--dept-left': `${departmentSplit}fr`,
-                        '--dept-right': `${100 - departmentSplit}fr`,
-                      } as CSSProperties)
-                    : undefined
-                }
-              >
-                {leftDepartments.length > 0 ? (
-                  <div
-                    className={cn('flex min-w-0 flex-col gap-6', rightDepartments.length === 0 && 'lg:w-[var(--dept-only)]')}
-                    style={
-                      rightDepartments.length === 0
-                        ? ({ '--dept-only': `${departmentSplit}%` } as CSSProperties)
-                        : undefined
-                    }
-                  >
-                    {leftDepartments.map((section) => renderDepartment(section))}
-                  </div>
-                ) : null}
-                {rightDepartments.length > 0 ? (
-                  <div
-                    className={cn(
-                      'flex min-w-0 flex-col gap-6',
-                      leftDepartments.length === 0 && 'lg:ml-auto lg:w-[var(--dept-only)]',
-                    )}
-                    style={
-                      leftDepartments.length === 0
-                        ? ({ '--dept-only': `${100 - departmentSplit}%` } as CSSProperties)
-                        : undefined
-                    }
-                  >
-                    {rightDepartments.map((section) => renderDepartment(section))}
-                  </div>
-                ) : null}
-              </div>
-              {canEdit ? (
-                <div
-                  role="separator"
-                  aria-orientation="vertical"
-                  aria-valuemin={20}
-                  aria-valuemax={80}
-                  aria-valuenow={departmentSplit}
-                  aria-label={home.departmentResize}
-                  className="absolute top-0 z-20 hidden h-full w-4 -translate-x-1/2 cursor-col-resize lg:block"
-                  style={{
-                    left:
-                      leftDepartments.length > 0 && rightDepartments.length > 0
-                        ? `calc((100% - 1.5rem) * ${departmentSplit / 100} + 0.75rem)`
-                        : `${departmentSplit}%`,
-                  }}
-                  onPointerDown={startSplitResize}
-                >
-                  <span className="pointer-events-none absolute left-1/2 top-1/2 h-12 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-dockora-pink" />
-                </div>
-              ) : null}
+          {departmentSections.length > 0 ? (
+            <div
+              className="relative mt-6"
+              style={{
+                height: departmentSections.reduce((max, section) => Math.max(max, section.y + section.height), 0) + 8,
+              }}
+            >
+              {departmentSections.map((section) => renderDepartment(section))}
             </div>
-          ) : null}
-          {wideDepartments.length > 0 ? (
-            <div className="mt-6 flex flex-col gap-6">{wideDepartments.map((section) => renderDepartment(section))}</div>
           ) : null}
         </section>
 
@@ -1419,9 +1394,6 @@ export function CasaDesktop({
                         onClick={() => {
                           setLinkError(null);
                           setDepartmentDraft('');
-                          const hasLeft = departments.some((entry) => entry.column === 'left');
-                          const hasRight = departments.some((entry) => entry.column === 'right');
-                          setDepartmentColumn(hasLeft && !hasRight ? 'right' : 'left');
                           setAddEditor('department');
                         }}
                       >
@@ -1440,7 +1412,13 @@ export function CasaDesktop({
                         return;
                       }
                       const id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-                      publish({ departments: [...departments, { id, name, column: departmentColumn }] });
+                      const y = departments.reduce((max, item) => {
+                        const bottom = item.y + item.height;
+                        return Number.isFinite(bottom) ? Math.max(max, bottom + 16) : max;
+                      }, 0);
+                      publish({
+                        departments: [...departments, { id, name, x: 0, y, width: 440, height: 300 }],
+                      });
                       setDepartmentDraft('');
                       setLinkError(null);
                       setAddEditor(null);
@@ -1456,27 +1434,6 @@ export function CasaDesktop({
                         className="dockora-field mt-1 w-full px-3"
                       />
                     </label>
-                    <div className="flex gap-2">
-                      {(['left', 'right', 'wide'] as const).map((column) => (
-                        <button
-                          key={column}
-                          type="button"
-                          className={cn(
-                            'border px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em]',
-                            departmentColumn === column
-                              ? 'border-dockora-pink text-white'
-                              : 'border-dockora-border text-dockora-muted hover:text-white',
-                          )}
-                          onClick={() => setDepartmentColumn(column)}
-                        >
-                          {column === 'left'
-                            ? home.departmentLeft
-                            : column === 'right'
-                              ? home.departmentRight
-                              : home.departmentWide}
-                        </button>
-                      ))}
-                    </div>
                     {linkError ? <p className="text-xs text-dockora-danger">{linkError}</p> : null}
                     <button type="submit" className={buttonClassName({ variant: 'primary', size: 'sm' })}>
                       {home.linkSave}
