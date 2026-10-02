@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import { Inter, Orbitron, JetBrains_Mono } from 'next/font/google';
 import { DarkTheme } from '@/components/dark-theme';
 import { AuthProvider } from '@/components/auth/auth-provider';
@@ -38,9 +39,10 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const nonce = (await headers()).get('x-nonce') ?? undefined;
   return (
-    <html lang="de" className="dark" suppressHydrationWarning>
+    <html lang="de" className="dark" nonce={nonce} suppressHydrationWarning>
       <body
         className={`${inter.variable} ${orbitron.variable} ${jetbrains.variable} font-sans antialiased`}
       >

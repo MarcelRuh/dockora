@@ -407,18 +407,11 @@ export class SelfUpdateService {
       // Bind host path → same path inside updater. Compose bind-mounts are
       // resolved by the Docker daemon on the host; a remount as /install breaks
       // relative volumes (nginx.conf) and leaks DOCKORA_INSTALL_DIR=/install.
-      const rawApplyUrl = `https://raw.githubusercontent.com/${this.options.repo}/${this.options.branch}/scripts/self-update-apply.sh`;
       const token = githubToken();
       const container = await raw.createContainer({
         name: UPDATER_NAME,
         Image: updaterImage,
-        Cmd: [
-          'sh',
-          '-c',
-          `if wget -qO /tmp/dockora-apply.sh ${JSON.stringify(rawApplyUrl)}; then exec sh /tmp/dockora-apply.sh; fi\n` +
-            `echo "WARN: could not download apply script, using embedded fallback" >&2\n` +
-            SELF_UPDATE_APPLY_SCRIPT,
-        ],
+        Cmd: ['sh', '-c', SELF_UPDATE_APPLY_SCRIPT],
         Env: [
           `DOCKORA_INSTALL_DIR=${hostDir}`,
           `DOCKORA_REPO=${this.options.repo}`,

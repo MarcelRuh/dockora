@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Dockora host-side updater (CLI counterpart to Settings → Self-Update)
+# Dockora host-side updater.
 #
-# Usage:
-#   wget -qO- https://raw.githubusercontent.com/MarcelRuh/dockora/main/scripts/update.sh | bash
-#   curl -fsSL https://raw.githubusercontent.com/MarcelRuh/dockora/main/scripts/update.sh | bash
+# Usage (from an existing install, no remote shell download):
+#   sh /opt/dockora/scripts/self-update-apply.sh
+#   DOCKORA_DIR=/opt/dockora bash /opt/dockora/scripts/update.sh
 #
 # Env:
 #   DOCKORA_DIR=/opt/dockora
@@ -20,13 +20,9 @@ export DOCKORA_INSTALL_DIR="$INSTALL_DIR"
 export DOCKORA_REPO="$REPO"
 export DOCKORA_UPDATE_BRANCH="$BRANCH"
 
-if [[ -f "${INSTALL_DIR}/scripts/self-update-apply.sh" ]]; then
-  exec sh "${INSTALL_DIR}/scripts/self-update-apply.sh"
+APPLY="${INSTALL_DIR}/scripts/self-update-apply.sh"
+if [[ ! -f "$APPLY" ]]; then
+  echo "ERROR: $APPLY is missing. Refusing to download a remote shell script." >&2
+  exit 1
 fi
-
-# First-time / wget pipe: fetch apply script into a temp file
-TMP="$(mktemp)"
-trap 'rm -f "$TMP"' EXIT
-wget -qO "$TMP" "https://raw.githubusercontent.com/${REPO}/${BRANCH}/scripts/self-update-apply.sh"
-chmod +x "$TMP"
-exec sh "$TMP"
+exec sh "$APPLY"

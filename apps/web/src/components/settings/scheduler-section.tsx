@@ -20,6 +20,7 @@ export function SchedulerSection({ canEdit }: { canEdit: boolean }) {
   const [success, setSuccess] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [cronEdits, setCronEdits] = useState<Record<string, string>>({});
+  const [ready, setReady] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -29,6 +30,8 @@ export function SchedulerSection({ canEdit }: { canEdit: boolean }) {
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : t.common.failed);
+    } finally {
+      setReady(true);
     }
   }, [t.common.failed]);
 
@@ -144,7 +147,7 @@ export function SchedulerSection({ canEdit }: { canEdit: boolean }) {
             </div>
           </div>
         ))}
-        {jobs.length === 0 ? (
+        {ready && !error && jobs.length === 0 ? (
           <p className="text-sm text-dockora-muted">{t.settings.scheduler.empty}</p>
         ) : null}
       </div>

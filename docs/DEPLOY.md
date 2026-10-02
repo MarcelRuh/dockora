@@ -94,7 +94,7 @@ Requires `DOCKORA_INSTALL_DIR` (set automatically by `install.sh`) and the insta
 ### CLI
 
 ```bash
-wget -qO- https://raw.githubusercontent.com/MarcelRuh/dockora/main/scripts/update.sh | bash
+sh /opt/dockora/scripts/self-update-apply.sh
 # or: DOCKORA_DIR=/srv/dockora bash scripts/update.sh
 ```
 

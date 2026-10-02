@@ -14,7 +14,7 @@ import { attachDockerExecSession, interactiveShellCommand } from './attach-exec.
  * Host (via host-agent + nsenter): ws://host/api/v1/system/host-terminal?cols=&rows=&shell=
  *   Rollen: admin only
  *
- * Auth: Sec-WebSocket-Protocol `dockora.jwt.<token>` (preferred) or `?token=` (legacy).
+ * Auth: Sec-WebSocket-Protocol `dockora.jwt.<token>` or the session cookie.
  */
 export const terminalModule: FastifyPluginAsync = async (app: FastifyInstance) => {
   await app.register(websocket);

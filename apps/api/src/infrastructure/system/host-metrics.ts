@@ -24,8 +24,9 @@ interface MemorySample {
  * Host-/Gast-Ressourcen (CPU/RAM/Disk).
  *
  * Docker-in-LXC: `/proc/meminfo` im Container zeigt oft den Hypervisor.
- * Bind-Mounts von `/proc/*` sind unzuverlässig (falsche MemAvailable).
- * Daher bevorzugt: Snap-Datei vom Host-Agent (`nsenter` → `/data/host-proc.snap`).
+ * Bind-Mounts von `/proc` sind unzuverlässig (falsche MemAvailable).
+ * Der Host-Agent liest `/proc/1/root` (pid:host + CAP_SYS_PTRACE) nach
+ * `/data/host-proc.snap`.
  */
 export class HostMetricsService implements IHostMetrics {
   private lastCpuSample: CpuSample | null = null;

@@ -44,9 +44,10 @@ services:
       - /usr/libexec/docker/cli-plugins:/usr/libexec/docker/cli-plugins:ro
       # Installationsbaum nur lesen (Update schreibt der One-Shot-Updater auf dem Host-Pfad)
       - ${DOCKORA_INSTALL_DIR:-/opt/dockora}:/dockora-install:ro
-      # Compose-Discovery. Enger machen, sobald COMPOSE_SEARCH_PATHS nur bestimmte Ordner braucht.
-      - /opt:/opt
-      - /srv:/srv
+      # /home bleibt schreibbar: dort liegen die Stacks und neue Projekte.
+      # /opt und /srv sind nur zum Entdecken gemountet.
+      - /opt:/opt:ro
+      - /srv:/srv:ro
       - /home:/home
       # CPU-Temperatur (wget/LXC: Host-Sysfs, falls im Container sonst leer)
       - /sys/class/thermal:/sys/class/thermal:ro
@@ -58,16 +59,24 @@ services:
       retries: 3
       start_period: 15s
 
-  # Liefert korrekte LXC-/Host-Metriken (Docker-in-LXC sieht sonst oft den Hypervisor)
+  # Liefert korrekte LXC-/Host-Metriken. pid:host + SYS_PTRACE lesen /proc/1/root.
+  # SYS_ADMIN entfällt. Bind-Mounts von /proc zeigen in LXC den Hypervisor.
   host-agent:
     image: alpine:3.20
     container_name: dockora-host-agent
     restart: unless-stopped
     pid: host
     network_mode: none
+    read_only: true
+    cap_drop:
+      - ALL
     cap_add:
-      - SYS_ADMIN
       - SYS_PTRACE
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 64
+    tmpfs:
+      - /tmp:size=8m,mode=1777
     volumes:
       - dockora-data:/data
       - ./scripts/host-proc-agent.sh:/agent.sh:ro

@@ -30,6 +30,7 @@ export function UsersSection() {
   const [editing, setEditing] = useState<AuthUser | null>(null);
   const [editDisplayName, setEditDisplayName] = useState('');
   const [editPassword, setEditPassword] = useState('');
+  const [ready, setReady] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -37,6 +38,8 @@ export function UsersSection() {
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : t.common.failed);
+    } finally {
+      setReady(true);
     }
   }, [t.common.failed]);
 
@@ -166,7 +169,7 @@ export function UsersSection() {
             </div>
           </li>
         ))}
-        {users.length === 0 ? (
+        {ready && !error && users.length === 0 ? (
           <li className="px-4 py-3 text-sm text-dockora-muted">{t.settings.users.empty}</li>
         ) : null}
       </ul>

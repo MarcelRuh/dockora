@@ -5,6 +5,18 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.48] – 2026-10-02
+
+### Changed
+
+- The host-agent reads `/proc/1/root` with `CAP_SYS_PTRACE` only. `CAP_SYS_ADMIN` is gone, the root filesystem is read-only, and the agent has no network
+- `/opt` and `/srv` are mounted read-only. `/home` stays writable so existing stacks can still be edited
+- Self-update runs the script shipped in the API image and no longer downloads a shell script
+- A `?token=` query is accepted only on GET event streams. WebSockets use the session cookie or `Sec-WebSocket-Protocol`
+- Pages send a `script-src` content security policy
+- Playwright opens Backups, Updates, Self-Update and the dock without confirming an action
+- Empty user and scheduler lists appear only after the request finishes
+
 ## [2.0.47] – 2026-10-02
 
 ### Changed

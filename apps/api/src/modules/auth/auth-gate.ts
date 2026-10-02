@@ -59,9 +59,19 @@ export function csrfMismatch(request: FastifyRequest): boolean {
 }
 
 /**
- * Browser-WebSockets können kein Authorization-Header setzen.
- * Token kommt per Cookie, Query `?token=` oder Sec-WebSocket-Protocol `dockora.jwt.<token>`.
+ * EventSource cannot set Authorization. A query token is accepted only on
+ * GET paths ending in /stream and never on WebSocket upgrades. Everything else uses the
+ * session cookie or `Sec-WebSocket-Protocol: dockora.jwt.<token>`.
  */
+export function allowsStreamQueryToken(request: FastifyRequest): boolean {
+  if (request.method !== 'GET') return false;
+  const upgrade = request.headers.upgrade;
+  if (typeof upgrade === 'string' && upgrade.toLowerCase() === 'websocket') return false;
+  if (request.headers['sec-websocket-key']) return false;
+  const path = (request.url ?? '').split('?')[0] ?? '';
+  return path.endsWith('/stream');
+}
+
 export function liftBearerToken(request: FastifyRequest): void {
   if (request.headers.authorization) {
     request.authSource = 'header';
@@ -76,7 +86,7 @@ export function liftBearerToken(request: FastifyRequest): void {
   }
 
   const queryToken = (request.query as { token?: string } | undefined)?.token;
-  if (queryToken) {
+  if (queryToken && allowsStreamQueryToken(request)) {
     request.headers.authorization = `Bearer ${queryToken}`;
     request.authSource = 'query';
     return;

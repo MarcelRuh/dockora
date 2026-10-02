@@ -5,7 +5,7 @@
 [![CI](https://github.com/MarcelRuh/dockora/actions/workflows/ci.yml/badge.svg)](https://github.com/MarcelRuh/dockora/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
-> Status: **v2.0.47** – self-hosted Docker management with in-app updates and GHCR images.
+> Status: **v2.0.48** – self-hosted Docker management with in-app updates and GHCR images.
 
 ## One-line install (wget)
 
@@ -56,7 +56,7 @@ curl -fsSL https://raw.githubusercontent.com/MarcelRuh/dockora/main/scripts/inst
 **CLI one-liner:**
 
 ```bash
-wget -qO- https://raw.githubusercontent.com/MarcelRuh/dockora/main/scripts/update.sh | bash
+sh /opt/dockora/scripts/self-update-apply.sh
 ```
 
 Preserves `.env` and `data/`, syncs from GitHub, then runs `docker compose up -d --build`.
@@ -64,7 +64,7 @@ Preserves `.env` and `data/`, syncs from GitHub, then runs `docker compose up -d
 ### Fast install via GHCR images
 
 ```bash
-wget -qO- https://raw.githubusercontent.com/MarcelRuh/dockora/main/scripts/install.sh | DOCKORA_USE_IMAGES=1 DOCKORA_IMAGE_TAG=2.0.47 bash
+wget -qO- https://raw.githubusercontent.com/MarcelRuh/dockora/main/scripts/install.sh | DOCKORA_USE_IMAGES=1 DOCKORA_IMAGE_TAG=2.0.48 bash
 ```
 
 Or manually:

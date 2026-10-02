@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CSRF_COOKIE, CSRF_HEADER, SESSION_COOKIE } from '@dockora/shared';
-import { csrfMismatch, isPublicAuthRoute, liftBearerToken } from './auth-gate.js';
+import { allowsStreamQueryToken, csrfMismatch, isPublicAuthRoute, liftBearerToken } from './auth-gate.js';
 import type { FastifyRequest } from 'fastify';
 
 describe('isPublicAuthRoute', () => {
@@ -39,15 +39,40 @@ describe('liftBearerToken', () => {
     expect(request.authSource).toBe('cookie');
   });
 
-  it('lifts token from query', () => {
+  it('lifts a query token only for a GET event stream', () => {
     const request = {
+      method: 'GET',
+      url: '/api/v1/dashboard/stream?token=abc.def',
       headers: {},
       query: { token: 'abc.def' },
       cookies: {},
     } as unknown as FastifyRequest;
+    expect(allowsStreamQueryToken(request)).toBe(true);
     liftBearerToken(request);
     expect(request.headers.authorization).toBe('Bearer abc.def');
     expect(request.authSource).toBe('query');
+  });
+
+  it('ignores query tokens on websockets and ordinary routes', () => {
+    const websocket = {
+      method: 'GET',
+      url: '/api/v1/containers/abc/terminal?token=abc.def',
+      headers: { upgrade: 'websocket', 'sec-websocket-key': 'key' },
+      query: { token: 'abc.def' },
+      cookies: {},
+    } as unknown as FastifyRequest;
+    liftBearerToken(websocket);
+    expect(websocket.headers.authorization).toBeUndefined();
+
+    const containers = {
+      method: 'GET',
+      url: '/api/v1/containers?token=abc.def',
+      headers: {},
+      query: { token: 'abc.def' },
+      cookies: {},
+    } as unknown as FastifyRequest;
+    liftBearerToken(containers);
+    expect(containers.headers.authorization).toBeUndefined();
   });
 
   it('lifts token from websocket protocol', () => {

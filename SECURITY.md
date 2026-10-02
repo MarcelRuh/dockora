@@ -29,7 +29,10 @@ We aim to acknowledge reports within **7 days**.
 - Restrict Docker socket access; prefer rootless Docker where possible
 - Keep `DOCKORA_API_BIND=127.0.0.1` unless another host must call the API directly
 - Leave `DOCKORA_HOST_TERMINAL` unset; set it to `1` only while you need a host shell
-- Narrow the `/home`, `/opt` and `/srv` mounts to the directories listed in `COMPOSE_SEARCH_PATHS`. The API entrypoint does not change their owner or mode
+- `/opt` and `/srv` are mounted read-only. `/home` stays writable because compose stacks are created and edited there. The API entrypoint does not change their owner or mode
+- The host-agent uses `pid: host` and `CAP_SYS_PTRACE` to read `/proc/1/root`. It has no `CAP_SYS_ADMIN`, no network, and a read-only root filesystem
+- In-app self-update runs the script embedded in the API image. It does not download a shell script. The one-shot updater still mounts the Docker socket so it can rebuild the stack
+- Browser sessions use the HttpOnly cookie. WebSockets use `Sec-WebSocket-Protocol: dockora.jwt.<token>`. A `?token=` query is accepted only on GET `*/stream` (EventSource)
 - Discord webhooks must be `https://discord.com/api/webhooks/…`. ntfy may use a LAN server; loopback and link-local addresses are rejected
 - Set `DOCKORA_EMBED=1` only on HTTPS, and set `DOCKORA_FRAME_ANCESTORS` to the parent site
 - Expose the UI only behind TLS (compose profile `tls`, or an external reverse proxy)
