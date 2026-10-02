@@ -361,6 +361,10 @@ if [[ "$SKIP_START" == "1" ]]; then
   exit 0
 fi
 
+if [[ -f "${INSTALL_DIR}/scripts/install-host-metrics.sh" ]]; then
+  DOCKORA_INSTALL_DIR="$INSTALL_DIR" sh "${INSTALL_DIR}/scripts/install-host-metrics.sh" || true
+fi
+
 COMPOSE=(docker compose -f docker-compose.yml)
 COMPOSE_PROFILES_ARGS=()
 if [[ "$TLS" == "1" ]]; then

@@ -1,14 +1,19 @@
 #!/bin/sh
-# Schreibt periodisch Host-/proc nach /data/host-proc.snap.
-# pid:host reicht, um PID 1 zu sehen. Lesen von /proc/1/root braucht CAP_SYS_PTRACE.
-# CAP_SYS_ADMIN und nsenter sind nicht nötig; Bind-Mounts von /proc lügen in LXC
-# (MemAvailable zeigt dann den Hypervisor).
+# Schreibt periodisch Host-Metriken.
+# Auf dem Host (systemd) ist /proc die LXC-Sicht.
+# Im Container lügt ein Bind-Mount von /proc; dort gilt /proc/1/root.
 set -eu
 OUT="${HOST_PROC_SNAP:-/data/host-proc.snap}"
 TMP="${OUT}.tmp"
 INTERVAL="${HOST_PROC_INTERVAL_SEC:-10}"
 ONCE="${HOST_PROC_ONCE:-0}"
-HOST="/proc/1/root"
+if [ -f /.dockerenv ]; then
+  HOST="/proc/1/root"
+  DF_TARGET="$HOST"
+else
+  HOST=""
+  DF_TARGET="/"
+fi
 
 while true; do
   if cat "$HOST/proc/meminfo" >"$TMP" 2>/dev/null; then
@@ -16,7 +21,7 @@ while true; do
       echo "----STAT----"
       cat "$HOST/proc/stat"
       echo "----DF----"
-      df -B1 -P "$HOST" 2>/dev/null | tail -1
+      df -B1 -P "$DF_TARGET" 2>/dev/null | tail -1
       echo "----TEMP----"
       pref=""
       other=""

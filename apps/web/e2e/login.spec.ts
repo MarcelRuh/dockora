@@ -67,11 +67,32 @@ test('backup, updates and the dock stay idle until an explicit confirm', async (
 
   await page.goto('/self-update');
   await expect(page.getByText(/Prüft GitHub|Checks GitHub/i)).toBeVisible();
-  await expect(page.getByRole('button', { name: /Jetzt aktualisieren|Update now/i })).toBeVisible();
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  const apply = page.getByRole('button', { name: /Jetzt aktualisieren|Update now/i });
+  await expect(apply).toBeVisible();
+  if (await apply.isEnabled()) {
+    await apply.click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('button', { name: /Abbrechen|Cancel/i }).click();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+  }
 
   await page.goto('/');
   const dock = page.locator('[data-dock-key="containers"]');
   await expect(dock).toBeVisible();
   await expect(dock).toHaveAttribute('aria-keyshortcuts', /Alt\+ArrowLeft/);
+
+  if (!process.env.CI) return;
+
+  const order = () =>
+    page.locator('[data-dock-key]').evaluateAll((els) =>
+      els.map((el) => el.getAttribute('data-dock-key')),
+    );
+  const before = await order();
+  await dock.focus();
+  await page.keyboard.press('Alt+ArrowRight');
+  await expect.poll(order).not.toEqual(before);
+  await page.locator('[data-dock-key="containers"]').focus();
+  await page.keyboard.press('Alt+ArrowLeft');
+  await expect.poll(order).toEqual(before);
 });

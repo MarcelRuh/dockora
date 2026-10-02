@@ -118,7 +118,7 @@ export const terminalModule: FastifyPluginAsync = async (app: FastifyInstance) =
       if (!agentReady) {
         socket.send(
           `\r\nHost-Agent "${hostAgentName}" nicht erreichbar.\r\n` +
-            'Starte den Service host-agent (pid: host) und versuche es erneut.\r\n',
+            'Starte ihn mit: docker compose --profile host-shell up -d\r\n',
         );
         socket.close();
         return;

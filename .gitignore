@@ -29,6 +29,8 @@ data/
 # Nur Laufzeit-Ordner im Repo-Root – nicht apps/api/src/modules/{backups,logs}
 /backups/
 apps/api/data/
+/run/
+docker-compose.override.yml
 
 # Logs (nur Root-/generische Logdateien, nicht Source-Module)
 /logs/

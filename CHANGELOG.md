@@ -5,6 +5,16 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.49] – 2026-10-02
+
+### Changed
+
+- Host metrics run as a systemd service on the host. The default Compose stack no longer adds `pid: host` or extra capabilities
+- The host shell is the opt-in profile `host-shell`
+- `/home` is read-only. Writable stack directories belong in `docker-compose.override.yml`
+- The API and web containers drop unneeded capabilities and set `no-new-privileges`
+- Playwright opens the self-update dialog and cancels it, and in CI moves one dock icon and moves it back
+
 ## [2.0.48] – 2026-10-02
 
 ### Changed

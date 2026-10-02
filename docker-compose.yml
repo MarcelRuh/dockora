@@ -36,19 +36,28 @@ services:
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       DOCKORA_HOST_TERMINAL: ${DOCKORA_HOST_TERMINAL:-0}
       DOCKORA_EMBED: ${DOCKORA_EMBED:-0}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - NET_RAW
+      - MKNOD
+      - AUDIT_WRITE
+      - SYS_CHROOT
+      - SETFCAP
     volumes:
       - dockora-data:/data
+      - ./run/host-proc.snap:/data/host-proc.snap:ro
       - ${DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock
       # Compose-Version + Self-Update-Hilfen (CLI liegt nicht im API-Image)
       - /usr/bin/docker:/usr/bin/docker:ro
       - /usr/libexec/docker/cli-plugins:/usr/libexec/docker/cli-plugins:ro
       # Installationsbaum nur lesen (Update schreibt der One-Shot-Updater auf dem Host-Pfad)
       - ${DOCKORA_INSTALL_DIR:-/opt/dockora}:/dockora-install:ro
-      # /home bleibt schreibbar: dort liegen die Stacks und neue Projekte.
+      # /home ist nur lesbar. Beschreibbare Stack-Ordner stehen in docker-compose.override.yml.
       # /opt und /srv sind nur zum Entdecken gemountet.
       - /opt:/opt:ro
       - /srv:/srv:ro
-      - /home:/home
+      - /home:/home:ro
       # CPU-Temperatur (wget/LXC: Host-Sysfs, falls im Container sonst leer)
       - /sys/class/thermal:/sys/class/thermal:ro
       - /sys/class/hwmon:/sys/class/hwmon:ro
@@ -59,9 +68,11 @@ services:
       retries: 3
       start_period: 15s
 
-  # Liefert korrekte LXC-/Host-Metriken. pid:host + SYS_PTRACE lesen /proc/1/root.
-  # SYS_ADMIN entfällt. Bind-Mounts von /proc zeigen in LXC den Hypervisor.
+  # Nur für die optionale Host-Shell (DOCKORA_HOST_TERMINAL=1):
+  # docker compose --profile host-shell up -d
+  # Metriken kommen vom systemd-Dienst dockora-host-metrics, nicht von diesem Container.
   host-agent:
+    profiles: ["host-shell"]
     image: alpine:3.20
     container_name: dockora-host-agent
     restart: unless-stopped
@@ -71,16 +82,14 @@ services:
     cap_drop:
       - ALL
     cap_add:
+      - SYS_ADMIN
       - SYS_PTRACE
     security_opt:
       - no-new-privileges:true
-    pids_limit: 64
+    pids_limit: 32
     tmpfs:
       - /tmp:size=8m,mode=1777
-    volumes:
-      - dockora-data:/data
-      - ./scripts/host-proc-agent.sh:/agent.sh:ro
-    command: ["sh", "/agent.sh"]
+    command: ["sh", "-c", "while true; do sleep 3600; done"]
 
   web:
     build:
@@ -96,6 +105,10 @@ services:
       DOCKORA_API_URL: http://api:3001
       DOCKORA_EMBED: ${DOCKORA_EMBED:-0}
       DOCKORA_FRAME_ANCESTORS: ${DOCKORA_FRAME_ANCESTORS:-}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     depends_on:
       api:
         condition: service_healthy

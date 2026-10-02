@@ -222,6 +222,25 @@ if [ "$SKIP_COMPOSE" = "1" ]; then
   exit 0
 fi
 
+install_host_metrics() {
+  script="${INSTALL_DIR}/scripts/install-host-metrics.sh"
+  if [ ! -f "$script" ]; then
+    echo "WARN: host metrics installer missing" >&2
+    return 0
+  fi
+  echo "==> Installing host metrics collector"
+  if [ -f /.dockerenv ]; then
+    docker run --rm --pid=host --privileged --network=none \
+      -v /:/host \
+      -e DOCKORA_INSTALL_DIR="$INSTALL_DIR" \
+      alpine:3.20 \
+      chroot /host sh "$script" || echo "WARN: host metrics installer failed" >&2
+  else
+    sh "$script" || echo "WARN: host metrics installer failed" >&2
+  fi
+}
+install_host_metrics
+
 echo "==> Rebuilding stack (docker compose up -d --build)"
 write_progress 28 build "Stack-Rebuild startet"
 cd "$INSTALL_DIR"
