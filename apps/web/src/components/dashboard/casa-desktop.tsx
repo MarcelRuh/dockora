@@ -137,10 +137,13 @@ export function CasaDesktop({
   const loc = locale === 'de' ? 'de-DE' : 'en-US';
   const home = t.dashboard.home;
   const [order, setOrder] = useState<DockKey[]>(() => [...DOCK_KEYS]);
+  const orderRef = useRef(order);
+  orderRef.current = order;
   const [widgets, setWidgets] = useState<Widgets>(DEFAULT_WIDGETS);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [hint, setHint] = useState(true);
   const [dragKey, setDragKey] = useState<DockKey | null>(null);
+  const [dockOver, setDockOver] = useState<DockKey | null>(null);
   const [query, setQuery] = useState('');
   const [urlOverrides, setUrlOverrides] = useState<Record<string, string>>({});
   const [publicUrlOverrides, setPublicUrlOverrides] = useState<Record<string, string>>({});
@@ -659,13 +662,60 @@ export function CasaDesktop({
     window.addEventListener('pointercancel', up);
   };
 
-  const dropOn = (target: DockKey) => {
-    if (!dragKey || dragKey === target) return;
-    const next = order.filter((key) => key !== dragKey);
-    const index = next.indexOf(target);
-    next.splice(index < 0 ? next.length : index, 0, dragKey);
+  const reorderDock = (from: DockKey, to: DockKey) => {
+    if (!canEditRef.current || from === to) return;
+    const next = [...orderRef.current];
+    const fromIndex = next.indexOf(from);
+    const toIndex = next.indexOf(to);
+    if (fromIndex < 0 || toIndex < 0) return;
+    next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, from);
     saveOrder(next);
-    setDragKey(null);
+  };
+
+  const startDockDrag = (key: DockKey, event: ReactPointerEvent<HTMLAnchorElement>) => {
+    if (event.button !== 0 || !canEditRef.current) return;
+    const startX = event.clientX;
+    const startY = event.clientY;
+    let active = false;
+    const blockSelect = (ev: Event) => ev.preventDefault();
+    const hitKey = (x: number, y: number) => {
+      const value = document.elementFromPoint(x, y)?.closest('[data-dock-key]')?.getAttribute('data-dock-key');
+      return value && orderRef.current.includes(value as DockKey) ? (value as DockKey) : null;
+    };
+    const move = (ev: PointerEvent) => {
+      if (!active && Math.hypot(ev.clientX - startX, ev.clientY - startY) <= 8) return;
+      if (!active) {
+        active = true;
+        dragged.current = true;
+        setDragKey(key);
+        document.body.style.userSelect = 'none';
+        document.addEventListener('selectstart', blockSelect);
+      }
+      const over = hitKey(ev.clientX, ev.clientY);
+      setDockOver(over && over !== key ? over : null);
+      ev.preventDefault();
+    };
+    const up = (ev: PointerEvent) => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+      document.removeEventListener('selectstart', blockSelect);
+      document.body.style.userSelect = '';
+      if (active) {
+        const over = hitKey(ev.clientX, ev.clientY);
+        if (over) reorderDock(key, over);
+        setDragKey(null);
+        setDockOver(null);
+        ev.preventDefault();
+      }
+      window.setTimeout(() => {
+        dragged.current = false;
+      }, 0);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
   };
 
   const persistUrls = (name: string, internal: string, publicUrl: string | undefined) => {
@@ -1091,17 +1141,17 @@ export function CasaDesktop({
         <>
           <div
             aria-label={home.departmentResize}
-            className="absolute bottom-3 right-0 top-10 z-10 w-2 cursor-ew-resize"
+            className="absolute bottom-11 right-0 top-10 z-10 w-11 cursor-ew-resize touch-none"
             onPointerDown={(event) => startDepartmentGesture(section.id, 'width', event)}
           />
           <div
             aria-label={home.departmentResize}
-            className="absolute bottom-0 left-2 right-3 z-10 h-2 cursor-ns-resize"
+            className="absolute bottom-0 left-2 right-11 z-10 h-11 cursor-ns-resize touch-none"
             onPointerDown={(event) => startDepartmentGesture(section.id, 'height', event)}
           />
           <div
             aria-label={home.departmentResize}
-            className="absolute bottom-0 right-0 z-20 h-4 w-4 cursor-nwse-resize"
+            className="absolute bottom-0 right-0 z-20 h-11 w-11 cursor-nwse-resize touch-none"
             onPointerDown={(event) => startDepartmentGesture(section.id, 'both', event)}
           >
             <span className="pointer-events-none absolute bottom-1 right-1 h-2 w-2 border-b-2 border-r-2 border-dockora-pink" />
@@ -1351,38 +1401,8 @@ export function CasaDesktop({
                 <li key={app.key}>
                   <Link
                     href={app.href}
-                    draggable={dragKey === app.key}
-                    onPointerDown={(event) => {
-                      const startX = event.clientX;
-                      const startY = event.clientY;
-                      const target = event.currentTarget;
-                      const move = (ev: globalThis.PointerEvent) => {
-                        if (Math.hypot(ev.clientX - startX, ev.clientY - startY) > 8) {
-                          dragged.current = true;
-                          target.draggable = true;
-                          setDragKey(app.key);
-                        }
-                      };
-                      const up = () => {
-                        window.removeEventListener('pointermove', move);
-                        window.removeEventListener('pointerup', up);
-                        window.setTimeout(() => {
-                          dragged.current = false;
-                        }, 0);
-                      };
-                      window.addEventListener('pointermove', move);
-                      window.addEventListener('pointerup', up);
-                    }}
-                    onDragStart={() => {
-                      dragged.current = true;
-                      setDragKey(app.key);
-                    }}
-                    onDragOver={(event) => event.preventDefault()}
-                    onDrop={() => dropOn(app.key)}
-                    onDragEnd={(event) => {
-                      event.currentTarget.draggable = false;
-                      setDragKey(null);
-                    }}
+                    data-dock-key={app.key}
+                    onPointerDown={(event) => startDockDrag(app.key, event)}
                     onClick={(event) => {
                       if (!dragged.current) return;
                       event.preventDefault();
@@ -1392,6 +1412,7 @@ export function CasaDesktop({
                     className={cn(
                       'flex shrink-0 items-center gap-2 px-2.5 py-2 text-[11px] font-medium uppercase tracking-wide text-dockora-muted hover:bg-dockora-accentSoft hover:text-white',
                       dragKey === app.key && 'opacity-50',
+                      dockOver === app.key && 'bg-dockora-accentSoft text-white',
                     )}
                   >
                     <span className="flex h-7 w-7 items-center justify-center text-dockora-pink">

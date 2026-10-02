@@ -75,12 +75,23 @@ export const terminalModule: FastifyPluginAsync = async (app: FastifyInstance) =
   );
 
   app.get(
+    `${API_PREFIX}/system/host-terminal/status`,
+    { preHandler: [app.requireRole('admin')] },
+    async () => ({ enabled: app.config.hostTerminalEnabled }),
+  );
+
+  app.get(
     `${API_PREFIX}/system/host-terminal`,
     {
       websocket: true,
       preHandler: [app.requireRole('admin')],
     },
     async (socket, request) => {
+      if (!app.config.hostTerminalEnabled) {
+        socket.send('\r\nHost terminal is disabled. Set DOCKORA_HOST_TERMINAL=1 and restart the API.\r\n');
+        socket.close();
+        return;
+      }
       const query = request.query as {
         cols?: string;
         rows?: string;

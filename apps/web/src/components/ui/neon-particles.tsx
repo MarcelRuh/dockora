@@ -181,7 +181,7 @@ export function NeonAtmosphere() {
       />
 
       <div
-        className="absolute border border-[rgba(255,0,110,0.28)]"
+        className="dockora-ambient-shape absolute border border-[rgba(255,0,110,0.28)]"
         style={{
           width: 72,
           height: 72,
@@ -192,7 +192,7 @@ export function NeonAtmosphere() {
         }}
       />
       <div
-        className="absolute rounded-full border border-[rgba(0,180,216,0.28)]"
+        className="dockora-ambient-shape absolute rounded-full border border-[rgba(0,180,216,0.28)]"
         style={{
           width: 56,
           height: 56,
@@ -203,7 +203,7 @@ export function NeonAtmosphere() {
         }}
       />
       <div
-        className="absolute border border-[rgba(131,56,236,0.28)]"
+        className="dockora-ambient-shape absolute border border-[rgba(131,56,236,0.28)]"
         style={{
           width: 88,
           height: 88,
@@ -215,7 +215,7 @@ export function NeonAtmosphere() {
         }}
       />
       <div
-        className="absolute border border-[rgba(6,214,160,0.22)]"
+        className="dockora-ambient-shape absolute border border-[rgba(6,214,160,0.22)]"
         style={{
           width: 48,
           height: 48,

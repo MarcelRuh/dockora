@@ -5,7 +5,7 @@
 [![CI](https://github.com/MarcelRuh/dockora/actions/workflows/ci.yml/badge.svg)](https://github.com/MarcelRuh/dockora/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
-> Status: **v2.0.44** – self-hosted Docker management with in-app updates and GHCR images.
+> Status: **v2.0.45** – self-hosted Docker management with in-app updates and GHCR images.
 
 ## One-line install (wget)
 
@@ -64,7 +64,7 @@ Preserves `.env` and `data/`, syncs from GitHub, then runs `docker compose up -d
 ### Fast install via GHCR images
 
 ```bash
-wget -qO- https://raw.githubusercontent.com/MarcelRuh/dockora/main/scripts/install.sh | DOCKORA_USE_IMAGES=1 DOCKORA_IMAGE_TAG=2.0.44 bash
+wget -qO- https://raw.githubusercontent.com/MarcelRuh/dockora/main/scripts/install.sh | DOCKORA_USE_IMAGES=1 DOCKORA_IMAGE_TAG=2.0.45 bash
 ```
 
 Or manually:
@@ -83,7 +83,7 @@ Images: `ghcr.io/marcelruh/dockora-api` / `dockora-web` (make packages **public*
 - Named volume list, size, unused prune, read-only browse
 - Image management & multi-registry update checker (Docker Hub, GHCR, Quay, …)
 - Backups (compose/env/settings/volumes, retention, scheduler) with secret redaction
-- Discord webhooks, monitoring thresholds, central logs
+- Discord and ntfy notifications, monitoring thresholds, central logs
 - JWT auth (admin/operator/viewer), audit log with retention, OpenAPI at `/api/docs`
 - Plugin drop-in loader (worker-isolated) + **in-app self-update** (Compose/GitHub or `DOCKORA_SELF_IMAGE`)
 
@@ -91,7 +91,7 @@ Images: `ghcr.io/marcelruh/dockora-api` / `dockora-web` (make packages **public*
 
 Empty instance — UI chrome only, no host stacks or personal data.
 
-**Dashboard** — engine status, live CPU/RAM/disk, container counts, notifications.
+**Home** — app grid, departments and system status. The picture below is an older empty dashboard.
 
 ![Dockora dashboard](docs/screenshots/dashboard.png)
 

@@ -253,6 +253,10 @@ export interface AppSettings {
   discordWebhookUrl: string;
   discordEnabled: boolean;
   discordEvents: NotificationEvent[];
+  ntfyBaseUrl: string;
+  ntfyTopic: string;
+  ntfyToken: string;
+  ntfyEnabled: boolean;
   locale: 'de' | 'en';
   timezone: string;
   updateCheckIntervalMinutes: number;

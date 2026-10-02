@@ -33,8 +33,17 @@ export const notificationsModule: FastifyPluginAsync = async (app: FastifyInstan
     `${API_PREFIX}/notifications/test`,
     { preHandler: [app.requireRole(...ADMIN_ROLES)] },
     async () => {
-    return service.testDiscord();
-  });
+      return service.testDiscord();
+    },
+  );
+
+  app.post(
+    `${API_PREFIX}/notifications/test-ntfy`,
+    { preHandler: [app.requireRole(...ADMIN_ROLES)] },
+    async () => {
+      return service.testNtfy();
+    },
+  );
 };
 
 declare module 'fastify' {

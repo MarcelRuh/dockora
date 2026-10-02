@@ -5,6 +5,20 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.45] – 2026-10-02
+
+### Changed
+
+- The module dock reorders with the same pointer drag as home apps
+- Decorative motion stops when reduced motion is requested, and department resize handles have a larger touch target
+- The API port binds to localhost unless `DOCKORA_API_BIND` says otherwise
+- The host shell stays off until `DOCKORA_HOST_TERMINAL=1`
+- Pages send `X-Frame-Options: SAMEORIGIN` unless `DOCKORA_EMBED=1` on HTTPS
+
+### Added
+
+- ntfy as a second notification channel next to Discord
+
 ## [2.0.44] – 2026-09-27
 
 ### Changed

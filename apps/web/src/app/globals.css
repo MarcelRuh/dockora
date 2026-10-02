@@ -465,3 +465,12 @@ body {
   font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
   line-height: 1.55;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-in,
+  .dockora-glow-orb,
+  .dockora-pulse,
+  .dockora-ambient-shape {
+    animation: none !important;
+  }
+}

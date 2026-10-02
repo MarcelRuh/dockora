@@ -13,6 +13,10 @@ const DEFAULTS: AppSettings = {
     'error',
     'backup.completed',
   ],
+  ntfyBaseUrl: 'https://ntfy.sh',
+  ntfyTopic: '',
+  ntfyToken: '',
+  ntfyEnabled: false,
   locale: 'de',
   timezone: 'Europe/Berlin',
   updateCheckIntervalMinutes: 120,
@@ -83,6 +87,10 @@ export class SettingsService {
       discordEvents: stored.discordEvents
         ? safeJson<NotificationEvent[]>(stored.discordEvents, base.discordEvents)
         : base.discordEvents,
+      ntfyBaseUrl: stored.ntfyBaseUrl ?? base.ntfyBaseUrl,
+      ntfyTopic: stored.ntfyTopic ?? base.ntfyTopic,
+      ntfyToken: stored.ntfyToken ?? base.ntfyToken,
+      ntfyEnabled: stored.ntfyEnabled ? stored.ntfyEnabled === 'true' : base.ntfyEnabled,
       locale: (stored.locale as AppSettings['locale']) ?? base.locale,
       timezone: stored.timezone ?? base.timezone,
       updateCheckIntervalMinutes: num(
@@ -130,7 +138,7 @@ export class SettingsService {
       ]);
     }
     // booleans as 'true'/'false'
-    for (const boolKey of ['discordEnabled', 'autoUpdateImages', 'authEnabled'] as const) {
+    for (const boolKey of ['discordEnabled', 'ntfyEnabled', 'autoUpdateImages', 'authEnabled'] as const) {
       if (boolKey in patch && typeof patch[boolKey] === 'boolean') {
         const idx = entries.findIndex(([k]) => k === boolKey);
         if (idx >= 0) entries[idx] = [boolKey, String(patch[boolKey])];

@@ -523,6 +523,7 @@ function attachSession(request: FastifyRequest, reply: FastifyReply, token: stri
       forwardedProto: request.headers['x-forwarded-proto'],
     }),
     maxAge: jwtExpiresToSeconds(request.server.config.jwtExpiresIn),
+    embed: request.server.config.embedEnabled,
   });
 }
 

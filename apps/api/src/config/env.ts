@@ -55,6 +55,10 @@ const envSchema = z.object({
   DOCKORA_GIT_SHA: z.string().optional(),
   /** Verzeichnis für Drop-in-Plugins (index.js pro Unterordner) */
   PLUGIN_DIR: z.string().optional(),
+  /** Host-Shell nur wenn ausdrücklich 1. Metriken laufen auch ohne dieses Flag. */
+  DOCKORA_HOST_TERMINAL: z.string().optional(),
+  /** Cross-Site-iframe: Session-Cookie SameSite=None; Secure. Braucht HTTPS. */
+  DOCKORA_EMBED: z.string().optional(),
 });
 
 export type AppConfig = {
@@ -83,6 +87,8 @@ export type AppConfig = {
   updateBranch: string;
   gitSha: string | null;
   pluginDir: string;
+  hostTerminalEnabled: boolean;
+  embedEnabled: boolean;
 };
 
 function splitPaths(value: string): string[] {
@@ -223,5 +229,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     updateBranch: e.DOCKORA_UPDATE_BRANCH?.trim() || 'main',
     gitSha: e.DOCKORA_GIT_SHA?.trim() || null,
     pluginDir,
+    hostTerminalEnabled: e.DOCKORA_HOST_TERMINAL === '1',
+    embedEnabled: e.DOCKORA_EMBED === '1',
   };
 }

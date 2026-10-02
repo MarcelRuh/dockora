@@ -13,7 +13,7 @@ import {
   shouldKeepWebhook,
 } from './secret-hygiene.js';
 
-const SECRET_KEYS = ['discordWebhookUrl', 'ghcrToken', 'lscrToken'] as const;
+const SECRET_KEYS = ['discordWebhookUrl', 'ghcrToken', 'lscrToken', 'ntfyToken'] as const;
 
 function maskSettingsSecrets(settings: AppSettings): AppSettings {
   return {
@@ -21,6 +21,7 @@ function maskSettingsSecrets(settings: AppSettings): AppSettings {
     discordWebhookUrl: maskWebhookUrl(settings.discordWebhookUrl),
     ghcrToken: maskSecret(settings.ghcrToken),
     lscrToken: maskSecret(settings.lscrToken),
+    ntfyToken: maskSecret(settings.ntfyToken),
   };
 }
 
@@ -49,6 +50,9 @@ export const settingsModule: FastifyPluginAsync = async (app: FastifyInstance) =
       }
       if (shouldKeepSecret(patch.lscrToken)) {
         delete patch.lscrToken;
+      }
+      if (shouldKeepSecret(patch.ntfyToken)) {
+        delete patch.ntfyToken;
       }
       const updated = await service.updateSettings(patch);
       if ('authEnabled' in patch) {

@@ -27,6 +27,10 @@ We aim to acknowledge reports within **7 days**.
 - Set a strong `BOOTSTRAP_ADMIN_PASSWORD` (≥ 12 characters, no defaults)
 - Authentication is **on by default**; keep it enabled on any network-exposed instance
 - Restrict Docker socket access; prefer rootless Docker where possible
+- Keep `DOCKORA_API_BIND=127.0.0.1` unless another host must call the API directly
+- Leave `DOCKORA_HOST_TERMINAL` unset; set it to `1` only while you need a host shell
+- Narrow the `/home`, `/opt` and `/srv` mounts to the directories listed in `COMPOSE_SEARCH_PATHS`
+- Set `DOCKORA_EMBED=1` only on HTTPS, and set `DOCKORA_FRAME_ANCESTORS` to the parent site
 - Expose the UI only behind TLS (compose profile `tls`, or an external reverse proxy)
 - Prefer `docker compose --profile tls` (Caddy) or `--profile proxy` (nginx HTTP) for same-origin SSE/WebSocket
 - Do not commit `.env` files or backup archives containing secrets

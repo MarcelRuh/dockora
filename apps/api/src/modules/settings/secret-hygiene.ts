@@ -32,6 +32,7 @@ export function redactSettingsForBackup<T extends Record<string, unknown>>(setti
     discordWebhookUrl: '',
     ghcrToken: '',
     lscrToken: '',
+    ntfyToken: '',
   };
 }
 
@@ -46,5 +47,6 @@ export function stripSecretsFromRestoredSettings(
   delete next.discordWebhookUrl;
   delete next.ghcrToken;
   delete next.lscrToken;
+  delete next.ntfyToken;
   return next;
 }

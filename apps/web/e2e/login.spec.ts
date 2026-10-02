@@ -12,3 +12,8 @@ test('login screen is reachable and skip-link works', async ({ page }) => {
   });
   await expect(password.or(page.locator('input[type="password"]')).first()).toBeVisible();
 });
+
+test('pages are not frameable from another site by default', async ({ page }) => {
+  const response = await page.goto('/');
+  expect(response?.headers()['x-frame-options']?.toLowerCase()).toBe('sameorigin');
+});

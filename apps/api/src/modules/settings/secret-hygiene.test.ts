@@ -27,10 +27,12 @@ describe('secret-hygiene', () => {
       discordWebhookUrl: 'https://discord.com/api/webhooks/1/secret',
       ghcrToken: 'ghp_secret',
       lscrToken: 'lscr_secret',
+      ntfyToken: 'tk_secret',
     });
     expect(out.discordWebhookUrl).toBe('');
     expect(out.ghcrToken).toBe('');
     expect(out.lscrToken).toBe('');
+    expect(out.ntfyToken).toBe('');
     expect(out.locale).toBe('de');
   });
 
@@ -40,10 +42,12 @@ describe('secret-hygiene', () => {
       discordWebhookUrl: 'https://discord.com/api/webhooks/1/secret',
       ghcrToken: 'ghp_secret',
       lscrToken: 'lscr_secret',
+      ntfyToken: 'tk_secret',
     });
     expect(out.discordWebhookUrl).toBeUndefined();
     expect(out.ghcrToken).toBeUndefined();
     expect(out.lscrToken).toBeUndefined();
+    expect(out.ntfyToken).toBeUndefined();
     expect(out.locale).toBe('en');
   });
 });

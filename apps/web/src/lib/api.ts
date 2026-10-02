@@ -544,6 +544,14 @@ export async function testDiscordNotification(): Promise<{ ok: boolean; message:
   return request('/notifications/test', { method: 'POST' });
 }
 
+export async function testNtfyNotification(): Promise<{ ok: boolean; message: string }> {
+  return request('/notifications/test-ntfy', { method: 'POST' });
+}
+
+export async function fetchHostTerminalStatus(): Promise<{ enabled: boolean }> {
+  return request('/system/host-terminal/status');
+}
+
 // Monitoring
 export async function fetchMonitoring(): Promise<MonitoringSnapshot> {
   return request<MonitoringSnapshot>('/monitoring');

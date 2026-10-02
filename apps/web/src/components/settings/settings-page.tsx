@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { AppSettings, NotificationEvent } from '@dockora/shared';
-import { fetchSettings, testDiscordNotification, updateSettings } from '@/lib/api';
+import { fetchSettings, testDiscordNotification, testNtfyNotification, updateSettings } from '@/lib/api';
 import { useLocale } from '@/i18n/locale-provider';
 import { useAuth } from '@/components/auth/auth-provider';
 import { canAdmin } from '@/lib/roles';
@@ -166,6 +166,19 @@ export function SettingsPageView() {
     try {
       await testDiscordNotification();
       setSuccess(t.settings.testDiscordOk);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t.common.failed);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleNtfyTest = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      await testNtfyNotification();
+      setSuccess(t.settings.testNtfyOk);
     } catch (err) {
       setError(err instanceof Error ? err.message : t.common.failed);
     } finally {
@@ -345,9 +358,14 @@ export function SettingsPageView() {
               title={t.settings.sections.notifications}
               description={desc.notifications}
               actions={
-                <Button disabled={saving} onClick={() => void handleDiscordTest()}>
-                  {t.settings.testDiscord}
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                  <Button disabled={saving} onClick={() => void handleDiscordTest()}>
+                    {t.settings.testDiscord}
+                  </Button>
+                  <Button disabled={saving} variant="ghost" onClick={() => void handleNtfyTest()}>
+                    {t.settings.testNtfy}
+                  </Button>
+                </div>
               }
             >
               <div className="grid gap-4 sm:grid-cols-2">
@@ -369,6 +387,43 @@ export function SettingsPageView() {
                     checked={settings.discordEnabled}
                     disabled={!isAdmin}
                     onChange={(v) => patch('discordEnabled', v)}
+                    yes={t.common.yes}
+                    no={t.common.no}
+                  />
+                </Field>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label={t.settings.fields.ntfyBaseUrl}>
+                  <Input
+                    value={settings.ntfyBaseUrl}
+                    onChange={(e) => patch('ntfyBaseUrl', e.target.value)}
+                    disabled={!isAdmin}
+                    placeholder="https://ntfy.sh"
+                  />
+                </Field>
+                <Field label={t.settings.fields.ntfyTopic}>
+                  <Input
+                    value={settings.ntfyTopic}
+                    onChange={(e) => patch('ntfyTopic', e.target.value)}
+                    disabled={!isAdmin}
+                    placeholder="dockora"
+                  />
+                </Field>
+                <Field label={t.settings.fields.ntfyToken} hint={t.settings.fields.tokenPlaceholder}>
+                  <Input
+                    type="password"
+                    autoComplete="off"
+                    value={settings.ntfyToken}
+                    onChange={(e) => patch('ntfyToken', e.target.value)}
+                    disabled={!isAdmin}
+                    placeholder={t.settings.fields.tokenPlaceholder}
+                  />
+                </Field>
+                <Field label={t.settings.fields.ntfyEnabled}>
+                  <ToggleRow
+                    checked={settings.ntfyEnabled}
+                    disabled={!isAdmin}
+                    onChange={(v) => patch('ntfyEnabled', v)}
                     yes={t.common.yes}
                     no={t.common.no}
                   />

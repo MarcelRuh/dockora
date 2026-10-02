@@ -9,7 +9,7 @@ services:
     group_add:
       - "${DOCKER_GID:-999}"
     ports:
-      - "${DOCKORA_API_BIND:-0.0.0.0}:${DOCKORA_API_PORT:-3001}:3001"
+      - "${DOCKORA_API_BIND:-127.0.0.1}:${DOCKORA_API_PORT:-3001}:3001"
     environment:
       NODE_ENV: production
       HOST: 0.0.0.0
@@ -34,6 +34,8 @@ services:
       DOCKORA_UPDATE_BRANCH: ${DOCKORA_UPDATE_BRANCH:-main}
       DOCKORA_GIT_SHA: ${DOCKORA_GIT_SHA:-}
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      DOCKORA_HOST_TERMINAL: ${DOCKORA_HOST_TERMINAL:-0}
+      DOCKORA_EMBED: ${DOCKORA_EMBED:-0}
     volumes:
       - dockora-data:/data
       - ${DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock
@@ -42,7 +44,7 @@ services:
       - /usr/libexec/docker/cli-plugins:/usr/libexec/docker/cli-plugins:ro
       # Installationsbaum nur lesen (Update schreibt der One-Shot-Updater auf dem Host-Pfad)
       - ${DOCKORA_INSTALL_DIR:-/opt/dockora}:/dockora-install:ro
-      # Compose-Discovery + Create (rw – sonst schlägt Projekt-Anlegen fehl)
+      # Compose-Discovery. Enger machen, sobald COMPOSE_SEARCH_PATHS nur bestimmte Ordner braucht.
       - /opt:/opt
       - /srv:/srv
       - /home:/home
@@ -83,6 +85,8 @@ services:
       - "${DOCKORA_WEB_BIND:-0.0.0.0}:${DOCKORA_WEB_PORT:-3000}:3000"
     environment:
       DOCKORA_API_URL: http://api:3001
+      DOCKORA_EMBED: ${DOCKORA_EMBED:-0}
+      DOCKORA_FRAME_ANCESTORS: ${DOCKORA_FRAME_ANCESTORS:-}
     depends_on:
       api:
         condition: service_healthy

@@ -4,6 +4,7 @@ import { prisma } from '../../infrastructure/db/prisma.js';
 import type { SettingsService } from '../settings/settings.service.js';
 import { pruneDataRetention } from '../settings/data-retention.js';
 import { sendDiscordEmbed, type DiscordField } from './discord.js';
+import { ntfyPriority, sendNtfy } from './ntfy.js';
 
 export interface NotificationsServiceDeps {
   settings: SettingsService;
@@ -89,6 +90,25 @@ export class NotificationsService {
         // Discord-Fehler sollen Benachrichtigung nicht blockieren
       }
     }
+    if (
+      settings.ntfyEnabled &&
+      settings.ntfyBaseUrl &&
+      settings.ntfyTopic &&
+      settings.discordEvents.includes(event)
+    ) {
+      try {
+        await sendNtfy({
+          baseUrl: settings.ntfyBaseUrl,
+          topic: settings.ntfyTopic,
+          token: settings.ntfyToken,
+          title,
+          message,
+          priority: ntfyPriority(severity),
+        });
+      } catch {
+        // ntfy-Fehler sollen die Benachrichtigung nicht blockieren
+      }
+    }
 
     return {
       id: row.id,
@@ -113,6 +133,29 @@ export class NotificationsService {
         event: 'error',
         severity: 'success',
         containers: ['beispiel-container'],
+      });
+      return { ok: true, message: 'Test message sent' };
+    } catch (error) {
+      return {
+        ok: false,
+        message: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
+  async testNtfy(): Promise<{ ok: boolean; message: string }> {
+    const settings = await this.deps.settings.getSettings();
+    if (!settings.ntfyBaseUrl || !settings.ntfyTopic) {
+      return { ok: false, message: 'ntfy server URL and topic are required' };
+    }
+    try {
+      await sendNtfy({
+        baseUrl: settings.ntfyBaseUrl,
+        topic: settings.ntfyTopic,
+        token: settings.ntfyToken,
+        title: 'Dockora Test',
+        message: 'ntfy funktioniert.',
+        priority: '3',
       });
       return { ok: true, message: 'Test message sent' };
     } catch (error) {

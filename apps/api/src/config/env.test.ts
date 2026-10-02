@@ -24,7 +24,20 @@ describe('loadConfig', () => {
     expect(config.composeSearchPaths).toEqual(['/opt', '/srv']);
     expect(config.composeExcludePaths).toContain('/opt/hidden');
     expect(config.autoUpdateEnabled).toBe(false);
+    expect(config.hostTerminalEnabled).toBe(false);
+    expect(config.embedEnabled).toBe(false);
     expect(config.backupDir).toContain('backups');
+  });
+
+  it('enables the host terminal and embed cookies only when asked', () => {
+    const config = loadConfig({
+      DATABASE_URL: 'file:./test.db',
+      JWT_SECRET: 'test-secret-at-least-16',
+      DOCKORA_HOST_TERMINAL: '1',
+      DOCKORA_EMBED: '1',
+    });
+    expect(config.hostTerminalEnabled).toBe(true);
+    expect(config.embedEnabled).toBe(true);
   });
 
   it('respects BACKUP_DIR override', () => {

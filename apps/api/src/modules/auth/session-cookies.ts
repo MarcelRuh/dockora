@@ -20,34 +20,39 @@ export function jwtExpiresToSeconds(expiresIn: string): number {
   }
 }
 
-function baseCookie(secure: boolean, maxAge: number) {
+export function sessionCookieBase(opts: { secure: boolean; maxAge: number; embed: boolean }) {
   return {
     path: '/',
-    sameSite: 'lax' as const,
-    secure,
-    maxAge,
+    sameSite: opts.embed ? ('none' as const) : ('lax' as const),
+    secure: opts.embed || opts.secure,
+    maxAge: opts.maxAge,
   };
 }
 
 export function setSessionCookies(
   reply: FastifyReply,
   token: string,
-  opts: { secure: boolean; maxAge: number },
+  opts: { secure: boolean; maxAge: number; embed?: boolean },
 ): void {
   const csrf = randomBytes(32).toString('hex');
+  const base = sessionCookieBase({ secure: opts.secure, maxAge: opts.maxAge, embed: opts.embed === true });
   reply.setCookie(SESSION_COOKIE, token, {
-    ...baseCookie(opts.secure, opts.maxAge),
+    ...base,
     httpOnly: true,
   });
   reply.setCookie(CSRF_COOKIE, csrf, {
-    ...baseCookie(opts.secure, opts.maxAge),
+    ...base,
     httpOnly: false,
   });
 }
 
 export function clearSessionCookies(reply: FastifyReply): void {
-  for (const secure of [false, true] as const) {
-    const base = { path: '/', sameSite: 'lax' as const, secure };
+  const variants = [
+    { path: '/', sameSite: 'lax' as const, secure: false },
+    { path: '/', sameSite: 'lax' as const, secure: true },
+    { path: '/', sameSite: 'none' as const, secure: true },
+  ];
+  for (const base of variants) {
     reply.clearCookie(SESSION_COOKIE, base);
     reply.clearCookie(CSRF_COOKIE, base);
   }

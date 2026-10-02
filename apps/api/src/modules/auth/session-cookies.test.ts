@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { headerValue, isSecureCookieRequest, jwtExpiresToSeconds } from './session-cookies.js';
+import { headerValue, isSecureCookieRequest, jwtExpiresToSeconds, sessionCookieBase } from './session-cookies.js';
 
 describe('jwtExpiresToSeconds', () => {
   it('parses day/hour/minute/second units', () => {
@@ -32,5 +32,21 @@ describe('isSecureCookieRequest', () => {
   it('falls back to the request protocol', () => {
     expect(isSecureCookieRequest({ protocol: 'https' })).toBe(true);
     expect(isSecureCookieRequest({ protocol: 'http' })).toBe(false);
+  });
+});
+
+describe('sessionCookieBase', () => {
+  it('keeps a lax cookie on a normal login', () => {
+    expect(sessionCookieBase({ secure: false, maxAge: 60, embed: false })).toMatchObject({
+      sameSite: 'lax',
+      secure: false,
+    });
+  });
+
+  it('uses SameSite=None and Secure when embedding is enabled', () => {
+    expect(sessionCookieBase({ secure: false, maxAge: 60, embed: true })).toMatchObject({
+      sameSite: 'none',
+      secure: true,
+    });
   });
 });
