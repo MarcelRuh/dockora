@@ -5,6 +5,7 @@ export function createLayoutSaveQueue(deps: {
   reloadRevision: () => Promise<number>;
   isConflict: (error: unknown) => boolean;
   onError: (kind: 'conflict' | 'failed') => void;
+  onSaved?: () => void;
 }) {
   let revision = 0;
   let latest: HomeLayout | null = null;
@@ -36,7 +37,10 @@ export function createLayoutSaveQueue(deps: {
             break;
           }
         }
-        if (!rerun && latest === snapshot) break;
+        if (!rerun && latest === snapshot) {
+          deps.onSaved?.();
+          break;
+        }
       }
     } finally {
       inflight = false;

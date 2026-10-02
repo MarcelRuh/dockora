@@ -11,7 +11,7 @@ import {
 import { useLocale } from '@/i18n/locale-provider';
 import { useAuth } from '@/components/auth/auth-provider';
 import { useDockerLiveReload } from '@/hooks/use-docker-live-reload';
-import { canAdmin } from '@/lib/roles';
+import { canAdmin, canOperate } from '@/lib/roles';
 import { formatBytes, formatRelativeTime } from '@/lib/format';
 import { Button, FilterBar, Input } from '@/components/ui/form-controls';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -33,6 +33,7 @@ export function VolumesPage() {
   const { t, locale } = useLocale();
   const { authEnabled, user } = useAuth();
   const isAdmin = canAdmin(user?.role, authEnabled);
+  const canOps = canOperate(user?.role, authEnabled);
   const loc = locale === 'de' ? 'de-DE' : 'en-US';
   const [items, setItems] = useState<VolumeSummary[]>([]);
   const [query, setQuery] = useState('');
@@ -151,9 +152,11 @@ export function VolumesPage() {
     </span>,
     vol.createdAt ? formatRelativeTime(vol.createdAt, loc) : '—',
     <div key={`a-${vol.name}`} className="flex flex-wrap gap-2">
-      <Button size="sm" disabled={browseBusy} onClick={() => void openBrowse(vol.name)}>
-        {t.volumes.browse}
-      </Button>
+      {canOps ? (
+        <Button size="sm" disabled={browseBusy} onClick={() => void openBrowse(vol.name)}>
+          {t.volumes.browse}
+        </Button>
+      ) : null}
       {isAdmin && vol.unused && !vol.protected ? (
         <Button
           size="sm"

@@ -10,7 +10,8 @@ import {
 } from '@dockora/shared';
 import { withDockerError } from '../../domain/docker-errors.js';
 import { actorIdFromRequest, auditService } from '../audit/audit.service.js';
-import { rolesForContainerAction } from '../auth/role-policy.js';
+import { isAuthEnabled } from '../auth/auth-gate.js';
+import { OPERATOR_ROLES, rolesForContainerAction } from '../auth/role-policy.js';
 import { throwComposeError } from '../compose/index.js';
 import { destructiveRateLimit } from '../../presentation/http/destructive-rate-limit.js';
 import { ContainersService } from './containers.service.js';
@@ -53,6 +54,7 @@ export const containersModule: FastifyPluginAsync = async (app: FastifyInstance)
 
   app.get<{ Params: { id: string } }>(
     `${API_PREFIX}/containers/:id/logs/stream`,
+    { preHandler: [app.requireRole(...OPERATOR_ROLES)] },
     async (request, reply) => {
       const tail = parseTail(request.query as { tail?: string });
       reply.hijack();
@@ -116,6 +118,7 @@ export const containersModule: FastifyPluginAsync = async (app: FastifyInstance)
 
   app.get<{ Params: { id: string }; Querystring: { tail?: string } }>(
     `${API_PREFIX}/containers/:id/logs`,
+    { preHandler: [app.requireRole(...OPERATOR_ROLES)] },
     async (request): Promise<{ logs: string }> => {
       const tail = parseTail(request.query);
       // Wrap as JSON — bare strings break the web client's JSON.parse
@@ -190,7 +193,13 @@ export const containersModule: FastifyPluginAsync = async (app: FastifyInstance)
   app.get<{ Params: { id: string } }>(
     `${API_PREFIX}/containers/:id`,
     async (request): Promise<ContainerDetails> => {
-      return withDockerError(app, () => service.getDetails(request.params.id));
+      const details = await withDockerError(app, () => service.getDetails(request.params.id));
+      const authOn = await isAuthEnabled();
+      const role = request.user?.role;
+      if (authOn && role !== 'admin' && role !== 'operator') {
+        return { ...details, env: [] };
+      }
+      return details;
     },
   );
 };

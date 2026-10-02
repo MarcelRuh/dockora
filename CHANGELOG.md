@@ -5,6 +5,14 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.54] – 2026-10-02
+
+### Changed
+
+- Container env, logs, volume browse and public URL secrets stay with operators
+- Home layout edits survive a reload while they are still saving
+- Dialogs trap focus; errors and tabs announce their state
+
 ## [2.0.53] – 2026-10-02
 
 ### Changed

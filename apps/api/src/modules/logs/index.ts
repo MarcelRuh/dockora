@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { API_PREFIX, type LogEntry, type LogLevel } from '@dockora/shared';
+import { OPERATOR_ROLES } from '../auth/role-policy.js';
 import { LogsService } from './logs.service.js';
 
 export const logsModule: FastifyPluginAsync = async (app: FastifyInstance) => {
@@ -13,7 +14,10 @@ export const logsModule: FastifyPluginAsync = async (app: FastifyInstance) => {
       limit?: string;
       since?: string;
     };
-  }>(`${API_PREFIX}/logs`, async (request): Promise<LogEntry[]> => {
+  }>(
+    `${API_PREFIX}/logs`,
+    { preHandler: [app.requireRole(...OPERATOR_ROLES)] },
+    async (request): Promise<LogEntry[]> => {
     const { container, level, q, since } = request.query;
     const limit = request.query.limit ? Number(request.query.limit) : undefined;
 

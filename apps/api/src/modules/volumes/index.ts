@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { API_PREFIX, type VolumeBrowseEntry, type VolumeSummary } from '@dockora/shared';
 import { throwDockerError, withDockerError } from '../../domain/docker-errors.js';
+import { OPERATOR_ROLES } from '../auth/role-policy.js';
 import { destructiveRateLimit } from '../../presentation/http/destructive-rate-limit.js';
 import { VolumeGuardError, VolumesService } from './volumes.service.js';
 
@@ -16,6 +17,7 @@ export const volumesModule: FastifyPluginAsync = async (app: FastifyInstance) =>
 
   app.get<{ Params: { name: string } }>(
     `${API_PREFIX}/volumes/:name/browse`,
+    { preHandler: [app.requireRole(...OPERATOR_ROLES)] },
     async (request): Promise<VolumeBrowseEntry[]> => {
       try {
         return await service.browse(request.params.name);

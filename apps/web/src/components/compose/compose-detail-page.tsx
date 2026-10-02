@@ -596,13 +596,15 @@ export function ComposeDetailPage({ id }: { id: string }) {
         )}
       </Section>
 
-      <Section title={t.compose.logs}>
-        <div id="compose-logs" />
-        <Button disabled={busy} onClick={() => void handleLogs()}>
-          {t.containers.logs.fetch}
-        </Button>
-        <LogViewer content={logs} />
-      </Section>
+      {canOps ? (
+        <Section title={t.compose.logs}>
+          <div id="compose-logs" />
+          <Button disabled={busy} onClick={() => void handleLogs()}>
+            {t.containers.logs.fetch}
+          </Button>
+          <LogViewer content={logs} />
+        </Section>
+      ) : null}
 
       <ConfirmDialog
         open={Boolean(confirm)}
@@ -870,11 +872,7 @@ function ServiceCard({
             {labels.logs}
           </Button>
         </div>
-      ) : (
-        <Button size="sm" disabled={busy} onClick={() => onLogs(service)}>
-          {labels.logs}
-        </Button>
-      )}
+      ) : null}
       <p className="text-xs text-dockora-muted">{labels.iconHint}</p>
       <div className="flex flex-wrap items-center gap-2">
         <Input

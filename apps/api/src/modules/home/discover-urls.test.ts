@@ -41,6 +41,15 @@ describe('discoverServicePublicUrl', () => {
     ).toBe('https://requests.example');
   });
 
+  it('drops credentials and query secrets from a public URL', () => {
+    expect(
+      discoverServicePublicUrl({
+        env: { SEERR_APP_URL: 'https://user:secret@requests.example/app?token=abc#frag' },
+        service: 'seerr',
+      }),
+    ).toBe('https://requests.example/app');
+  });
+
   it('rejects non-http values', () => {
     expect(
       discoverServicePublicUrl({

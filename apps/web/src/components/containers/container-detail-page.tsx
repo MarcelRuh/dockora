@@ -79,6 +79,10 @@ export function ContainerDetailPage({ id }: { id: string }) {
     void loadContainer();
   }, [loadContainer]);
 
+  useEffect(() => {
+    if (!canOps && (tab === 'logs' || tab === 'terminal')) setTab('overview');
+  }, [canOps, tab]);
+
   useDockerLiveReload(() => void loadContainer({ silent: true }), 60_000);
 
   useEffect(() => {
@@ -112,12 +116,12 @@ export function ContainerDetailPage({ id }: { id: string }) {
   }, [id, tail, t.common.failed]);
 
   useEffect(() => {
-    if (tab !== 'logs') return;
+    if (!canOps || tab !== 'logs') return;
     void loadLogs();
-  }, [tab, loadLogs]);
+  }, [canOps, tab, loadLogs]);
 
   useEffect(() => {
-    if (tab !== 'logs' || !liveLogs) return;
+    if (!canOps || tab !== 'logs' || !liveLogs) return;
 
     let es: EventSource | null = null;
     let raf = 0;
@@ -158,7 +162,7 @@ export function ContainerDetailPage({ id }: { id: string }) {
       if (raf) window.cancelAnimationFrame(raf);
       es?.close();
     };
-  }, [tab, liveLogs, id, tail, loadLogs]);
+  }, [canOps, tab, liveLogs, id, tail, loadLogs]);
 
   const runAction = async (action: 'start' | 'stop' | 'restart') => {
     setBusy(true);
@@ -191,8 +195,12 @@ export function ContainerDetailPage({ id }: { id: string }) {
   const tabs = [
     { id: 'overview', label: t.containers.tabs.overview },
     { id: 'stats', label: t.containers.tabs.stats },
-    { id: 'logs', label: t.containers.tabs.logs },
-    { id: 'terminal', label: t.containers.tabs.terminal },
+    ...(canOps
+      ? [
+          { id: 'logs', label: t.containers.tabs.logs },
+          { id: 'terminal', label: t.containers.tabs.terminal },
+        ]
+      : []),
   ];
 
   if (loading && !container) {
@@ -329,15 +337,17 @@ export function ContainerDetailPage({ id }: { id: string }) {
             )}
           </Section>
 
-          <Section title={t.containers.overview.env} className="mt-6">
-            {container.env.length === 0 ? (
-              <p className="text-sm text-dockora-muted">—</p>
-            ) : (
-              <pre className="max-h-64 overflow-auto rounded border border-dockora-border bg-dockora-bg p-3 font-mono text-xs">
-                {container.env.join('\n')}
-              </pre>
-            )}
-          </Section>
+          {canOps ? (
+            <Section title={t.containers.overview.env} className="mt-6">
+              {container.env.length === 0 ? (
+                <p className="text-sm text-dockora-muted">—</p>
+              ) : (
+                <pre className="max-h-64 overflow-auto rounded border border-dockora-border bg-dockora-bg p-3 font-mono text-xs">
+                  {container.env.join('\n')}
+                </pre>
+              )}
+            </Section>
+          ) : null}
         </Section>
       ) : null}
 

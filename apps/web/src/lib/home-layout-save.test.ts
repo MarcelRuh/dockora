@@ -44,6 +44,22 @@ describe('createLayoutSaveQueue', () => {
     expect(seen).toEqual(['one', 'two']);
   });
 
+  it('reports a save only after the latest layout lands', async () => {
+    let saved = 0;
+    const queue = createLayoutSaveQueue({
+      save: (_value, revision) => Promise.resolve(revision + 1),
+      reloadRevision: () => Promise.resolve(0),
+      isConflict: () => false,
+      onError: () => undefined,
+      onSaved: () => {
+        saved += 1;
+      },
+    });
+    queue.submit(layout('done'));
+    await queue.settled();
+    expect(saved).toBe(1);
+  });
+
   it('retries a stale revision with the latest layout', async () => {
     const revisions: number[] = [];
     let calls = 0;

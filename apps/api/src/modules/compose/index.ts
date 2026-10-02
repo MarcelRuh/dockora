@@ -107,6 +107,7 @@ export const composeModule: FastifyPluginAsync = async (app: FastifyInstance) =>
 
   app.get<{ Params: { id: string }; Querystring: { service?: string } }>(
     `${API_PREFIX}/compose/:id/logs`,
+    { preHandler: [app.requireRole(...OPERATOR_ROLES)] },
     async (request): Promise<{ logs: string }> => {
       try {
         // Wrap as JSON — bare strings are sent as text by Fastify and break the web client JSON.parse

@@ -211,6 +211,7 @@ export function CasaDesktop({
   const [pageHost, setPageHost] = useState('');
   const layoutRef = useRef<HomeLayout>(readHomeLayoutCache());
   const dirtyRef = useRef(false);
+  const layoutEpoch = useRef(0);
   const hydratedRef = useRef(false);
   const saveTimer = useRef<number | null>(null);
   const canEditRef = useRef(canEdit);
@@ -225,6 +226,10 @@ export function CasaDesktop({
       isConflict: (error) => error instanceof ApiError && error.status === 409,
       onError: (kind) =>
         setLayoutError(kind === 'conflict' ? saveErrorRef.current.conflict : saveErrorRef.current.failed),
+      onSaved: () => {
+        if (saveTimer.current) return;
+        dirtyRef.current = false;
+      },
     });
   }
 
@@ -242,7 +247,8 @@ export function CasaDesktop({
 
   const publish = (patch: Partial<HomeLayout>) => {
     const next = { ...layoutRef.current, ...patch };
-    if (!hydratedRef.current) dirtyRef.current = true;
+    layoutEpoch.current += 1;
+    dirtyRef.current = true;
     applyLayout(next);
     writeHomeLayoutCache(next);
     if (!hydratedRef.current || !canEditRef.current) return;
@@ -259,9 +265,17 @@ export function CasaDesktop({
     setHint(localStorage.getItem(HINT_KEY) !== '0');
     setPageHost(window.location.hostname);
     let cancelled = false;
+    const epoch = layoutEpoch.current;
     void fetchHomeLayout()
       .then((remote) => {
         if (cancelled) return;
+        if (epoch !== layoutEpoch.current) {
+          hydratedRef.current = true;
+          if (dirtyRef.current && canEditRef.current) {
+            saveQueueRef.current?.submit(layoutRef.current);
+          }
+          return;
+        }
         const choice = pickHomeLayout({
           remoteStored: remote.stored,
           remote: completeHomeLayout(remote.layout),

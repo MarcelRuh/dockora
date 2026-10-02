@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { DashboardOverview } from '@dockora/shared';
 import { useAuth } from '@/components/auth/auth-provider';
 import { useLocale } from '@/i18n/locale-provider';
@@ -8,6 +8,7 @@ import { ApiError, applyDockerHostUpdate, fetchDockerHostUpdateStatus } from '@/
 import { canAdmin } from '@/lib/roles';
 import { cn } from '@/lib/utils';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { useDialogFocus } from '@/components/ui/focus-dialog';
 import { ProgressBar } from '@/components/ui/progress-bar';
 import { Button } from '@/components/ui/form-controls';
 import { ErrorBanner, SuccessBanner } from '@/components/ui/page-parts';
@@ -23,11 +24,13 @@ export function DashboardView({
   const { t, locale } = useLocale();
   const loc = locale === 'de' ? 'de-DE' : 'en-US';
   const [engineOpen, setEngineOpen] = useState(false);
+  const enginePanelRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(enginePanelRef, () => setEngineOpen(false), engineOpen);
 
   return (
     <div className="space-y-6 animate-in fade-in">
       {state === 'error' && !data ? (
-        <p className="border border-dockora-danger/35 bg-dockora-danger/8 px-3 py-2 text-sm text-dockora-danger">
+        <p role="alert" className="border border-dockora-danger/35 bg-dockora-danger/8 px-3 py-2 text-sm text-dockora-danger">
           {t.dashboard.loadError}: {error}
         </p>
       ) : null}
@@ -48,7 +51,11 @@ export function DashboardView({
                 onClick={() => setEngineOpen(false)}
               />
               <div className="absolute left-1/2 top-[8vh] w-[min(56rem,94vw)] -translate-x-1/2">
-              <div className="dockora-dialog-panel dockora-glass max-h-[80vh] space-y-4 overflow-y-auto p-4">
+              <div
+                ref={enginePanelRef}
+                tabIndex={-1}
+                className="dockora-dialog-panel dockora-glass max-h-[80vh] space-y-4 overflow-y-auto p-4 outline-none"
+              >
                 <div className="flex items-center justify-between gap-3">
                   <h2 className="text-sm font-medium">{t.dashboard.home.more}</h2>
                   <button type="button" className="text-sm text-dockora-muted" onClick={() => setEngineOpen(false)}>

@@ -1,5 +1,6 @@
 'use client';
 
+import { useId } from 'react';
 import { cn } from '@/lib/utils';
 
 export function PageHeader({
@@ -66,7 +67,10 @@ export function AccentPanel({
 
 export function ErrorBanner({ message }: { message: string }) {
   return (
-    <p className="border border-dockora-danger/40 bg-dockora-danger/10 px-4 py-3 text-sm text-dockora-danger shadow-[0_0_16px_rgba(255,84,0,0.2)]">
+    <p
+      role="alert"
+      className="border border-dockora-danger/40 bg-dockora-danger/10 px-4 py-3 text-sm text-dockora-danger shadow-[0_0_16px_rgba(255,84,0,0.2)]"
+    >
       {message}
     </p>
   );
@@ -74,7 +78,10 @@ export function ErrorBanner({ message }: { message: string }) {
 
 export function SuccessBanner({ message }: { message: string }) {
   return (
-    <p className="border border-dockora-success/40 bg-dockora-success/10 px-4 py-3 text-sm text-dockora-success shadow-[0_0_16px_rgba(6,214,160,0.2)]">
+    <p
+      role="status"
+      className="border border-dockora-success/40 bg-dockora-success/10 px-4 py-3 text-sm text-dockora-success shadow-[0_0_16px_rgba(6,214,160,0.2)]"
+    >
       {message}
     </p>
   );
@@ -129,13 +136,29 @@ export function TabBar({
   active: string;
   onChange: (id: string) => void;
 }) {
+  const baseId = useId();
   return (
-    <div className="flex flex-wrap gap-0 border-b border-dockora-border">
-      {tabs.map((tab) => (
+    <div role="tablist" className="flex flex-wrap gap-0 border-b border-dockora-border">
+      {tabs.map((tab, index) => (
         <button
           key={tab.id}
           type="button"
+          role="tab"
+          id={`${baseId}-${tab.id}`}
+          aria-selected={active === tab.id}
+          tabIndex={active === tab.id ? 0 : -1}
           onClick={() => onChange(tab.id)}
+          onKeyDown={(event) => {
+            if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+            event.preventDefault();
+            const delta = event.key === 'ArrowRight' ? 1 : -1;
+            const next = tabs[(index + delta + tabs.length) % tabs.length];
+            if (!next) return;
+            onChange(next.id);
+            event.currentTarget.parentElement
+              ?.querySelector<HTMLElement>(`#${CSS.escape(`${baseId}-${next.id}`)}`)
+              ?.focus();
+          }}
           className={cn(
             '-mb-px border-b-2 px-4 py-2.5 font-display text-[11px] font-semibold uppercase tracking-wider transition-colors',
             active === tab.id

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { fetchComposeProjects, fetchContainers, fetchImages } from '@/lib/api';
 import { useLocale } from '@/i18n/locale-provider';
+import { useDialogFocus } from '@/components/ui/focus-dialog';
 import { cn } from '@/lib/utils';
 
 type Hit = { href: string; label: string; hint: string };
@@ -41,6 +42,8 @@ export function GlobalSearch({
   const [hits, setHits] = useState<Hit[]>([]);
   const [loading, setLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(panelRef, () => setOpen(false), open);
 
   const loadHits = useCallback(async () => {
     const localeKey = locale;
@@ -152,7 +155,10 @@ export function GlobalSearch({
             aria-label={t.common.close}
             onClick={() => setOpen(false)}
           />
-          <div className="absolute left-1/2 top-[12vh] w-[min(36rem,92vw)] -translate-x-1/2 overflow-hidden rounded-md border border-dockora-border bg-dockora-surface shadow-neon">
+          <div
+            ref={panelRef}
+            className="absolute left-1/2 top-[12vh] w-[min(36rem,92vw)] -translate-x-1/2 overflow-hidden rounded-md border border-dockora-border bg-dockora-surface shadow-neon"
+          >
             <input
               ref={inputRef}
               value={query}

@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { LogEntry, LogLevel } from '@dockora/shared';
 import { fetchLogs } from '@/lib/api';
+import { useAuth } from '@/components/auth/auth-provider';
 import { useLocale } from '@/i18n/locale-provider';
+import { canOperate } from '@/lib/roles';
 import { logLevelTone } from '@/lib/status';
 import { Button, Input, Select, FilterBar } from '@/components/ui/form-controls';
 import {
@@ -19,6 +21,8 @@ const FILTER_DEBOUNCE_MS = 350;
 
 export function LogsPageView() {
   const { t, locale } = useLocale();
+  const { authEnabled, user, loading: authLoading } = useAuth();
+  const canOps = canOperate(user?.role, authEnabled);
   const loc = locale === 'de' ? 'de-DE' : 'en-US';
   const [items, setItems] = useState<LogEntry[]>([]);
   const [draftContainer, setDraftContainer] = useState('');
@@ -62,8 +66,9 @@ export function LogsPageView() {
   );
 
   useEffect(() => {
+    if (authLoading || !canOps) return;
     void load();
-  }, [load]);
+  }, [authLoading, canOps, load]);
 
   const applyFiltersNow = () => {
     setContainer(draftContainer.trim());
@@ -78,6 +83,15 @@ export function LogsPageView() {
       {entry.message}
     </span>,
   ]);
+
+  if (!authLoading && !canOps) {
+    return (
+      <div className="space-y-6 animate-in fade-in duration-500">
+        <PageHeader title={t.logs.title} subtitle={t.logs.subtitle} />
+        <p className="text-sm text-dockora-muted">{t.common.noPermission}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">

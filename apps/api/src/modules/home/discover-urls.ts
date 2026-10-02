@@ -116,7 +116,12 @@ function httpUrl(value: string | undefined): string | null {
   try {
     const url = new URL(trimmed);
     if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
-    return trimmed;
+    if (!url.username && !url.password && !url.search && !url.hash) return trimmed;
+    url.username = '';
+    url.password = '';
+    url.search = '';
+    url.hash = '';
+    return url.toString();
   } catch {
     return null;
   }

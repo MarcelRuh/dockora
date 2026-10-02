@@ -67,6 +67,7 @@ function ContainerNode({ data }: NodeProps<Node<ContainerNodeData>>) {
       role="link"
       tabIndex={0}
       aria-label={data.label}
+      onClick={open}
       onKeyDown={(event) => {
         if (event.key !== 'Enter' && event.key !== ' ') return;
         event.preventDefault();

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { useLocale } from '@/i18n/locale-provider';
 import { GlobalSearch } from '@/components/global-search';
@@ -11,6 +11,7 @@ import type { Locale } from '@dockora/shared';
 import { AuthLogoutButton, useAuth } from '@/components/auth/auth-provider';
 import { NAV_ICONS } from '@/components/ui/nav-icons';
 import { BrandLogo, BrandLogoWide } from '@/components/ui/brand-logo';
+import { useDialogFocus } from '@/components/ui/focus-dialog';
 import { fetchSelfUpdateStatus } from '@/lib/api';
 import { canAdmin } from '@/lib/roles';
 
@@ -163,6 +164,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const home = pathname === '/';
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const drawerRef = useRef<HTMLElement>(null);
+  useDialogFocus(drawerRef, () => setDrawerOpen(false), drawerOpen);
 
   useEffect(() => {
     setDrawerOpen(false);
@@ -250,6 +253,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               onClick={() => setDrawerOpen(false)}
             />
             <aside
+              ref={drawerRef}
               className="dockora-drawer absolute inset-y-0 left-0 flex w-[min(18rem,88vw)] flex-col border-r border-dockora-railBorder bg-dockora-rail text-dockora-railText shadow-neon"
               role="dialog"
               aria-modal="true"
