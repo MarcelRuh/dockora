@@ -334,6 +334,7 @@ export function ComposeListPage() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={t.common.search}
+          aria-label={t.common.search}
           className="max-w-md"
         />
       </FilterBar>

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { confirmTotp, disableTotp, setupTotp } from '@/lib/api';
 import { useLocale } from '@/i18n/locale-provider';
 import { useAuth } from '@/components/auth/auth-provider';
-import { Button, Input } from '@/components/ui/form-controls';
+import { Button, Input, Label } from '@/components/ui/form-controls';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ErrorBanner, Section, SuccessBanner } from '@/components/ui/page-parts';
 
@@ -176,20 +176,26 @@ export function TotpSection() {
         onConfirm={() => void runDisable()}
       >
         <div className="space-y-2">
-          <Input
-            type="password"
-            placeholder={t.auth.password}
-            value={disablePassword}
-            onChange={(e) => setDisablePassword(e.target.value)}
-            autoComplete="current-password"
-          />
-          <Input
-            placeholder={t.auth.totpCode}
-            value={disableCode}
-            onChange={(e) => setDisableCode(e.target.value)}
-            inputMode="numeric"
-            autoComplete="one-time-code"
-          />
+          <div>
+            <Label htmlFor="totp-disable-password">{t.auth.password}</Label>
+            <Input
+              id="totp-disable-password"
+              type="password"
+              value={disablePassword}
+              onChange={(e) => setDisablePassword(e.target.value)}
+              autoComplete="current-password"
+            />
+          </div>
+          <div>
+            <Label htmlFor="totp-disable-code">{t.auth.totpCode}</Label>
+            <Input
+              id="totp-disable-code"
+              value={disableCode}
+              onChange={(e) => setDisableCode(e.target.value)}
+              inputMode="numeric"
+              autoComplete="one-time-code"
+            />
+          </div>
         </div>
       </ConfirmDialog>
     </Section>

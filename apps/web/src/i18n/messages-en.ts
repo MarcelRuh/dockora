@@ -739,6 +739,8 @@ export const en = {
         empty: 'No audit entries yet.',
         filterAction: 'Filter action…',
         filterResource: 'Filter resource…',
+        filterSince: 'From',
+        filterUntil: 'Until',
       },
       fields: {
         dockerSocket: 'Docker socket',

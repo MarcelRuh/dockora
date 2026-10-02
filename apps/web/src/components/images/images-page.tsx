@@ -172,6 +172,7 @@ export function ImagesPage() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={t.common.search}
+          aria-label={t.common.search}
           className="max-w-md"
         />
       </FilterBar>
@@ -183,6 +184,7 @@ export function ImagesPage() {
               value={pullRef}
               onChange={(e) => setPullRef(e.target.value)}
               placeholder={t.images.pullPlaceholder}
+              aria-label={t.images.pull}
               className="max-w-md"
               disabled={busy}
             />

@@ -180,6 +180,7 @@ export function VolumesPage() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={t.common.search}
+          aria-label={t.common.search}
           className="max-w-md"
         />
         <label className="flex items-center gap-2 text-sm text-dockora-muted">

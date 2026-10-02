@@ -5,6 +5,14 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.50] – 2026-10-02
+
+### Changed
+
+- Filter fields on containers, images, logs, volumes, compose and the audit log have accessible names
+- Disabling 2FA asks for a labelled password and authenticator code
+- Playwright opens a restore or upgrade dialog when that button is on the page and cancels it
+
 ## [2.0.49] – 2026-10-02
 
 ### Changed

@@ -45,24 +45,28 @@ export function AuditSection() {
       <FilterBar className="mb-3">
         <Input
           placeholder={t.settings.audit.filterAction}
+          aria-label={t.settings.audit.filterAction}
           value={action}
           onChange={(e) => setAction(e.target.value)}
           className="min-w-[10rem] flex-1"
         />
         <Input
           placeholder={t.settings.audit.filterResource}
+          aria-label={t.settings.audit.filterResource}
           value={resource}
           onChange={(e) => setResource(e.target.value)}
           className="min-w-[10rem] flex-1"
         />
         <Input
           type="datetime-local"
+          aria-label={t.settings.audit.filterSince}
           value={since}
           onChange={(e) => setSince(e.target.value)}
           className="min-w-[11rem]"
         />
         <Input
           type="datetime-local"
+          aria-label={t.settings.audit.filterUntil}
           value={until}
           onChange={(e) => setUntil(e.target.value)}
           className="min-w-[11rem]"

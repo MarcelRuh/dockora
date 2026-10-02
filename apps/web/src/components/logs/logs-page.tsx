@@ -86,6 +86,7 @@ export function LogsPageView() {
       <FilterBar>
         <Input
           placeholder={t.logs.container}
+          aria-label={t.logs.container}
           value={draftContainer}
           onChange={(e) => setDraftContainer(e.target.value)}
           className="max-w-xs"
@@ -103,6 +104,7 @@ export function LogsPageView() {
         </Select>
         <Input
           placeholder={t.logs.search}
+          aria-label={t.logs.search}
           value={draftSearch}
           onChange={(e) => setDraftSearch(e.target.value)}
           className="max-w-xs"

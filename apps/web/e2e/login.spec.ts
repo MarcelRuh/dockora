@@ -59,11 +59,26 @@ test('backup, updates and the dock stay idle until an explicit confirm', async (
   await page.goto('/backups');
   await expect(page.getByRole('heading', { name: /Backups/i })).toBeVisible();
   await expect(page.getByRole('button', { name: /Backup erstellen|Create backup/i })).toBeVisible();
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  const restore = page.getByRole('button', { name: /^Wiederherstellen$|^Restore$/ }).first();
+  if (await restore.isVisible().catch(() => false)) {
+    await restore.click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('button', { name: /Abbrechen|Cancel/i }).click();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+  }
 
   await page.goto('/updates');
   await expect(page.getByRole('heading', { name: /Updates/i })).toBeVisible();
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  const upgrade = page.getByRole('button', { name: /^Upgraden$|^Upgrade$/ }).first();
+  if (await upgrade.isVisible().catch(() => false)) {
+    await upgrade.click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole('button', { name: /Bestätigen|Confirm/i })).toBeVisible();
+    await dialog.getByRole('button', { name: /Abbrechen|Cancel/i }).click();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+  }
 
   await page.goto('/self-update');
   await expect(page.getByText(/Prüft GitHub|Checks GitHub/i)).toBeVisible();

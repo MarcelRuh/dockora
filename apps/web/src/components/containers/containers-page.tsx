@@ -365,12 +365,14 @@ export function ContainersPage() {
       <FilterBar>
         <Input
           placeholder={t.containers.filterName}
+          aria-label={t.containers.filterName}
           value={draftName}
           onChange={(e) => setDraftName(e.target.value)}
           className="max-w-xs"
         />
         <Input
           placeholder={t.containers.filterImage}
+          aria-label={t.containers.filterImage}
           value={draftImage}
           onChange={(e) => setDraftImage(e.target.value)}
           className="max-w-xs"
