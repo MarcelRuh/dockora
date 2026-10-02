@@ -4,6 +4,7 @@ import {
   formatContainerList,
   normalizeContainerName,
 } from './discord.js';
+import { assertDiscordWebhookUrl } from './outbound-url.js';
 
 describe('discord formatting', () => {
   it('normalizes leading slash on container names', () => {
@@ -22,6 +23,14 @@ describe('discord formatting', () => {
     expect(formatContainerList(['plex', '/plex', '', 'radarr'])).toBe(
       '• `plex`\n• `radarr`',
     );
+  });
+
+  it('accepts only Discord webhook URLs', () => {
+    expect(
+      assertDiscordWebhookUrl('https://discord.com/api/webhooks/1/token').hostname,
+    ).toBe('discord.com');
+    expect(() => assertDiscordWebhookUrl('https://evil.test/api/webhooks/1/token')).toThrow(/discord/);
+    expect(() => assertDiscordWebhookUrl('http://discord.com/api/webhooks/1/token')).toThrow(/discord/);
   });
 
   it('maps events to readable labels', () => {

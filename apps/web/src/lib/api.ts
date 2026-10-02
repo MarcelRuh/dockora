@@ -119,10 +119,10 @@ export async function fetchHomeLayout(): Promise<HomeLayoutResponse> {
   return request<HomeLayoutResponse>('/home/layout');
 }
 
-export async function saveHomeLayout(layout: HomeLayout): Promise<HomeLayoutResponse> {
+export async function saveHomeLayout(layout: HomeLayout, revision: number): Promise<HomeLayoutResponse> {
   return request<HomeLayoutResponse>('/home/layout', {
     method: 'PUT',
-    body: JSON.stringify(layout),
+    body: JSON.stringify({ ...layout, revision }),
   });
 }
 

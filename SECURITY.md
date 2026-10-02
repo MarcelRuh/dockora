@@ -29,7 +29,8 @@ We aim to acknowledge reports within **7 days**.
 - Restrict Docker socket access; prefer rootless Docker where possible
 - Keep `DOCKORA_API_BIND=127.0.0.1` unless another host must call the API directly
 - Leave `DOCKORA_HOST_TERMINAL` unset; set it to `1` only while you need a host shell
-- Narrow the `/home`, `/opt` and `/srv` mounts to the directories listed in `COMPOSE_SEARCH_PATHS`
+- Narrow the `/home`, `/opt` and `/srv` mounts to the directories listed in `COMPOSE_SEARCH_PATHS`. The API entrypoint does not change their owner or mode
+- Discord webhooks must be `https://discord.com/api/webhooks/…`. ntfy may use a LAN server; loopback and link-local addresses are rejected
 - Set `DOCKORA_EMBED=1` only on HTTPS, and set `DOCKORA_FRAME_ANCESTORS` to the parent site
 - Expose the UI only behind TLS (compose profile `tls`, or an external reverse proxy)
 - Prefer `docker compose --profile tls` (Caddy) or `--profile proxy` (nginx HTTP) for same-origin SSE/WebSocket

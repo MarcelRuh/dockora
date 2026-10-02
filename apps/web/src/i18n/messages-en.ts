@@ -116,6 +116,7 @@ export const en = {
         checkNow: 'Check now',
         checking: 'Checking…',
         layoutSaveFailed: 'Could not save the home screen',
+        layoutSaveConflict: 'The home screen changed somewhere else. Move it again to save.',
         more: 'Engine and history',
         openInDockora: 'Open in Dockora',
         appUrl: 'Address',

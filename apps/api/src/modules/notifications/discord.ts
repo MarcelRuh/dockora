@@ -1,6 +1,7 @@
 import os from 'node:os';
 import { request } from 'undici';
 import type { NotificationEvent } from '@dockora/shared';
+import { assertDiscordWebhookUrl } from './outbound-url.js';
 
 export interface DiscordField {
   name: string;
@@ -72,6 +73,7 @@ export async function sendDiscordEmbed(
   if (!webhookUrl) {
     throw new Error('Discord webhook URL not configured');
   }
+  assertDiscordWebhookUrl(webhookUrl);
 
   const color = SEVERITY_COLORS[options.severity ?? 'info'] ?? SEVERITY_COLORS.info;
   const hostname = os.hostname();

@@ -114,6 +114,7 @@ export const de = {
         checkNow: 'Jetzt prüfen',
         checking: 'Prüfe…',
         layoutSaveFailed: 'Home konnte nicht gespeichert werden',
+        layoutSaveConflict: 'Home wurde woanders geändert. Nochmal ziehen, dann wird neu gespeichert.',
         more: 'Engine und Verlauf',
         openInDockora: 'In Dockora öffnen',
         appUrl: 'Adresse',

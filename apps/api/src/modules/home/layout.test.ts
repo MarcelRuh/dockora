@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { emptyHomeLayout, normalizeHomeLayout } from './layout.js';
+import { emptyHomeLayout, expectedHomeRevision, normalizeHomeLayout, readHomeLayoutState } from './layout.js';
 
 describe('normalizeHomeLayout', () => {
   it('returns an empty layout for junk input', () => {
@@ -69,6 +69,25 @@ describe('normalizeHomeLayout', () => {
       departments: [{ id: 'box002', name: 'Filme', x: 0.25, y: 12, width: 0.9, height: 280 }],
     });
     expect(layout.departments[0]).toMatchObject({ x: 0.25, y: 12, width: 0.75, height: 280 });
+  });
+
+  it('ignores a revision field on the layout body', () => {
+    expect(normalizeHomeLayout({ revision: 4, appOrder: ['settings'] }).appOrder).toEqual(['settings']);
+    expect(expectedHomeRevision({ revision: 4, appOrder: ['settings'] })).toBe(4);
+    expect(expectedHomeRevision({ revision: 1.5 })).toBeNull();
+    expect(expectedHomeRevision({ appOrder: [] })).toBeNull();
+  });
+
+  it('reads an older layout without a revision as revision 0', () => {
+    const state = readHomeLayoutState(JSON.stringify({ appOrder: ['logs'] }), null);
+    expect(state.stored).toBe(true);
+    expect(state.revision).toBe(0);
+    expect(state.layout.appOrder).toEqual(['logs']);
+    expect(readHomeLayoutState(null, '3')).toEqual({
+      stored: false,
+      revision: 0,
+      layout: emptyHomeLayout(),
+    });
   });
 
   it('preserves hidden widgets', () => {

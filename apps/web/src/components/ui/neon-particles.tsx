@@ -188,7 +188,6 @@ export function NeonAtmosphere() {
           top: '14%',
           left: '7%',
           transform: 'rotate(45deg)',
-          animation: 'dockora-shape-float 12s ease-in-out infinite',
         }}
       />
       <div
@@ -198,8 +197,6 @@ export function NeonAtmosphere() {
           height: 56,
           top: '22%',
           right: '10%',
-          animation: 'dockora-shape-float 15s ease-in-out infinite',
-          animationDelay: '-2s',
         }}
       />
       <div
@@ -210,8 +207,6 @@ export function NeonAtmosphere() {
           bottom: '18%',
           left: '18%',
           borderRadius: 12,
-          animation: 'dockora-shape-float 14s ease-in-out infinite',
-          animationDelay: '-4s',
         }}
       />
       <div
@@ -222,8 +217,6 @@ export function NeonAtmosphere() {
           bottom: '28%',
           right: '16%',
           transform: 'rotate(20deg)',
-          animation: 'dockora-shape-float 11s ease-in-out infinite',
-          animationDelay: '-6s',
         }}
       />
     </div>

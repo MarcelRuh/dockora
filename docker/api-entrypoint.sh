@@ -1,23 +1,11 @@
 #!/bin/sh
 # Runs as root, then drops to dockora.
-# Makes standard Compose roots writable (API user cannot mkdir under root-owned /home).
+# Only the Dockora data volume is chowned. Host mounts (/home, /opt, /srv) stay as they are.
 set -eu
 
-mkdir -p /data /data/compose /home /srv
+mkdir -p /data /data/compose
 
 chown -R dockora:dockora /data 2>/dev/null || true
-
-# Dedicated compose roots – safe to own on a Dockora host/LXC
-for dir in /home /srv /data/compose; do
-  if [ -d "$dir" ]; then
-    if chown dockora:dockora "$dir" 2>/dev/null; then
-      chmod 755 "$dir" 2>/dev/null || true
-    else
-      # Fallback: sticky world-writable (like /tmp) so create still works
-      chmod 1777 "$dir" 2>/dev/null || true
-    fi
-  fi
-done
 
 # Docker socket is typically root:docker (srw-rw----). Compose sets group_add to
 # DOCKER_GID, but runuser drops those supplementary groups unless the user is

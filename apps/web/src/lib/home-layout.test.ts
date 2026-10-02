@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   clampDepartmentBox,
+  nudgeDepartmentBox,
   completeHomeLayout,
   departmentPixelSpan,
   departmentVisualBox,
@@ -103,6 +104,12 @@ describe('home layout helpers', () => {
       width: 0.25,
       height: 300,
     });
+  });
+
+  it('nudges a fractional department by pixels', () => {
+    expect(
+      nudgeDepartmentBox({ x: 0.1, y: 10, width: 0.4, height: 200 }, 1000, 0, { x: 8, y: -8 }),
+    ).toMatchObject({ x: 0.108, y: 2, width: 0.4, height: 200 });
   });
 
   it('grows a department to its apps and keeps the row beside it', () => {

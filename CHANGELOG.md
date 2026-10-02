@@ -5,6 +5,17 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.46] – 2026-10-02
+
+### Changed
+
+- The API entrypoint no longer changes the owner or mode of host `/home` and `/srv`
+- Settings fields are labelled for assistive technology, and the home dialogs keep keyboard focus inside
+- Departments and the dock can be moved from the keyboard
+- Home layout saves carry a revision, so a slower save cannot overwrite a newer one
+- Page entrance motion is shorter; the background shapes stay still
+- Discord webhooks must be Discord HTTPS addresses. ntfy rejects loopback and link-local targets; a server on the LAN still works
+
 ## [2.0.45] – 2026-10-02
 
 ### Changed

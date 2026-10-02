@@ -60,7 +60,7 @@ body {
 @keyframes dockora-fade-in {
   from {
     opacity: 0;
-    transform: translateY(16px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
@@ -80,34 +80,6 @@ body {
   }
 }
 
-@keyframes dockora-orb-float {
-  0%,
-  100% {
-    transform: translate(0, 0) scale(1);
-  }
-  25% {
-    transform: translate(30px, -40px) scale(1.1);
-  }
-  50% {
-    transform: translate(-20px, 20px) scale(0.95);
-  }
-  75% {
-    transform: translate(40px, 30px) scale(1.05);
-  }
-}
-
-@keyframes dockora-shape-float {
-  0%,
-  100% {
-    transform: translateY(0) rotate(0deg);
-    opacity: 0.35;
-  }
-  50% {
-    transform: translateY(-24px) rotate(12deg);
-    opacity: 0.55;
-  }
-}
-
 @keyframes dockora-badge-pulse {
   0%,
   100% {
@@ -120,7 +92,7 @@ body {
 
 .animate-in.fade-in {
   /* forwards only – avoid fill-mode:both shifting hit-targets during enter */
-  animation: dockora-fade-in 0.45s ease forwards;
+  animation: dockora-fade-in 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .dockora-glass {
@@ -266,7 +238,6 @@ body {
   filter: blur(40px);
   opacity: 0.28;
   pointer-events: none;
-  animation: dockora-orb-float 10s ease-in-out infinite;
 }
 
 .dockora-clip-btn {

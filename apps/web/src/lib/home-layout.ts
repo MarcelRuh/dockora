@@ -222,6 +222,25 @@ export function fitDepartmentLayout(
 }
 
 /** Stores x and width as fractions of the canvas so the same layout fits a narrower screen. */
+/** Moves or resizes a department by pixel deltas and stores the clamped box. */
+export function nudgeDepartmentBox(
+  stored: Pick<HomeDepartment, 'x' | 'y' | 'width' | 'height'>,
+  canvasWidth: number,
+  pixelSpan: number,
+  delta: Partial<Pick<HomeDepartment, 'x' | 'y' | 'width' | 'height'>>,
+): Pick<HomeDepartment, 'x' | 'y' | 'width' | 'height'> {
+  const visual = departmentVisualBox(stored, canvasWidth, pixelSpan);
+  return clampDepartmentBox(
+    {
+      x: visual.x + (delta.x ?? 0),
+      y: visual.y + (delta.y ?? 0),
+      width: visual.width + (delta.width ?? 0),
+      height: visual.height + (delta.height ?? 0),
+    },
+    canvasWidth,
+  );
+}
+
 export function clampDepartmentBox(
   visual: Pick<HomeDepartment, 'x' | 'y' | 'width' | 'height'>,
   canvasWidth: number,

@@ -6,6 +6,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
@@ -24,6 +25,7 @@ import { HOME_DOCK_KEYS } from '@dockora/shared';
 import { AuthLogoutButton, useAuth } from '@/components/auth/auth-provider';
 import { BrandLogoWide } from '@/components/ui/brand-logo';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { DialogFrame } from '@/components/ui/focus-dialog';
 import { Button, buttonClassName } from '@/components/ui/form-controls';
 import { NAV_ICONS } from '@/components/ui/nav-icons';
 import { ServiceIcon } from '@/components/ui/service-icon';
@@ -37,6 +39,7 @@ import {
   fetchDiscoveredAppUrls,
   fetchHomeLayout,
   fetchSelfUpdateStatus,
+  ApiError,
   fetchUpdates,
   pullUpdate,
   saveComposeYaml,
@@ -49,11 +52,13 @@ import {
   departmentUsesFraction,
   departmentVisualBox,
   fitDepartmentLayout,
+  nudgeDepartmentBox,
   pickHomeLayout,
   readHomeLayoutCache,
   withDockDefaults,
   writeHomeLayoutCache,
 } from '@/lib/home-layout';
+import { createLayoutSaveQueue } from '@/lib/home-layout-save';
 import { containerLinkChoices, resolveContainerAppHref, resolvePublicAppUrl } from '@/lib/container-app-link';
 import { resolveContainerIconUrl } from '@/lib/container-icon';
 import { setComposeServicePublicUrl, setComposeServiceUrl } from '@/lib/compose-icon-yaml';
@@ -210,6 +215,18 @@ export function CasaDesktop({
   const saveTimer = useRef<number | null>(null);
   const canEditRef = useRef(canEdit);
   canEditRef.current = canEdit;
+  const saveErrorRef = useRef({ failed: home.layoutSaveFailed, conflict: home.layoutSaveConflict });
+  saveErrorRef.current = { failed: home.layoutSaveFailed, conflict: home.layoutSaveConflict };
+  const saveQueueRef = useRef<ReturnType<typeof createLayoutSaveQueue> | null>(null);
+  if (saveQueueRef.current === null) {
+    saveQueueRef.current = createLayoutSaveQueue({
+      save: async (layout, revision) => (await saveHomeLayout(layout, revision)).revision,
+      reloadRevision: async () => (await fetchHomeLayout()).revision ?? 0,
+      isConflict: (error) => error instanceof ApiError && error.status === 409,
+      onError: (kind) =>
+        setLayoutError(kind === 'conflict' ? saveErrorRef.current.conflict : saveErrorRef.current.failed),
+    });
+  }
 
   const applyLayout = (layout: HomeLayout) => {
     layoutRef.current = layout;
@@ -232,7 +249,7 @@ export function CasaDesktop({
     if (saveTimer.current) window.clearTimeout(saveTimer.current);
     saveTimer.current = window.setTimeout(() => {
       saveTimer.current = null;
-      void saveHomeLayout(layoutRef.current).catch(() => setLayoutError(home.layoutSaveFailed));
+      saveQueueRef.current?.submit(layoutRef.current);
     }, 400);
   };
 
@@ -243,7 +260,7 @@ export function CasaDesktop({
     setPageHost(window.location.hostname);
     let cancelled = false;
     void fetchHomeLayout()
-      .then(async (remote) => {
+      .then((remote) => {
         if (cancelled) return;
         const choice = pickHomeLayout({
           remoteStored: remote.stored,
@@ -254,11 +271,8 @@ export function CasaDesktop({
         });
         applyLayout(choice.layout);
         writeHomeLayoutCache(choice.layout);
-        if (choice.upload) {
-          await saveHomeLayout(choice.layout).catch(() => {
-            if (!cancelled) setLayoutError(home.layoutSaveFailed);
-          });
-        }
+        saveQueueRef.current?.setRevision(typeof remote.revision === 'number' ? remote.revision : 0);
+        if (choice.upload) saveQueueRef.current?.submit(choice.layout);
         if (!cancelled) hydratedRef.current = true;
       })
       .catch(() => {
@@ -275,7 +289,7 @@ export function CasaDesktop({
       window.clearTimeout(saveTimer.current);
       saveTimer.current = null;
       if (hydratedRef.current && canEditRef.current) {
-        void saveHomeLayout(layoutRef.current).catch(() => undefined);
+        saveQueueRef.current?.submit(layoutRef.current);
       }
     };
   }, []);
@@ -600,16 +614,59 @@ export function CasaDesktop({
   const departmentCanvasWidth = () =>
     canvasWidthRef.current || departmentCanvasRef.current?.clientWidth || appsSectionRef.current?.clientWidth || 1;
 
-  const updateDepartmentBox = (id: string, visual: Pick<HomeDepartment, 'x' | 'y' | 'width' | 'height'>) => {
+  const applyDepartmentBox = (id: string, box: Pick<HomeDepartment, 'x' | 'y' | 'width' | 'height'>) => {
     const current = layoutRef.current.departments.find((item) => item.id === id);
     if (!current) return;
-    const next = { ...current, ...clampDepartmentBox(visual, departmentCanvasWidth()) };
+    const next = { ...current, ...box };
     if (next.x === current.x && next.y === current.y && next.width === current.width && next.height === current.height) {
       return;
     }
     publish({
       departments: layoutRef.current.departments.map((item) => (item.id === id ? next : item)),
     });
+  };
+
+  const updateDepartmentBox = (id: string, visual: Pick<HomeDepartment, 'x' | 'y' | 'width' | 'height'>) => {
+    applyDepartmentBox(id, clampDepartmentBox(visual, departmentCanvasWidth()));
+  };
+
+  const nudgeDepartment = (
+    id: string,
+    delta: Partial<Pick<HomeDepartment, 'x' | 'y' | 'width' | 'height'>>,
+  ) => {
+    const current = layoutRef.current.departments.find((item) => item.id === id);
+    if (!current || !canEditRef.current) return;
+    applyDepartmentBox(
+      id,
+      nudgeDepartmentBox(current, departmentCanvasWidth(), departmentPixelSpan(layoutRef.current.departments), delta),
+    );
+  };
+
+  const onDepartmentKey = (
+    id: string,
+    mode: 'move' | 'both' | 'width' | 'height',
+    event: ReactKeyboardEvent<HTMLElement>,
+  ) => {
+    if (!canEditRef.current) return;
+    if (event.target !== event.currentTarget) return;
+    const step = 8;
+    const horizontal = event.key === 'ArrowLeft' ? -step : event.key === 'ArrowRight' ? step : 0;
+    const vertical = event.key === 'ArrowUp' ? -step : event.key === 'ArrowDown' ? step : 0;
+    if (!horizontal && !vertical) return;
+    event.preventDefault();
+    if (mode === 'width') {
+      nudgeDepartment(id, { width: horizontal });
+      return;
+    }
+    if (mode === 'height') {
+      nudgeDepartment(id, { height: vertical });
+      return;
+    }
+    if (mode === 'both' || event.shiftKey) {
+      nudgeDepartment(id, { width: horizontal, height: vertical });
+      return;
+    }
+    nudgeDepartment(id, { x: horizontal, y: vertical });
   };
 
   const startDepartmentGesture = (
@@ -1053,9 +1110,13 @@ export function CasaDesktop({
       }}
     >
       <div
+        role="group"
+        tabIndex={canEdit ? 0 : undefined}
         aria-label={home.departmentMove}
-        className="flex cursor-grab items-center gap-3 px-3 py-2 active:cursor-grabbing"
+        aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown Shift+ArrowLeft Shift+ArrowRight Shift+ArrowUp Shift+ArrowDown"
+        className="flex cursor-grab items-center gap-3 px-3 py-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-dockora-pink active:cursor-grabbing"
         onPointerDown={(event) => startDepartmentGesture(section.id, 'move', event)}
+        onKeyDown={(event) => onDepartmentKey(section.id, 'move', event)}
       >
         {renameId === section.id ? (
           <input
@@ -1140,19 +1201,37 @@ export function CasaDesktop({
       {canEdit ? (
         <>
           <div
+            role="slider"
+            tabIndex={0}
             aria-label={home.departmentResize}
-            className="absolute bottom-11 right-0 top-10 z-10 w-11 cursor-ew-resize touch-none"
+            aria-orientation="horizontal"
+            aria-valuemin={200}
+            aria-valuemax={1600}
+            aria-valuenow={Math.round(departmentVisualBox(section, canvasWidth, departmentSpan).width)}
+            className="absolute bottom-11 right-0 top-10 z-10 w-11 cursor-ew-resize touch-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-dockora-pink"
             onPointerDown={(event) => startDepartmentGesture(section.id, 'width', event)}
+            onKeyDown={(event) => onDepartmentKey(section.id, 'width', event)}
           />
           <div
+            role="slider"
+            tabIndex={0}
             aria-label={home.departmentResize}
-            className="absolute bottom-0 left-2 right-11 z-10 h-11 cursor-ns-resize touch-none"
+            aria-orientation="vertical"
+            aria-valuemin={160}
+            aria-valuemax={1200}
+            aria-valuenow={Math.round(departmentVisualBox(section, canvasWidth, departmentSpan).height)}
+            className="absolute bottom-0 left-2 right-11 z-10 h-11 cursor-ns-resize touch-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-dockora-pink"
             onPointerDown={(event) => startDepartmentGesture(section.id, 'height', event)}
+            onKeyDown={(event) => onDepartmentKey(section.id, 'height', event)}
           />
           <div
+            role="group"
+            tabIndex={0}
             aria-label={home.departmentResize}
-            className="absolute bottom-0 right-0 z-20 h-11 w-11 cursor-nwse-resize touch-none"
+            aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown"
+            className="absolute bottom-0 right-0 z-20 h-11 w-11 cursor-nwse-resize touch-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-dockora-pink"
             onPointerDown={(event) => startDepartmentGesture(section.id, 'both', event)}
+            onKeyDown={(event) => onDepartmentKey(section.id, 'both', event)}
           >
             <span className="pointer-events-none absolute bottom-1 right-1 h-2 w-2 border-b-2 border-r-2 border-dockora-pink" />
           </div>
@@ -1403,6 +1482,15 @@ export function CasaDesktop({
                     href={app.href}
                     data-dock-key={app.key}
                     onPointerDown={(event) => startDockDrag(app.key, event)}
+                    onKeyDown={(event) => {
+                      if (!event.altKey || (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')) return;
+                      event.preventDefault();
+                      const keys = orderRef.current;
+                      const index = keys.indexOf(app.key);
+                      const neighbor = event.key === 'ArrowLeft' ? keys[index - 1] : keys[index + 1];
+                      if (neighbor) reorderDock(app.key, neighbor);
+                    }}
+                    aria-keyshortcuts="Alt+ArrowLeft Alt+ArrowRight"
                     onClick={(event) => {
                       if (!dragged.current) return;
                       event.preventDefault();
@@ -1442,19 +1530,7 @@ export function CasaDesktop({
         : null}
       {addEditor
         ? createPortal(
-            <div
-              className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
-              role="presentation"
-              onMouseDown={(event) => {
-                if (event.target === event.currentTarget) setAddEditor(null);
-              }}
-            >
-              <div
-                role="dialog"
-                aria-modal="true"
-                aria-label={home.add}
-                className="dockora-panel w-full max-w-lg overflow-hidden"
-              >
+            <DialogFrame label={home.add} onClose={() => setAddEditor(null)}>
                 <div className="flex items-start gap-3 px-5 pt-5">
                   <div className="min-w-0 flex-1">
                     <p className="dockora-section-tag">{home.apps}</p>
@@ -1625,26 +1701,13 @@ export function CasaDesktop({
                     </div>
                   </form>
                 )}
-              </div>
-            </div>,
+            </DialogFrame>,
             document.body,
           )
         : null}
       {linkDialog
         ? createPortal(
-            <div
-              className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
-              role="presentation"
-              onMouseDown={(event) => {
-                if (event.target === event.currentTarget) setLinkPicker(null);
-              }}
-            >
-              <div
-                role="dialog"
-                aria-modal="true"
-                aria-label={home.chooseLink}
-                className="dockora-panel w-full max-w-lg overflow-hidden"
-              >
+            <DialogFrame label={home.chooseLink} onClose={() => setLinkPicker(null)}>
                 <div className="flex items-start gap-3 px-5 pt-5">
                   <ServiceIcon
                     url={linkDialog.icon}
@@ -1681,8 +1744,7 @@ export function CasaDesktop({
                     </li>
                   ))}
                 </ul>
-              </div>
-            </div>,
+            </DialogFrame>,
             document.body,
           )
         : null}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { cloneElement, useCallback, useEffect, useId, useMemo, useState, type ReactElement } from 'react';
 import type { AppSettings, NotificationEvent } from '@dockora/shared';
 import { fetchSettings, testDiscordNotification, testNtfyNotification, updateSettings } from '@/lib/api';
 import { useLocale } from '@/i18n/locale-provider';
@@ -676,36 +676,84 @@ function Field({
 }: {
   label: string;
   hint?: string;
-  children: React.ReactNode;
+  children: ReactElement;
 }) {
+  const autoId = useId();
+  const hintId = hint ? `${autoId}-hint` : undefined;
+  const control = isLabeledControl(children);
+  const controlId = control ? (readProp(children, 'id') ?? autoId) : autoId;
+  const describedBy = [control ? readProp(children, 'aria-describedby') : undefined, hintId]
+    .filter(Boolean)
+    .join(' ');
+  const controlChild = control
+    ? cloneElement(children, {
+        id: controlId,
+        'aria-describedby': describedBy || undefined,
+      } as { id: string; 'aria-describedby'?: string })
+    : children;
+
   return (
     <div>
-      <Label className="mb-1">{label}</Label>
-      {children}
-      {hint ? <p className="mt-1.5 text-xs text-dockora-muted">{hint}</p> : null}
+      {control ? (
+        <Label htmlFor={controlId} className="mb-1">
+          {label}
+        </Label>
+      ) : (
+        <Label id={`${autoId}-label`} className="mb-1">
+          {label}
+        </Label>
+      )}
+      {control ? (
+        controlChild
+      ) : (
+        <div role="group" aria-labelledby={`${autoId}-label`} aria-describedby={hintId}>
+          {children}
+        </div>
+      )}
+      {hint ? (
+        <p id={hintId} className="mt-1.5 text-xs text-dockora-muted">
+          {hint}
+        </p>
+      ) : null}
     </div>
   );
 }
 
+function isLabeledControl(child: ReactElement): boolean {
+  return child.type === Input || child.type === Select || child.type === ToggleRow;
+}
+
+function readProp(child: ReactElement, key: string): string | undefined {
+  const props = child.props as Record<string, unknown>;
+  const value = props[key];
+  return typeof value === 'string' ? value : undefined;
+}
+
 function ToggleRow({
+  id,
   checked,
   disabled,
   onChange,
   yes,
   no,
+  'aria-describedby': describedBy,
 }: {
+  id?: string;
   checked: boolean;
   disabled?: boolean;
   onChange: (value: boolean) => void;
   yes: string;
   no: string;
+  'aria-describedby'?: string;
 }) {
   return (
-    <label className="flex h-10 items-center gap-2 text-sm">
+    <label htmlFor={id} className="flex h-10 items-center gap-2 text-sm">
       <input
+        id={id}
         type="checkbox"
         checked={checked}
         disabled={disabled}
+        aria-describedby={describedBy}
         onChange={(e) => onChange(e.target.checked)}
       />
       {checked ? yes : no}

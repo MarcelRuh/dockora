@@ -322,6 +322,8 @@ export interface HomeLayout {
 
 export interface HomeLayoutResponse {
   stored: boolean;
+  /** Increments on every successful save. 0 means nothing has been stored yet. */
+  revision: number;
   layout: HomeLayout;
 }
 

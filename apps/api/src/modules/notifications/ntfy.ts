@@ -1,4 +1,5 @@
 import { request } from 'undici';
+import { assertNtfyBaseUrl, assertNtfyHostResolves } from './outbound-url.js';
 
 export interface NtfyMessage {
   baseUrl: string;
@@ -12,15 +13,17 @@ export interface NtfyMessage {
 const TOPIC = /^[A-Za-z0-9_-]{1,64}$/;
 
 export function ntfyEndpoint(baseUrl: string, topic: string): string {
-  const base = baseUrl.trim().replace(/\/+$/, '');
-  if (!/^https?:\/\/[^\s/]+(?:\/[^\s]*)?$/i.test(base)) {
-    throw new Error('ntfy server URL must start with http:// or https://');
-  }
+  const url = assertNtfyBaseUrl(baseUrl);
   const name = topic.trim();
   if (!TOPIC.test(name)) {
     throw new Error('ntfy topic must be 1–64 letters, numbers, _ or -');
   }
+  const base = url.toString().replace(/\/+$/, '');
   return `${base}/${encodeURIComponent(name)}`;
+}
+
+function headerText(value: string, max: number): string {
+  return value.replace(/[\u0000-\u001f\u007f]/g, ' ').slice(0, max);
 }
 
 export function ntfyPriority(severity: string | undefined): '3' | '4' | '5' {
@@ -31,8 +34,9 @@ export function ntfyPriority(severity: string | undefined): '3' | '4' | '5' {
 
 export async function sendNtfy(message: NtfyMessage): Promise<void> {
   const url = ntfyEndpoint(message.baseUrl, message.topic);
+  await assertNtfyHostResolves(new URL(url).hostname);
   const headers: Record<string, string> = {
-    Title: message.title.slice(0, 180),
+    Title: headerText(message.title, 180),
     Priority: message.priority ?? '3',
   };
   const token = message.token?.trim();

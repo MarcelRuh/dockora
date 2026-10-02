@@ -182,3 +182,25 @@ function isHttpUrl(value: string): boolean {
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
+
+export const HOME_LAYOUT_REVISION_KEY = 'homeLayoutRevision';
+
+export function readHomeLayoutState(
+  rawLayout: string | null,
+  rawRevision: string | null,
+): { stored: boolean; revision: number; layout: HomeLayout } {
+  if (!rawLayout) return { stored: false, revision: 0, layout: emptyHomeLayout() };
+  try {
+    const revision = rawRevision && /^\d+$/.test(rawRevision) ? Number(rawRevision) : 0;
+    return { stored: true, revision, layout: normalizeHomeLayout(JSON.parse(rawLayout) as unknown) };
+  } catch {
+    return { stored: false, revision: 0, layout: emptyHomeLayout() };
+  }
+}
+
+/** Missing or invalid revision means an older client that writes unconditionally. */
+export function expectedHomeRevision(body: unknown): number | null {
+  if (!isRecord(body) || typeof body.revision !== 'number') return null;
+  if (!Number.isInteger(body.revision) || body.revision < 0) return null;
+  return body.revision;
+}

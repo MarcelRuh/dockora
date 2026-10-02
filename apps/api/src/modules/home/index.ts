@@ -1,11 +1,18 @@
 import type { FastifyInstance, FastifyPluginAsync } from 'fastify';
-import { API_PREFIX, type HomeLayoutResponse } from '@dockora/shared';
+import { API_PREFIX, type HomeLayout, type HomeLayoutResponse } from '@dockora/shared';
 import { actorIdFromRequest, auditService } from '../audit/audit.service.js';
 import { OPERATOR_ROLES } from '../auth/role-policy.js';
 import { ComposeService } from '../compose/compose.service.js';
 import { PrismaSettingsRepository } from '../settings/settings.service.js';
 import { discoverProjectPublicUrls } from './discover-urls.js';
-import { HOME_LAYOUT_KEY, emptyHomeLayout, normalizeHomeLayout } from './layout.js';
+import { prisma } from '../../infrastructure/db/prisma.js';
+import {
+  HOME_LAYOUT_KEY,
+  HOME_LAYOUT_REVISION_KEY,
+  expectedHomeRevision,
+  normalizeHomeLayout,
+  readHomeLayoutState,
+} from './layout.js';
 
 const MAX_BODY_CHARS = 64_000;
 
@@ -33,18 +40,25 @@ export const homeModule: FastifyPluginAsync = async (app: FastifyInstance) => {
       if (encoded.length > MAX_BODY_CHARS) {
         throw app.httpErrors.payloadTooLarge('Home layout is too large');
       }
+      const expected = expectedHomeRevision(request.body);
       const layout = normalizeHomeLayout(request.body);
-      await repo.set(HOME_LAYOUT_KEY, JSON.stringify(layout));
-      void auditService.record({
-        action: 'home.layout.update',
-        actorId: actorIdFromRequest(request),
-        resource: 'home',
-        metadata: {
-          links: layout.links.length,
-          urls: Object.keys(layout.appUrls).length,
-        },
-      });
-      return { stored: true, layout };
+      try {
+        const saved = await writeHomeLayout(expected, layout);
+        void auditService.record({
+          action: 'home.layout.update',
+          actorId: actorIdFromRequest(request),
+          resource: 'home',
+          metadata: {
+            links: layout.links.length,
+            urls: Object.keys(layout.appUrls).length,
+            revision: saved.revision,
+          },
+        });
+        return saved;
+      } catch (error) {
+        if (error instanceof HomeLayoutConflict) throw app.httpErrors.conflict(error.message);
+        throw error;
+      }
     },
   );
 };
@@ -81,12 +95,44 @@ async function discoverContainerPublicUrls(
   return urls;
 }
 
-async function readLayout(repo: PrismaSettingsRepository): Promise<HomeLayoutResponse> {
-  const raw = await repo.get(HOME_LAYOUT_KEY);
-  if (!raw) return { stored: false, layout: emptyHomeLayout() };
-  try {
-    return { stored: true, layout: normalizeHomeLayout(JSON.parse(raw) as unknown) };
-  } catch {
-    return { stored: false, layout: emptyHomeLayout() };
+class HomeLayoutConflict extends Error {
+  constructor() {
+    super('Home layout changed');
+    this.name = 'HomeLayoutConflict';
   }
+}
+
+async function writeHomeLayout(
+  expected: number | null,
+  layout: HomeLayout,
+): Promise<HomeLayoutResponse> {
+  const value = JSON.stringify(layout);
+  return prisma.$transaction(async (tx) => {
+    const [layoutRow, revisionRow] = await Promise.all([
+      tx.setting.findUnique({ where: { key: HOME_LAYOUT_KEY } }),
+      tx.setting.findUnique({ where: { key: HOME_LAYOUT_REVISION_KEY } }),
+    ]);
+    const current = readHomeLayoutState(layoutRow?.value ?? null, revisionRow?.value ?? null);
+    if (expected !== null && expected !== current.revision) throw new HomeLayoutConflict();
+    const revision = current.revision + 1;
+    await tx.setting.upsert({
+      where: { key: HOME_LAYOUT_KEY },
+      create: { key: HOME_LAYOUT_KEY, value },
+      update: { value },
+    });
+    await tx.setting.upsert({
+      where: { key: HOME_LAYOUT_REVISION_KEY },
+      create: { key: HOME_LAYOUT_REVISION_KEY, value: String(revision) },
+      update: { value: String(revision) },
+    });
+    return { stored: true, revision, layout };
+  });
+}
+
+async function readLayout(repo: PrismaSettingsRepository): Promise<HomeLayoutResponse> {
+  const [raw, revision] = await Promise.all([
+    repo.get(HOME_LAYOUT_KEY),
+    repo.get(HOME_LAYOUT_REVISION_KEY),
+  ]);
+  return readHomeLayoutState(raw, revision);
 }
