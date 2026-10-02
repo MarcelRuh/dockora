@@ -14,6 +14,7 @@ export function ContainerTerminal({ containerId }: { containerId: string }) {
       errorLabel={t.containers.terminal.error}
       unauthorizedLabel={t.containers.terminal.unauthorized}
       heightClassName="h-[420px]"
+      label={t.nav.terminal}
     />
   );
 }

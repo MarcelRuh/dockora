@@ -93,6 +93,7 @@ export function CodeEditorInner({
   formatFailed,
   leading,
   envText = '',
+  label,
 }: {
   value: string;
   onChange: (next: string) => void;
@@ -105,6 +106,7 @@ export function CodeEditorInner({
   leading?: ReactNode;
   /** Compose `.env` used for ${VAR} interpolation hints */
   envText?: string;
+  label: string;
 }) {
   const [formatError, setFormatError] = useState<string | null>(null);
   const valueRef = useRef(value);
@@ -130,6 +132,7 @@ export function CodeEditorInner({
       indentUnit.of('  '),
       editorTheme,
       syntaxHighlighting(yamlHighlight),
+      EditorView.contentAttributes.of({ 'aria-label': label, role: 'textbox' }),
       lintGutter(),
       linter((view) => {
         const text = view.state.doc.toString();
@@ -173,7 +176,7 @@ export function CodeEditorInner({
         ]),
       ),
     ],
-    [applyFormat, envText, language],
+    [applyFormat, envText, label, language],
   );
 
   return (

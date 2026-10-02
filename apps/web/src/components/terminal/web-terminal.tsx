@@ -18,6 +18,7 @@ export type WebTerminalProps = {
   unauthorizedLabel: string;
   className?: string;
   heightClassName?: string;
+  label: string;
 };
 
 /**
@@ -30,6 +31,7 @@ export function WebTerminal({
   unauthorizedLabel,
   className,
   heightClassName = 'h-[min(70vh,560px)]',
+  label,
 }: WebTerminalProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
@@ -156,6 +158,8 @@ export function WebTerminal({
   return (
     <div
       ref={hostRef}
+      role="application"
+      aria-label={label}
       tabIndex={0}
       className={
         className ??

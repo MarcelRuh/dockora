@@ -8,13 +8,13 @@ describe('withAuthQuery', () => {
     );
   });
 
-  it('appends token only for cross-origin EventSource', () => {
+  it('keeps cross-origin stream URLs free of the JWT', () => {
     expect(withAuthQuery('/api/v1/dashboard/stream', { token: 'secret.jwt', crossOrigin: true })).toBe(
-      '/api/v1/dashboard/stream?token=secret.jwt',
+      '/api/v1/dashboard/stream',
     );
     expect(
       withAuthQuery('/api/v1/containers/abc/logs/stream?follow=1', { token: 'a.b', crossOrigin: true }),
-    ).toBe('/api/v1/containers/abc/logs/stream?follow=1&token=a.b');
+    ).toBe('/api/v1/containers/abc/logs/stream?follow=1');
   });
 
   it('does not append an empty token', () => {

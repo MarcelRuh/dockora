@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { API_PREFIX, type AppSettings } from '@dockora/shared';
-import { invalidateAuthEnabledCache } from '../auth/auth-gate.js';
+import { invalidateAuthEnabledCache, isAuthEnabled } from '../auth/auth-gate.js';
 import { actorIdFromRequest, auditService } from '../audit/audit.service.js';
 import {
   PrismaSettingsRepository,
@@ -25,15 +25,27 @@ function maskSettingsSecrets(settings: AppSettings): AppSettings {
   };
 }
 
+function hideSettingsSecrets(settings: AppSettings): AppSettings {
+  return {
+    ...settings,
+    discordWebhookUrl: '',
+    ghcrToken: '',
+    lscrToken: '',
+    ntfyToken: '',
+  };
+}
+
 export const settingsModule: FastifyPluginAsync = async (app: FastifyInstance) => {
   const service = new SettingsService(new PrismaSettingsRepository());
 
-  app.get(`${API_PREFIX}/settings`, async (): Promise<AppSettings> => {
+  app.get(`${API_PREFIX}/settings`, async (request): Promise<AppSettings> => {
     const settings = await service.getSettings({
       dockerSocket: app.config.dockerSocket,
       composeSearchPaths: app.config.composeSearchPaths,
       autoUpdateImages: app.config.autoUpdateEnabled,
     });
+    const authOn = await isAuthEnabled();
+    if (authOn && request.user?.role !== 'admin') return hideSettingsSecrets(settings);
     return maskSettingsSecrets(settings);
   });
 

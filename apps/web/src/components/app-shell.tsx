@@ -245,7 +245,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="fixed inset-0 z-50 md:hidden" role="presentation">
             <button
               type="button"
-              className="absolute inset-0 bg-black/70"
+              className="dockora-dialog-backdrop absolute inset-0 bg-black/70"
               aria-label={t.common.close}
               onClick={() => setDrawerOpen(false)}
             />

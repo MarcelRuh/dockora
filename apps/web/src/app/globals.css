@@ -508,11 +508,15 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .animate-in,
+  .animate-in.fade-in {
+    animation: dockora-backdrop-in 160ms linear forwards !important;
+  }
+
   .dockora-glow-orb,
   .dockora-pulse,
   .dockora-ambient-shape,
-  .dockora-drawer {
+  .dockora-drawer,
+  .animate-pulse {
     animation: none !important;
   }
 

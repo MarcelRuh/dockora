@@ -69,7 +69,7 @@ export function EnvEditor({
   return (
     <div className="space-y-3">
       {mode === 'raw' ? (
-        <CodeEditor
+          <CodeEditor
           language="env"
           value={value}
           onChange={onChange}
@@ -79,6 +79,7 @@ export function EnvEditor({
           formatLabel={labels.format}
           formatFailed={labels.formatFailed}
           leading={modeButtons}
+          label={labels.raw}
         />
       ) : (
         <>

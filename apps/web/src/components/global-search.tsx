@@ -158,6 +158,7 @@ export function GlobalSearch({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={t.common.globalSearch}
+              aria-label={t.common.globalSearch}
               className="dockora-field w-full rounded-none border-0 border-b border-dockora-border px-4 py-3 font-mono text-sm"
             />
             <ul className="max-h-[min(50vh,22rem)] overflow-y-auto py-1">

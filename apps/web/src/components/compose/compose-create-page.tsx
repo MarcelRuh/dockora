@@ -258,6 +258,7 @@ export function ComposeCreatePage() {
             formatLabel={t.compose.format}
             formatFailed={t.compose.formatFailed}
             envText={envContent}
+            label={t.compose.yaml}
           />
           {missingEnv.length > 0 ? (
             <p className="text-xs text-dockora-warning">

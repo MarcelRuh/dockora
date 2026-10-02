@@ -147,6 +147,7 @@ export function UsersSection() {
             </div>
             <div className="flex items-center gap-2">
               <Select
+                aria-label={`${t.settings.users.role} ${u.email}`}
                 value={u.role}
                 disabled={busy || me?.id === u.id}
                 onChange={(e) => void handleRoleChange(u.id, e.target.value as UserRole)}

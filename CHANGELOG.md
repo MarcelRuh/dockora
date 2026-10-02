@@ -5,6 +5,15 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.52] – 2026-10-02
+
+### Changed
+
+- Search, role, env file, code editors and the terminal have accessible names
+- Reduced motion keeps a short fade on page changes and stops skeleton pulses
+- Cross-origin live streams send the session in a header, login lockout survives a restart, and non-admins no longer receive secret settings fields
+- Self-update uses the host-shell agent for host metrics when that profile is already running
+
 ## [2.0.51] – 2026-10-02
 
 ### Changed

@@ -52,6 +52,7 @@ export function HostTerminalPage() {
               token={getSessionToken()}
               errorLabel={t.hostTerminal.error}
               unauthorizedLabel={t.hostTerminal.unauthorized}
+              label={t.hostTerminal.title}
             />
           ) : null}
         </>

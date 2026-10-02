@@ -17,21 +17,99 @@ export function apiDirectBaseUrl(): string {
 }
 
 /**
- * JWT in the query string only for cross-origin EventSource (cookies are not sent).
- * Same-origin uses the HttpOnly session cookie via `withCredentials`.
+ * Same-origin EventSource sends the HttpOnly cookie.
+ * Cross-origin EventSource cannot set headers, so that path uses fetch
+ * and `Authorization` instead of putting the JWT in the URL.
  */
 export function withAuthQuery(
   url: string,
-  options?: { token?: string | null; crossOrigin?: boolean },
+  _options?: { token?: string | null; crossOrigin?: boolean },
 ): string {
-  const crossOrigin = options?.crossOrigin ?? Boolean(apiDirectBaseUrl());
-  const token = options?.token !== undefined ? options.token : getSessionToken();
-  if (!crossOrigin || !token) return url;
-  const sep = url.includes('?') ? '&' : '?';
-  return `${url}${sep}token=${encodeURIComponent(token)}`;
+  return url;
+}
+
+type StreamHandler = (event: MessageEvent) => void;
+
+class HeaderEventSource {
+  readyState = 0;
+  onmessage: StreamHandler | null = null;
+  onerror: ((event: Event) => void) | null = null;
+  private readonly listeners = new Map<string, Set<StreamHandler>>();
+  private readonly abort = new AbortController();
+
+  constructor(url: string, token: string) {
+    void this.read(url, token);
+  }
+
+  addEventListener(type: string, handler: StreamHandler): void {
+    const set = this.listeners.get(type) ?? new Set<StreamHandler>();
+    set.add(handler);
+    this.listeners.set(type, set);
+  }
+
+  close(): void {
+    this.readyState = 2;
+    this.abort.abort();
+  }
+
+  private emit(type: string, data: string): void {
+    const event = new MessageEvent(type, { data });
+    if (type === 'message') this.onmessage?.(event);
+    this.listeners.get(type)?.forEach((handler) => handler(event));
+  }
+
+  private consume(buffer: string): string {
+    const blocks = buffer.split('\n\n');
+    const rest = blocks.pop() ?? '';
+    for (const block of blocks) {
+      let name = 'message';
+      const data: string[] = [];
+      for (const line of block.split('\n')) {
+        if (line.startsWith('event:')) name = line.slice(6).trim();
+        else if (line.startsWith('data:')) data.push(line.slice(5).replace(/^ /, ''));
+      }
+      if (data.length > 0) this.emit(name, data.join('\n'));
+    }
+    return rest;
+  }
+
+  private async read(url: string, token: string): Promise<void> {
+    try {
+      const response = await fetch(url, {
+        signal: this.abort.signal,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'text/event-stream',
+        },
+      });
+      if (!response.ok || !response.body) throw new Error('stream failed');
+      this.readyState = 1;
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      while (this.readyState === 1) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        buffer = this.consume(buffer);
+      }
+      if (this.readyState === 1) {
+        this.readyState = 2;
+        this.onerror?.(new Event('error'));
+      }
+    } catch {
+      if (this.readyState !== 2) {
+        this.readyState = 2;
+        this.onerror?.(new Event('error'));
+      }
+    }
+  }
 }
 
 export function openEventSource(pathWithQuery: string): EventSource {
-  const url = withAuthQuery(`${apiDirectBaseUrl()}${pathWithQuery}`);
+  const base = apiDirectBaseUrl();
+  const url = `${base}${pathWithQuery}`;
+  const token = getSessionToken();
+  if (base && token) return new HeaderEventSource(url, token) as unknown as EventSource;
   return new EventSource(url, { withCredentials: true });
 }

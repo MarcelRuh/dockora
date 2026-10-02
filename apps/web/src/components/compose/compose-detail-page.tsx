@@ -411,6 +411,7 @@ export function ComposeDetailPage({ id }: { id: string }) {
           formatLabel={t.compose.format}
           formatFailed={t.compose.formatFailed}
           envText={envContent}
+          label={t.compose.yaml}
         />
         {missingEnv.length > 0 ? (
           <p className="mt-2 text-xs text-dockora-warning">
@@ -443,6 +444,7 @@ export function ComposeDetailPage({ id }: { id: string }) {
         <p className="mb-2 text-sm text-dockora-muted">{t.compose.envHint}</p>
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <Select
+            aria-label={t.compose.envFile}
             value={envFile}
             onChange={(e) => {
               const next = e.target.value;

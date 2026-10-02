@@ -230,11 +230,17 @@ install_host_metrics() {
   fi
   echo "==> Installing host metrics collector"
   if [ -f /.dockerenv ]; then
-    docker run --rm --pid=host --privileged --network=none \
-      -v /:/host \
-      -e DOCKORA_INSTALL_DIR="$INSTALL_DIR" \
-      alpine:3.20 \
-      chroot /host sh "$script" || echo "WARN: host metrics installer failed" >&2
+    if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx 'dockora-host-agent'; then
+      docker exec dockora-host-agent nsenter -t 1 -m -u -i -n \
+        env DOCKORA_INSTALL_DIR="$INSTALL_DIR" sh "$script" \
+        || echo "WARN: host metrics installer failed" >&2
+    else
+      docker run --rm --pid=host --privileged --network=none \
+        -v /:/host \
+        -e DOCKORA_INSTALL_DIR="$INSTALL_DIR" \
+        alpine:3.20 \
+        chroot /host sh "$script" || echo "WARN: host metrics installer failed" >&2
+    fi
   else
     sh "$script" || echo "WARN: host metrics installer failed" >&2
   fi

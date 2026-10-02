@@ -1,3 +1,4 @@
+import path from 'node:path';
 import bcrypt from 'bcryptjs';
 import type { FastifyInstance, FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import fp from 'fastify-plugin';
@@ -20,6 +21,7 @@ import {
   clearLoginFailures,
   loginLockKey,
   recordLoginFailure,
+  useLoginLockoutFile,
 } from './login-lockout.js';
 import { isWeakBootstrapPassword } from '../../config/env.js';
 import { actorIdFromRequest, auditService } from '../audit/audit.service.js';
@@ -42,7 +44,17 @@ declare module '@fastify/jwt' {
   }
 }
 
+function lockoutFileFromDatabaseUrl(databaseUrl: string): string | null {
+  if (!databaseUrl.startsWith('file:')) return null;
+  const filePath = databaseUrl.slice('file:'.length);
+  if (!filePath || filePath === ':memory:') return null;
+  return path.join(path.dirname(filePath), 'login-lockout.json');
+}
+
 const authPlugin: FastifyPluginAsync = async (app: FastifyInstance) => {
+  const lockFile = lockoutFileFromDatabaseUrl(app.config.databaseUrl);
+  if (lockFile) useLoginLockoutFile(lockFile);
+
   await app.register(fjwt, {
     secret: app.config.jwtSecret,
     sign: { expiresIn: app.config.jwtExpiresIn },

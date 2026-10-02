@@ -1,4 +1,7 @@
-/** Login brute-force Schutz (in-memory). */
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
+
+/** Login brute-force Schutz. Optional auf eine Datei gespiegelt, damit ein Neustart die Sperre behält. */
 
 interface LockState {
   failures: number;
@@ -7,6 +10,34 @@ interface LockState {
 }
 
 const locks = new Map<string, LockState>();
+let persistPath: string | null = null;
+
+export function useLoginLockoutFile(filePath: string): void {
+  persistPath = filePath;
+  try {
+    if (!existsSync(filePath)) return;
+    const parsed = JSON.parse(readFileSync(filePath, 'utf8')) as Record<string, LockState>;
+    locks.clear();
+    for (const [key, state] of Object.entries(parsed)) {
+      if (!state || typeof state.failures !== 'number') continue;
+      locks.set(key, state);
+    }
+  } catch {
+    // Login bleibt nutzbar, auch wenn die Datei kaputt ist.
+  }
+}
+
+function persistLocks(): void {
+  if (!persistPath) return;
+  try {
+    mkdirSync(path.dirname(persistPath), { recursive: true });
+    const payload: Record<string, LockState> = {};
+    for (const [key, state] of locks) payload[key] = state;
+    writeFileSync(persistPath, JSON.stringify(payload));
+  } catch {
+    // Sperre gilt weiter im Speicher.
+  }
+}
 
 const MAX_FAILURES = 5;
 const LOCK_MS = 15 * 60 * 1000;
@@ -36,6 +67,7 @@ export function recordLoginFailure(key: string): void {
 
   if (windowExpired) {
     locks.set(key, { failures: 1, lockedUntil: 0, windowStartedAt: now });
+    persistLocks();
     return;
   }
 
@@ -45,10 +77,12 @@ export function recordLoginFailure(key: string): void {
     lockedUntil: failures >= MAX_FAILURES ? now + LOCK_MS : 0,
     windowStartedAt: prev.windowStartedAt,
   });
+  persistLocks();
 }
 
 export function clearLoginFailures(key: string): void {
   locks.delete(key);
+  persistLocks();
 }
 
 /** Test helper */
