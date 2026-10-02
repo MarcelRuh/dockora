@@ -57,9 +57,21 @@ function NetworkGroupNode({ data }: NodeProps<Node<NetworkGroupData>>) {
 }
 
 function ContainerNode({ data }: NodeProps<Node<ContainerNodeData>>) {
+  const router = useRouter();
   const running = data.status === 'running';
+  const open = () => {
+    if (data.containerId) router.push(`/containers/${encodeURIComponent(data.containerId)}`);
+  };
   return (
     <div
+      role="link"
+      tabIndex={0}
+      aria-label={data.label}
+      onKeyDown={(event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        open();
+      }}
       className={cn(
         'w-[228px] cursor-pointer rounded-md border bg-dockora-surface px-2.5 py-1.5',
         running ? 'border-dockora-success/40' : 'border-dockora-border',

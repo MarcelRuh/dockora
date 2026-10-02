@@ -441,8 +441,10 @@ body {
   height: 28px !important;
 }
 
-.react-flow__controls-button:hover {
-  background: var(--dockora-surface-2) !important;
+@media (hover: hover) and (pointer: fine) {
+  .react-flow__controls-button:hover {
+    background: var(--dockora-surface-2) !important;
+  }
 }
 
 .react-flow__controls-button svg {

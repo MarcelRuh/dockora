@@ -5,6 +5,14 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.53] – 2026-10-02
+
+### Changed
+
+- Compose env, interpolated config, preview and project YAML are operator-only
+- Home tiles and the dock name their targets; network nodes are links
+- Network-map control hover stays on fine pointers
+
 ## [2.0.52] – 2026-10-02
 
 ### Changed

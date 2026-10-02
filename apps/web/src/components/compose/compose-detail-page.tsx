@@ -98,18 +98,20 @@ export function ComposeDetailPage({ id }: { id: string }) {
       setProject(data);
       setYaml(data.yaml);
       setServiceContainers(containers.filter((c) => c.composeProject === data.name));
-      const preferred =
-        data.envFiles.includes('.env') || data.envFiles.length === 0
-          ? '.env'
-          : (data.envFiles[0] ?? '.env');
-      void loadEnv(preferred);
+      if (canOps) {
+        const preferred =
+          data.envFiles.includes('.env') || data.envFiles.length === 0
+            ? '.env'
+            : (data.envFiles[0] ?? '.env');
+        void loadEnv(preferred);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : t.compose.notFound);
       setProject(null);
     } finally {
       setLoading(false);
     }
-  }, [id, loadEnv, t.compose.notFound]);
+  }, [canOps, id, loadEnv, t.compose.notFound]);
 
   useEffect(() => {
     void load();
@@ -402,6 +404,9 @@ export function ComposeDetailPage({ id }: { id: string }) {
       {success ? <SuccessBanner message={success} /> : null}
 
       <Section title={t.compose.yaml}>
+        {!canOps ? <p className="text-sm text-dockora-muted">{t.common.noPermission}</p> : null}
+        {canOps ? (
+        <>
         <CodeEditor
           language="yaml"
           value={yaml}
@@ -429,18 +434,25 @@ export function ComposeDetailPage({ id }: { id: string }) {
               {t.compose.recreate}
             </Button>
           ) : null}
-          <Button disabled={busy} onClick={() => void handleValidate()}>
-            {t.compose.validate}
-          </Button>
+          {canOps ? (
+            <Button disabled={busy} onClick={() => void handleValidate()}>
+              {t.compose.validate}
+            </Button>
+          ) : null}
         </div>
         {validation ? (
           <pre className="mt-3 max-h-48 overflow-auto rounded border border-dockora-border bg-dockora-bg p-3 font-mono text-xs whitespace-pre-wrap">
             {validation}
           </pre>
         ) : null}
+        </>
+        ) : null}
       </Section>
 
       <Section title={t.compose.envFile}>
+        {!canOps ? <p className="text-sm text-dockora-muted">{t.common.noPermission}</p> : null}
+        {canOps ? (
+        <>
         <p className="mb-2 text-sm text-dockora-muted">{t.compose.envHint}</p>
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <Select
@@ -491,6 +503,8 @@ export function ComposeDetailPage({ id }: { id: string }) {
               {t.compose.saveEnv}
             </Button>
           </div>
+        ) : null}
+        </>
         ) : null}
       </Section>
 

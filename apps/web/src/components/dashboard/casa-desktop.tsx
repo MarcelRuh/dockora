@@ -1497,6 +1497,7 @@ export function CasaDesktop({
                       dragged.current = false;
                     }}
                     title={t.nav[app.key]}
+                    aria-label={t.nav[app.key]}
                     className={cn(
                       'flex shrink-0 items-center gap-2 px-2.5 py-2 text-[11px] font-medium uppercase tracking-wide text-dockora-muted hover:bg-dockora-accentSoft hover:text-white',
                       dragKey === app.key && 'opacity-50',
@@ -1884,11 +1885,11 @@ function ContainerTile({
         {children}
       </button>
     ) : external ? (
-      <a href={href} target="_blank" rel="noopener noreferrer" title={name} className={face} onClick={onClick}>
+      <a href={href} target="_blank" rel="noopener noreferrer" title={name} aria-label={name} className={face} onClick={onClick}>
         {children}
       </a>
     ) : (
-      <Link href={href} title={name} className={face} onClick={onClick}>
+      <Link href={href} title={name} aria-label={name} className={face} onClick={onClick}>
         {children}
       </Link>
     );

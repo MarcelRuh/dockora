@@ -8,6 +8,7 @@ import {
   type ComposeProjectSummary,
 } from '@dockora/shared';
 import { actorIdFromRequest, auditService } from '../audit/audit.service.js';
+import { isAuthEnabled } from '../auth/auth-gate.js';
 import { ADMIN_ROLES, OPERATOR_ROLES, rolesForComposeAction } from '../auth/role-policy.js';
 import {
   ComposeNotFoundError,
@@ -118,6 +119,7 @@ export const composeModule: FastifyPluginAsync = async (app: FastifyInstance) =>
 
   app.get<{ Params: { id: string } }>(
     `${API_PREFIX}/compose/:id/config`,
+    { preHandler: [app.requireRole(...OPERATOR_ROLES)] },
     async (request): Promise<{ config: string }> => {
       try {
         // `docker compose config` returns YAML; wrap so the response is valid JSON
@@ -130,6 +132,7 @@ export const composeModule: FastifyPluginAsync = async (app: FastifyInstance) =>
 
   app.get<{ Params: { id: string } }>(
     `${API_PREFIX}/compose/:id/preview`,
+    { preHandler: [app.requireRole(...OPERATOR_ROLES)] },
     async (request) => {
       try {
         return await service.previewChanges(request.params.id);
@@ -156,6 +159,7 @@ export const composeModule: FastifyPluginAsync = async (app: FastifyInstance) =>
 
   app.get<{ Params: { id: string }; Querystring: { file?: string } }>(
     `${API_PREFIX}/compose/:id/env`,
+    { preHandler: [app.requireRole(...OPERATOR_ROLES)] },
     async (request) => {
       try {
         return await service.getEnvFile(request.params.id, request.query.file ?? '.env');
@@ -332,7 +336,13 @@ export const composeModule: FastifyPluginAsync = async (app: FastifyInstance) =>
     `${API_PREFIX}/compose/:id`,
     async (request): Promise<ComposeProjectDetails> => {
       try {
-        return await service.getDetails(request.params.id);
+        const details = await service.getDetails(request.params.id);
+        const authOn = await isAuthEnabled();
+        const role = request.user?.role;
+        if (authOn && role !== 'admin' && role !== 'operator') {
+          return { ...details, yaml: '' };
+        }
+        return details;
       } catch (error) {
         return await throwComposeError(app, error);
       }
