@@ -707,6 +707,7 @@ export const en = {
         email: 'Email',
         password: 'Password (min 12)',
         displayName: 'Display name',
+        role: 'Role',
         edit: 'Edit',
         editTitle: 'Edit user',
         newPasswordOptional: 'New password (optional, min 12)',

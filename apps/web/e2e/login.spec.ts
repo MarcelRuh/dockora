@@ -17,3 +17,28 @@ test('pages are not frameable from another site by default', async ({ page }) =>
   const response = await page.goto('/');
   expect(response?.headers()['x-frame-options']?.toLowerCase()).toBe('sameorigin');
 });
+
+test('signed-in forms expose labels and the second login step does too', async ({ page }) => {
+  const email = process.env.SMOKE_EMAIL ?? 'admin@dockora.local';
+  const password = process.env.SMOKE_PASSWORD ?? 'dockora-admin-change-me';
+
+  await page.goto('/');
+  await page.getByLabel(/E-Mail|Email/i).fill(email);
+  await page.getByLabel(/Passwort|Password/i).fill(password);
+  await page.getByRole('button', { name: /Anmelden|Sign in/i }).click();
+  await expect(page.getByRole('button', { name: /Anmelden|Sign in/i })).toHaveCount(0);
+
+  const totp = page.getByLabel(/Authenticator-Code|Authenticator code/i);
+  if (await totp.isVisible().catch(() => false)) {
+    await expect(totp).toBeVisible();
+    await expect(page.getByText(/6-stelliger Code|6-digit code/i)).toBeVisible();
+    return;
+  }
+
+  await page.goto('/settings');
+  await page.getByRole('button', { name: /Sicherheit|Security/i }).click();
+  await expect(page.getByLabel(/^E-Mail$|^Email$/)).toBeVisible();
+  await expect(page.getByLabel(/Passwort \(min|Password \(min/i)).toBeVisible();
+  await expect(page.getByLabel(/Anzeigename|Display name/i).first()).toBeVisible();
+  await expect(page.getByLabel(/^Rolle$|^Role$/)).toBeVisible();
+});

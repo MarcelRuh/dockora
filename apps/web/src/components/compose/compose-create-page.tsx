@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   composeAction,
@@ -34,6 +34,11 @@ export function ComposeCreatePage() {
   const { authEnabled, user } = useAuth();
   const canOps = canOperate(user?.role, authEnabled);
   const router = useRouter();
+  const nameId = useId();
+  const pathId = useId();
+  const fileId = useId();
+  const yamlLabelId = useId();
+  const envLabelId = useId();
 
   const [bases, setBases] = useState<Array<{ path: string; writable: boolean }>>([]);
   const [name, setName] = useState('');
@@ -187,19 +192,21 @@ export function ComposeCreatePage() {
         ) : null}
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <label className="space-y-1.5 text-sm">
-            <Label>{t.common.name}</Label>
+          <div className="space-y-1.5 text-sm">
+            <Label htmlFor={nameId}>{t.common.name}</Label>
             <Input
+              id={nameId}
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="my-app"
               autoComplete="off"
               disabled={creating}
             />
-          </label>
-          <label className="space-y-1.5 text-sm">
-            <Label>{t.compose.basePath}</Label>
+          </div>
+          <div className="space-y-1.5 text-sm">
+            <Label htmlFor={pathId}>{t.compose.basePath}</Label>
             <Select
+              id={pathId}
               value={basePath}
               onChange={(e) => setBasePath(e.target.value)}
               disabled={creating}
@@ -212,10 +219,11 @@ export function ComposeCreatePage() {
                 </option>
               ))}
             </Select>
-          </label>
-          <label className="space-y-1.5 text-sm">
-            <Label>{t.compose.filename}</Label>
+          </div>
+          <div className="space-y-1.5 text-sm">
+            <Label htmlFor={fileId}>{t.compose.filename}</Label>
             <Select
+              id={fileId}
               value={composeFileName}
               onChange={(e) => setComposeFileName(e.target.value)}
               disabled={creating}
@@ -226,7 +234,7 @@ export function ComposeCreatePage() {
               <option value="docker-compose.yml">docker-compose.yml</option>
               <option value="docker-compose.yaml">docker-compose.yaml</option>
             </Select>
-          </label>
+          </div>
           <label className="flex items-end gap-2 pb-2 text-sm">
             <input
               type="checkbox"
@@ -239,8 +247,8 @@ export function ComposeCreatePage() {
           </label>
         </div>
 
-        <div className="space-y-1.5 text-sm">
-          <Label>{t.compose.yaml}</Label>
+        <div className="space-y-1.5 text-sm" role="group" aria-labelledby={yamlLabelId}>
+          <Label id={yamlLabelId}>{t.compose.yaml}</Label>
           <CodeEditor
             language="yaml"
             value={yaml}
@@ -258,8 +266,8 @@ export function ComposeCreatePage() {
           ) : null}
         </div>
 
-        <div className="space-y-1.5 text-sm">
-          <Label>{t.compose.envOptional}</Label>
+        <div className="space-y-1.5 text-sm" role="group" aria-labelledby={envLabelId}>
+          <Label id={envLabelId}>{t.compose.envOptional}</Label>
           <p className="text-xs text-dockora-muted">{t.compose.envHint}</p>
           <EnvEditor
             value={envContent}

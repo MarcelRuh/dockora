@@ -707,6 +707,7 @@ export const de = {
         email: 'E-Mail',
         password: 'Passwort (min. 12)',
         displayName: 'Anzeigename',
+        role: 'Rolle',
         edit: 'Bearbeiten',
         editTitle: 'Benutzer bearbeiten',
         newPasswordOptional: 'Neues Passwort (optional, min. 12)',

@@ -11,7 +11,7 @@ import {
 } from '@/lib/api';
 import { useLocale } from '@/i18n/locale-provider';
 import { useAuth } from '@/components/auth/auth-provider';
-import { Button, Input, Select } from '@/components/ui/form-controls';
+import { Button, Input, Label, Select } from '@/components/ui/form-controls';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ErrorBanner, Section, SuccessBanner } from '@/components/ui/page-parts';
 
@@ -175,31 +175,51 @@ export function UsersSection() {
         onSubmit={(e) => void handleCreate(e)}
         className="dockora-field-group grid gap-3 sm:grid-cols-2"
       >
-        <Input
-          type="email"
-          placeholder={t.settings.users.email}
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
-        <Input
-          type="password"
-          placeholder={t.settings.users.password}
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          minLength={MIN_PASSWORD_LENGTH}
-          required
-        />
-        <Input
-          placeholder={t.settings.users.displayName}
-          value={displayName}
-          onChange={(e) => setDisplayName(e.target.value)}
-        />
-        <Select value={role} onChange={(e) => setRole(e.target.value as UserRole)} className="w-full">
-          <option value="admin">admin</option>
-          <option value="operator">operator</option>
-          <option value="viewer">viewer</option>
-        </Select>
+        <div>
+          <Label htmlFor="user-email">{t.settings.users.email}</Label>
+          <Input
+            id="user-email"
+            type="email"
+            autoComplete="off"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+        </div>
+        <div>
+          <Label htmlFor="user-password">{t.settings.users.password}</Label>
+          <Input
+            id="user-password"
+            type="password"
+            autoComplete="new-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            minLength={MIN_PASSWORD_LENGTH}
+            required
+          />
+        </div>
+        <div>
+          <Label htmlFor="user-display-name">{t.settings.users.displayName}</Label>
+          <Input
+            id="user-display-name"
+            autoComplete="off"
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+          />
+        </div>
+        <div>
+          <Label htmlFor="user-role">{t.settings.users.role}</Label>
+          <Select
+            id="user-role"
+            value={role}
+            onChange={(e) => setRole(e.target.value as UserRole)}
+            className="w-full"
+          >
+            <option value="admin">admin</option>
+            <option value="operator">operator</option>
+            <option value="viewer">viewer</option>
+          </Select>
+        </div>
         <Button type="submit" variant="primary" disabled={busy} className="sm:col-span-2">
           {t.settings.users.create}
         </Button>
@@ -237,18 +257,25 @@ export function UsersSection() {
         onConfirm={() => void handleEditSave()}
       >
         <div className="space-y-3 pt-2">
-          <Input
-            placeholder={t.settings.users.displayName}
-            value={editDisplayName}
-            onChange={(e) => setEditDisplayName(e.target.value)}
-          />
-          <Input
-            type="password"
-            placeholder={t.settings.users.newPasswordOptional}
-            value={editPassword}
-            onChange={(e) => setEditPassword(e.target.value)}
-            minLength={MIN_PASSWORD_LENGTH}
-          />
+          <div>
+            <Label htmlFor="user-edit-name">{t.settings.users.displayName}</Label>
+            <Input
+              id="user-edit-name"
+              value={editDisplayName}
+              onChange={(e) => setEditDisplayName(e.target.value)}
+            />
+          </div>
+          <div>
+            <Label htmlFor="user-edit-password">{t.settings.users.newPasswordOptional}</Label>
+            <Input
+              id="user-edit-password"
+              type="password"
+              autoComplete="new-password"
+              value={editPassword}
+              onChange={(e) => setEditPassword(e.target.value)}
+              minLength={MIN_PASSWORD_LENGTH}
+            />
+          </div>
         </div>
       </ConfirmDialog>
     </Section>

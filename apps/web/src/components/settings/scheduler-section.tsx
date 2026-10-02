@@ -115,6 +115,7 @@ export function SchedulerSection({ canEdit }: { canEdit: boolean }) {
             <div className="flex flex-wrap items-center gap-2">
               <Input
                 className="w-40 font-mono text-xs"
+                aria-label={`${jobLabel(job.type, t.settings.scheduler.jobTypes)} cron`}
                 value={cronEdits[job.id] ?? job.cron}
                 disabled={!canEdit || busy === job.id}
                 onChange={(e) => setCronEdits((m) => ({ ...m, [job.id]: e.target.value }))}

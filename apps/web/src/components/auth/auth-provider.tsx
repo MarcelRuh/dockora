@@ -138,8 +138,11 @@ function LoginForm({ onSuccess }: { onSuccess: (user: AuthUser) => void }) {
             className="dockora-panel space-y-4 p-6 shadow-neon"
           >
             <div>
-              <label className="mb-1 block text-sm text-dockora-muted">{t.auth.totpCode}</label>
+              <label htmlFor="login-totp" className="mb-1 block text-sm text-dockora-muted">
+                {t.auth.totpCode}
+              </label>
               <Input
+                id="login-totp"
                 inputMode="numeric"
                 autoComplete="one-time-code"
                 value={totpCode}
@@ -147,8 +150,11 @@ function LoginForm({ onSuccess }: { onSuccess: (user: AuthUser) => void }) {
                 placeholder="123456"
                 required
                 autoFocus
+                aria-describedby="login-totp-hint"
               />
-              <p className="mt-1.5 text-xs text-dockora-muted">{t.auth.totpHint}</p>
+              <p id="login-totp-hint" className="mt-1.5 text-xs text-dockora-muted">
+                {t.auth.totpHint}
+              </p>
             </div>
             {error ? <ErrorBanner message={error} /> : null}
             <Button type="submit" variant="primary" className="w-full" disabled={submitting}>

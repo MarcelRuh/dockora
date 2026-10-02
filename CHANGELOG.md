@@ -5,6 +5,14 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.47] – 2026-10-02
+
+### Changed
+
+- The authenticator step, user form, scheduler cron field, and compose create fields have real labels
+- The status dot only changes opacity
+- Playwright checks the signed-in user form, and the authenticator field when that step is shown
+
 ## [2.0.46] – 2026-10-02
 
 ### Changed

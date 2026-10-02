@@ -1,5 +1,6 @@
 'use client';
 
+import { cloneElement, isValidElement, useId, type ReactElement, type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 const variants = {
@@ -126,14 +127,27 @@ export function Field({
   children,
   className,
 }: {
-  label?: React.ReactNode;
-  children: React.ReactNode;
+  label?: ReactNode;
+  children: ReactNode;
   className?: string;
 }) {
+  const autoId = useId();
+  const control = isValidElement(children) ? (children as ReactElement<{ id?: string }>) : null;
+  const controlId = control ? (control.props.id ?? autoId) : undefined;
   return (
     <div className={cn('min-w-0 flex-1 space-y-1', className)}>
-      {label ? <Label>{label}</Label> : null}
-      {children}
+      {label ? (
+        <Label htmlFor={controlId} id={control ? undefined : autoId}>
+          {label}
+        </Label>
+      ) : null}
+      {control && controlId
+        ? cloneElement(control, { id: controlId })
+        : (
+          <div role="group" aria-labelledby={label ? autoId : undefined}>
+            {children}
+          </div>
+        )}
     </div>
   );
 }
