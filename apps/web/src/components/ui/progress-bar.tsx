@@ -37,7 +37,7 @@ export function ProgressBar({
     >
       <div
         className={cn(
-          'h-full transition-[width] duration-500',
+          'dockora-meter h-full',
           resolvedTone === 'accent' &&
             'bg-gradient-to-r from-dockora-pink to-dockora-purple shadow-[0_0_12px_rgba(255,0,110,0.55)]',
           resolvedTone === 'success' &&
@@ -47,7 +47,7 @@ export function ProgressBar({
           resolvedTone === 'danger' &&
             'bg-dockora-danger shadow-[0_0_12px_rgba(255,84,0,0.55)]',
         )}
-        style={{ width: `${pct}%` }}
+        style={{ transform: `scaleX(${pct / 100})` }}
       />
     </div>
   );

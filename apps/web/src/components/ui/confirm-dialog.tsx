@@ -79,13 +79,13 @@ export function ConfirmDialog({
   if (!open) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
-      role="presentation"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget && !busy) onCancel();
-      }}
-    >
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" role="presentation">
+      <div
+        className="dockora-dialog-backdrop absolute inset-0 bg-black/70 backdrop-blur-sm"
+        onMouseDown={() => {
+          if (!busy) onCancel();
+        }}
+      />
       <div
         ref={panelRef}
         role="dialog"
@@ -93,7 +93,7 @@ export function ConfirmDialog({
         aria-labelledby={titleId}
         tabIndex={-1}
         className={cn(
-          'dockora-panel w-full space-y-4 p-5 shadow-neon outline-none',
+          'dockora-dialog-panel dockora-panel relative w-full space-y-4 p-5 shadow-neon outline-none',
           wide ? 'max-w-2xl' : 'max-w-md',
         )}
       >

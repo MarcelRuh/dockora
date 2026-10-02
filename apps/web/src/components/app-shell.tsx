@@ -250,7 +250,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               onClick={() => setDrawerOpen(false)}
             />
             <aside
-              className="absolute inset-y-0 left-0 flex w-[min(18rem,88vw)] flex-col border-r border-dockora-railBorder bg-dockora-rail text-dockora-railText shadow-neon animate-in slide-in-from-left duration-200"
+              className="dockora-drawer absolute inset-y-0 left-0 flex w-[min(18rem,88vw)] flex-col border-r border-dockora-railBorder bg-dockora-rail text-dockora-railText shadow-neon"
               role="dialog"
               aria-modal="true"
               aria-label={t.common.menu}

@@ -43,11 +43,12 @@ export function DashboardView({
             <div className="fixed inset-0 z-[70]" role="dialog" aria-modal="true" aria-label={t.dashboard.home.more}>
               <button
                 type="button"
-                className="absolute inset-0 bg-black/70"
+                className="dockora-dialog-backdrop absolute inset-0 bg-black/70"
                 aria-label={t.common.close}
                 onClick={() => setEngineOpen(false)}
               />
-              <div className="dockora-glass absolute left-1/2 top-[8vh] max-h-[80vh] w-[min(56rem,94vw)] -translate-x-1/2 space-y-4 overflow-y-auto p-4">
+              <div className="absolute left-1/2 top-[8vh] w-[min(56rem,94vw)] -translate-x-1/2">
+              <div className="dockora-dialog-panel dockora-glass max-h-[80vh] space-y-4 overflow-y-auto p-4">
                 <div className="flex items-center justify-between gap-3">
                   <h2 className="text-sm font-medium">{t.dashboard.home.more}</h2>
                   <button type="button" className="text-sm text-dockora-muted" onClick={() => setEngineOpen(false)}>
@@ -56,6 +57,7 @@ export function DashboardView({
                 </div>
                 <EngineStrip overview={data} onUpdated={() => void refresh()} />
                 <LifetimeStrip overview={data} labels={t.dashboard.lifetime} locale={loc} />
+              </div>
               </div>
             </div>
           ) : null}

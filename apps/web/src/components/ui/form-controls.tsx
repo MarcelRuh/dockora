@@ -29,7 +29,7 @@ export function buttonClassName({
   className?: string;
 } = {}) {
   return cn(
-    'inline-flex shrink-0 items-center justify-center font-display font-semibold uppercase transition-[color,background-color,border-color,box-shadow,filter] disabled:cursor-not-allowed disabled:opacity-40',
+    'dockora-press inline-flex shrink-0 items-center justify-center font-display font-semibold uppercase disabled:cursor-not-allowed disabled:opacity-40',
     variants[variant],
     sizes[size],
     className,

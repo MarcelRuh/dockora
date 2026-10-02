@@ -58,20 +58,21 @@ export function DialogFrame({
   }, []);
 
   return (
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
-      role="presentation"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-    >
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" role="presentation">
+      <div
+        className="dockora-dialog-backdrop absolute inset-0 bg-black/70 backdrop-blur-sm"
+        onMouseDown={() => onClose()}
+      />
       <div
         ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-label={label}
         tabIndex={-1}
-        className={cn('dockora-panel w-full max-w-lg overflow-hidden outline-none', panelClassName)}
+        className={cn(
+          'dockora-dialog-panel dockora-panel relative w-full max-w-lg overflow-hidden outline-none',
+          panelClassName,
+        )}
       >
         {children}
       </div>

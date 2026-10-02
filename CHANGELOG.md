@@ -5,6 +5,14 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.51] – 2026-10-02
+
+### Changed
+
+- Confirm and detail dialogs ease in; the mobile menu slides in from the edge
+- Buttons acknowledge a press, resource meters move on the compositor, and hover glow stays on fine pointers
+- Reduced motion keeps a short fade and drops travel. Search stays instant because it opens from the keyboard
+
 ## [2.0.50] – 2026-10-02
 
 ### Changed
