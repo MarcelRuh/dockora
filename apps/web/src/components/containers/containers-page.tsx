@@ -415,6 +415,7 @@ export function ContainersPage() {
           stickyFirst
           stickyLast
           rowKeys={items.map((c) => c.id)}
+          checkboxLabel={t.common.selectAll}
           headers={[
             '',
             t.common.name,

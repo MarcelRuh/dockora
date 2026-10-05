@@ -197,7 +197,13 @@ export const containersModule: FastifyPluginAsync = async (app: FastifyInstance)
       const authOn = await isAuthEnabled();
       const role = request.user?.role;
       if (authOn && role !== 'admin' && role !== 'operator') {
-        return { ...details, env: [] };
+        return {
+          ...details,
+          env: [],
+          command: '',
+          labels: {},
+          mounts: details.mounts.map((mount) => ({ ...mount, source: '' })),
+        };
       }
       return details;
     },

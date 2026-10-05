@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   useEffect,
   useMemo,
@@ -136,6 +137,7 @@ export function CasaDesktop({
   overview: DashboardOverview;
   onOpenEngine: () => void;
 }) {
+  const router = useRouter();
   const { t, locale, setLocale } = useLocale();
   const { authEnabled, user } = useAuth();
   const canEdit = canOperate(user?.role, authEnabled);
@@ -150,6 +152,7 @@ export function CasaDesktop({
   const [dragKey, setDragKey] = useState<DockKey | null>(null);
   const [dockOver, setDockOver] = useState<DockKey | null>(null);
   const [query, setQuery] = useState('');
+  const [hitIndex, setHitIndex] = useState(0);
   const [urlOverrides, setUrlOverrides] = useState<Record<string, string>>({});
   const [publicUrlOverrides, setPublicUrlOverrides] = useState<Record<string, string>>({});
   const [discoveredUrls, setDiscoveredUrls] = useState<Record<string, string>>({});
@@ -212,6 +215,7 @@ export function CasaDesktop({
   const layoutRef = useRef<HomeLayout>(readHomeLayoutCache());
   const dirtyRef = useRef(false);
   const layoutEpoch = useRef(0);
+  const saveGeneration = useRef(0);
   const hydratedRef = useRef(false);
   const saveTimer = useRef<number | null>(null);
   const canEditRef = useRef(canEdit);
@@ -227,6 +231,7 @@ export function CasaDesktop({
       onError: (kind) =>
         setLayoutError(kind === 'conflict' ? saveErrorRef.current.conflict : saveErrorRef.current.failed),
       onSaved: () => {
+        saveGeneration.current += 1;
         if (saveTimer.current) return;
         dirtyRef.current = false;
       },
@@ -266,9 +271,14 @@ export function CasaDesktop({
     setPageHost(window.location.hostname);
     let cancelled = false;
     const epoch = layoutEpoch.current;
+    const savesAtStart = saveGeneration.current;
     void fetchHomeLayout()
       .then((remote) => {
         if (cancelled) return;
+        if (saveGeneration.current !== savesAtStart) {
+          hydratedRef.current = true;
+          return;
+        }
         if (epoch !== layoutEpoch.current) {
           hydratedRef.current = true;
           if (dirtyRef.current && canEditRef.current) {
@@ -491,6 +501,7 @@ export function CasaDesktop({
   const pageHits = needle
     ? APPS.filter((app) => t.nav[app.key].toLowerCase().includes(needle))
     : [];
+  const activeHit = pageHits[hitIndex] ?? pageHits[0];
   const pendingUpdates = useMemo(
     () => updates.filter((item) => item.updateAvailable && !item.error),
     [updates],
@@ -829,6 +840,7 @@ export function CasaDesktop({
         : undefined;
     setUrlBusy(true);
     setUrlMessage(null);
+    const previousPending = pendingRecreate;
     setPendingRecreate(null);
     const service = container.labels['com.docker.compose.service']?.trim();
     const workingDir = container.labels['com.docker.compose.project.working_dir']?.trim();
@@ -859,6 +871,7 @@ export function CasaDesktop({
         setUrlMessage(home.appUrlComposeMissing);
       }
     } catch (error) {
+      setPendingRecreate(previousPending);
       setUrlMessage(error instanceof Error ? error.message : t.common.failed);
     } finally {
       setUrlBusy(false);
@@ -1316,16 +1329,49 @@ export function CasaDesktop({
           <div className={cn('relative min-w-[12rem] flex-1', pageHits.length > 0 && 'z-30')}>
             <input
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              onChange={(event) => {
+                setHitIndex(0);
+                setQuery(event.target.value);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape') {
+                  setQuery('');
+                  return;
+                }
+                if (pageHits.length === 0) return;
+                if (event.key === 'ArrowDown') {
+                  event.preventDefault();
+                  setHitIndex((index) => (index + 1) % pageHits.length);
+                } else if (event.key === 'ArrowUp') {
+                  event.preventDefault();
+                  setHitIndex((index) => (index - 1 + pageHits.length) % pageHits.length);
+                } else if (event.key === 'Enter' && activeHit) {
+                  event.preventDefault();
+                  setQuery('');
+                  router.push(activeHit.href);
+                }
+              }}
               placeholder={home.searchPlaceholder}
               aria-label={home.searchPlaceholder}
+              role="combobox"
+              aria-autocomplete="list"
+              aria-expanded={pageHits.length > 0}
+              aria-controls="home-page-hits"
+              aria-activedescendant={activeHit ? `home-page-hit-${activeHit.key}` : undefined}
               className="dockora-field w-full px-3.5"
             />
             {pageHits.length > 0 ? (
-              <ul className="dockora-panel !absolute left-0 right-0 z-30 mt-2 overflow-hidden py-1">
+              <ul id="home-page-hits" role="listbox" className="dockora-panel !absolute left-0 right-0 z-30 mt-2 overflow-hidden py-1">
                 {pageHits.map((hit) => (
-                  <li key={hit.key}>
-                    <Link href={hit.href} className="block px-4 py-2 text-sm uppercase tracking-wide hover:bg-dockora-accentSoft" onClick={() => setQuery('')}>
+                  <li key={hit.key} role="presentation">
+                    <Link
+                      id={`home-page-hit-${hit.key}`}
+                      role="option"
+                      aria-selected={hit.key === activeHit?.key}
+                      href={hit.href}
+                      className="block px-4 py-2 text-sm uppercase tracking-wide hover:bg-dockora-accentSoft"
+                      onClick={() => setQuery('')}
+                    >
                       {t.nav[hit.key]}
                     </Link>
                   </li>
@@ -1424,8 +1470,8 @@ export function CasaDesktop({
             }
           />
         </div>
-        {updateError ? <p className="text-xs text-dockora-danger">{updateError}</p> : null}
-        {layoutError ? <p className="text-xs text-dockora-danger">{layoutError}</p> : null}
+        {updateError ? <p role="alert" className="text-xs text-dockora-danger">{updateError}</p> : null}
+        {layoutError ? <p role="alert" className="text-xs text-dockora-danger">{layoutError}</p> : null}
 
         <section ref={appsSectionRef} aria-label={home.apps} data-app-grid="" className="relative min-w-0">
           <div
@@ -1640,7 +1686,7 @@ export function CasaDesktop({
                         className="dockora-field mt-1 w-full px-3"
                       />
                     </label>
-                    {linkError ? <p className="text-xs text-dockora-danger">{linkError}</p> : null}
+                    {linkError ? <p role="alert" className="text-xs text-dockora-danger">{linkError}</p> : null}
                     <button type="submit" className={buttonClassName({ variant: 'primary', size: 'sm' })}>
                       {home.linkSave}
                     </button>
@@ -1698,7 +1744,7 @@ export function CasaDesktop({
                         className="dockora-field mt-1 w-full px-3"
                       />
                     </label>
-                    {linkError ? <p className="text-xs text-dockora-danger">{linkError}</p> : null}
+                    {linkError ? <p role="alert" className="text-xs text-dockora-danger">{linkError}</p> : null}
                     <div className="flex flex-wrap justify-end gap-2 pt-1">
                       <button
                         type="button"

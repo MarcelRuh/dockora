@@ -6,6 +6,7 @@ import {
 } from '../settings/settings.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { actorIdFromRequest, auditService } from '../audit/audit.service.js';
+import { isAuthEnabled } from '../auth/auth-gate.js';
 import { ADMIN_ROLES } from '../auth/role-policy.js';
 import { destructiveRateLimit } from '../../presentation/http/destructive-rate-limit.js';
 import { BackupsService } from './backups.service.js';
@@ -21,8 +22,13 @@ export const backupsModule: FastifyPluginAsync = async (app: FastifyInstance) =>
 
   app.decorate('backupsService', service);
 
-  app.get(`${API_PREFIX}/backups`, async (): Promise<BackupInfo[]> => {
-    return service.list();
+  app.get(`${API_PREFIX}/backups`, async (request): Promise<BackupInfo[]> => {
+    const list = await service.list();
+    const authOn = await isAuthEnabled();
+    if (authOn && request.user?.role !== 'admin') {
+      return list.map((backup) => ({ ...backup, path: '', includes: [] }));
+    }
+    return list;
   });
 
   app.post<{

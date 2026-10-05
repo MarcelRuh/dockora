@@ -1,6 +1,5 @@
 'use client';
 
-import { useId } from 'react';
 import { cn } from '@/lib/utils';
 
 export function PageHeader({
@@ -127,16 +126,25 @@ export function StatusBadge({
   );
 }
 
+export function tabPanelProps(idPrefix: string, tabId: string) {
+  return {
+    role: 'tabpanel' as const,
+    id: `${idPrefix}-panel-${tabId}`,
+    'aria-labelledby': `${idPrefix}-${tabId}`,
+  };
+}
+
 export function TabBar({
+  idPrefix,
   tabs,
   active,
   onChange,
 }: {
+  idPrefix: string;
   tabs: { id: string; label: string }[];
   active: string;
   onChange: (id: string) => void;
 }) {
-  const baseId = useId();
   return (
     <div role="tablist" className="flex flex-wrap gap-0 border-b border-dockora-border">
       {tabs.map((tab, index) => (
@@ -144,7 +152,8 @@ export function TabBar({
           key={tab.id}
           type="button"
           role="tab"
-          id={`${baseId}-${tab.id}`}
+          id={`${idPrefix}-${tab.id}`}
+          aria-controls={`${idPrefix}-panel-${tab.id}`}
           aria-selected={active === tab.id}
           tabIndex={active === tab.id ? 0 : -1}
           onClick={() => onChange(tab.id)}
@@ -156,7 +165,7 @@ export function TabBar({
             if (!next) return;
             onChange(next.id);
             event.currentTarget.parentElement
-              ?.querySelector<HTMLElement>(`#${CSS.escape(`${baseId}-${next.id}`)}`)
+              ?.querySelector<HTMLElement>(`#${CSS.escape(`${idPrefix}-${next.id}`)}`)
               ?.focus();
           }}
           className={cn(
@@ -180,6 +189,7 @@ export function DataTable({
   empty,
   stickyFirst = false,
   stickyLast = false,
+  checkboxLabel,
 }: {
   headers: string[];
   rows: React.ReactNode[][];
@@ -187,6 +197,7 @@ export function DataTable({
   empty?: React.ReactNode;
   stickyFirst?: boolean;
   stickyLast?: boolean;
+  checkboxLabel?: string;
 }) {
   if (rows.length === 0 && empty) return <>{empty}</>;
 
@@ -237,7 +248,11 @@ export function DataTable({
                   scope="col"
                   className={cellSticky(j, headers.length, true)}
                 >
-                  {h}
+                  {leadingCheckbox && j === 0 ? (
+                    <span className="sr-only">{checkboxLabel}</span>
+                  ) : (
+                    h
+                  )}
                 </th>
               ))}
             </tr>

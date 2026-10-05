@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import type { UpdateCheckResult } from '@dockora/shared';
 import { checkUpdates, fetchUpdates, pullUpdate } from '@/lib/api';
 import { useLocale } from '@/i18n/locale-provider';
@@ -19,6 +19,7 @@ import {
   StatusBadge,
   SuccessBanner,
   TabBar,
+  tabPanelProps,
 } from '@/components/ui/page-parts';
 
 type FilterId = 'all' | 'available' | 'errors';
@@ -75,6 +76,7 @@ export function UpdatesPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [phase, setPhase] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterId>('all');
+  const tabsId = useId();
   const [confirm, setConfirm] = useState<null | { mode: 'one' | 'all'; id?: string; count?: number }>(
     null,
   );
@@ -261,6 +263,7 @@ export function UpdatesPage() {
       />
 
       <TabBar
+        idPrefix={tabsId}
         tabs={[
           { id: 'all', label: `${t.updates.filterAll} (${items.length})` },
           { id: 'available', label: `${t.updates.filterAvailable} (${availableCount})` },
@@ -290,6 +293,7 @@ export function UpdatesPage() {
       {success ? <SuccessBanner message={success} /> : null}
       {loading ? <LoadingState message={t.common.loading} /> : null}
 
+      <div {...tabPanelProps(tabsId, filter)}>
       {!loading ? (
         <DataTable
           stickyFirst
@@ -308,6 +312,7 @@ export function UpdatesPage() {
           empty={<EmptyState message={t.updates.empty} />}
         />
       ) : null}
+      </div>
 
       <ConfirmDialog
         open={Boolean(confirm)}

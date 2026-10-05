@@ -5,6 +5,15 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.55] – 2026-10-05
+
+### Changed
+
+- Viewers no longer receive container commands, mount paths, label dumps, or backup file paths
+- Saved home addresses drop credentials and query secrets for viewers
+- A home layout reload ignores a response that started before the latest save
+- Tabs name their panels, the home search moves with the keyboard, and checkbox columns have a name
+
 ## [2.0.54] – 2026-10-02
 
 ### Changed

@@ -69,7 +69,19 @@ export function containerLinkChoices(
 
 function httpUrl(value: string | undefined): string | null {
   const trimmed = value?.trim() ?? '';
-  return /^https?:\/\//i.test(trimmed) ? trimmed : null;
+  if (!/^https?:\/\//i.test(trimmed)) return null;
+  try {
+    const url = new URL(trimmed);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+    if (!url.username && !url.password && !url.search && !url.hash) return trimmed;
+    url.username = '';
+    url.password = '';
+    url.search = '';
+    url.hash = '';
+    return url.toString();
+  } catch {
+    return null;
+  }
 }
 
 function pickWebPort<T extends { port: string; href: string | null; hostPort: string | null }>(
@@ -93,7 +105,7 @@ function labeledAppUrl(
     const raw = labels[key]?.trim();
     if (!raw) continue;
     const expanded = expandWebuiTemplate(raw, ports, host);
-    if (/^https?:\/\//i.test(expanded)) return expanded;
+    if (/^https?:\/\//i.test(expanded)) return httpUrl(expanded);
   }
   return null;
 }

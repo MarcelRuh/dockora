@@ -403,6 +403,7 @@ export function ComposeListPage() {
         <DataTable
           stickyFirst
           stickyLast
+          checkboxLabel={t.common.selectAll}
           headers={[
             '',
             t.common.name,

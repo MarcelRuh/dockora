@@ -3,7 +3,7 @@
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useId, useState } from 'react';
 import type { ContainerDetails, ContainerStatsSnapshot } from '@dockora/shared';
 import {
   containerAction,
@@ -30,6 +30,7 @@ import {
   Section,
   StatusBadge,
   TabBar,
+  tabPanelProps,
 } from '@/components/ui/page-parts';
 import { ProgressBar } from '@/components/ui/progress-bar';
 import { ServiceIcon } from '@/components/ui/service-icon';
@@ -46,6 +47,7 @@ export function ContainerDetailPage({ id }: { id: string }) {
   const { t, locale } = useLocale();
   const { authEnabled, user } = useAuth();
   const canOps = canOperate(user?.role, authEnabled);
+  const tabsId = useId();
   const isAdmin = canAdmin(user?.role, authEnabled);
   const router = useRouter();
   const loc = locale === 'de' ? 'de-DE' : 'en-US';
@@ -273,8 +275,9 @@ export function ContainerDetailPage({ id }: { id: string }) {
 
       {error ? <ErrorBanner message={error} /> : null}
 
-      <TabBar tabs={tabs} active={tab} onChange={(v) => setTab(v as Tab)} />
+      <TabBar idPrefix={tabsId} tabs={tabs} active={tab} onChange={(v) => setTab(v as Tab)} />
 
+      <div {...tabPanelProps(tabsId, tab)} className="space-y-6">
       {tab === 'overview' ? (
         <Section>
           <KeyValueGrid
@@ -286,11 +289,15 @@ export function ContainerDetailPage({ id }: { id: string }) {
                 label: t.containers.overview.composeProject,
                 value: container.composeProject ?? '—',
               },
-              {
-                label: t.containers.overview.command,
-                value: container.command ?? '—',
-                mono: true,
-              },
+              ...(canOps
+                ? [
+                    {
+                      label: t.containers.overview.command,
+                      value: container.command || '—',
+                      mono: true,
+                    },
+                  ]
+                : []),
               {
                 label: t.containers.overview.restartPolicy,
                 value: container.restartPolicy ?? '—',
@@ -314,7 +321,7 @@ export function ContainerDetailPage({ id }: { id: string }) {
               <ul className="space-y-2">
                 {container.mounts.map((m, i) => (
                   <li key={i} className="font-mono text-xs border-l-2 border-dockora-border pl-3">
-                    {m.source} → {m.destination}
+                    {m.source ? `${m.source} → ${m.destination}` : m.destination}
                     {m.mode ? ` (${m.mode})` : ''}
                   </li>
                 ))}
@@ -322,6 +329,7 @@ export function ContainerDetailPage({ id }: { id: string }) {
             )}
           </Section>
 
+          {canOps ? (
           <Section title={t.containers.overview.labels} className="mt-6">
             {Object.keys(container.labels).length === 0 ? (
               <p className="text-sm text-dockora-muted">—</p>
@@ -336,6 +344,7 @@ export function ContainerDetailPage({ id }: { id: string }) {
               </dl>
             )}
           </Section>
+          ) : null}
 
           {canOps ? (
             <Section title={t.containers.overview.env} className="mt-6">
@@ -437,6 +446,7 @@ export function ContainerDetailPage({ id }: { id: string }) {
           )}
         </Section>
       ) : null}
+      </div>
 
       <ConfirmDialog
         open={removeOpen}

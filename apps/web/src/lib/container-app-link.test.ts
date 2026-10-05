@@ -67,6 +67,9 @@ describe('resolveContainerAppHref', () => {
     expect(resolvePublicAppUrl('seerr', {}, {}, { seerr: 'https://requests.example' })).toBe(
       'https://requests.example',
     );
+    expect(
+      resolvePublicAppUrl('seerr', {}, { seerr: 'https://user:secret@requests.example/app?token=abc' }, {}),
+    ).toBe('https://requests.example/app');
     expect(resolvePublicAppUrl('seerr', {}, { seerr: '' }, { seerr: 'https://requests.example' })).toBeNull();
     expect(
       resolvePublicAppUrl('seerr', { public_url: 'https://from-label.example' }, {}, {}),

@@ -1,10 +1,11 @@
 import type { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { API_PREFIX, type HomeLayout, type HomeLayoutResponse } from '@dockora/shared';
 import { actorIdFromRequest, auditService } from '../audit/audit.service.js';
+import { isAuthEnabled } from '../auth/auth-gate.js';
 import { OPERATOR_ROLES } from '../auth/role-policy.js';
 import { ComposeService } from '../compose/compose.service.js';
 import { PrismaSettingsRepository } from '../settings/settings.service.js';
-import { discoverProjectPublicUrls } from './discover-urls.js';
+import { discoverProjectPublicUrls, sanitizePublicUrl } from './discover-urls.js';
 import { prisma } from '../../infrastructure/db/prisma.js';
 import {
   HOME_LAYOUT_KEY,
@@ -24,8 +25,14 @@ export const homeModule: FastifyPluginAsync = async (app: FastifyInstance) => {
     excludePaths: app.config.composeExcludePaths,
   });
 
-  app.get(`${API_PREFIX}/home/layout`, async (): Promise<HomeLayoutResponse> => {
-    return readLayout(repo);
+  app.get(`${API_PREFIX}/home/layout`, async (request): Promise<HomeLayoutResponse> => {
+    const state = await readLayout(repo);
+    const authOn = await isAuthEnabled();
+    const role = request.user?.role;
+    if (authOn && role !== 'admin' && role !== 'operator') {
+      return { ...state, layout: redactHomeUrls(state.layout) };
+    }
+    return state;
   });
 
   app.get(`${API_PREFIX}/home/discovered-urls`, async (): Promise<{ urls: Record<string, string> }> => {
@@ -62,6 +69,17 @@ export const homeModule: FastifyPluginAsync = async (app: FastifyInstance) => {
     },
   );
 };
+
+function redactHomeUrls(layout: HomeLayout): HomeLayout {
+  const cleanMap = (urls: Record<string, string>) =>
+    Object.fromEntries(Object.entries(urls).map(([key, value]) => [key, sanitizePublicUrl(value)]));
+  return {
+    ...layout,
+    appUrls: cleanMap(layout.appUrls ?? {}),
+    appPublicUrls: cleanMap(layout.appPublicUrls ?? {}),
+    links: (layout.links ?? []).map((link) => ({ ...link, url: sanitizePublicUrl(link.url) })),
+  };
+}
 
 async function discoverContainerPublicUrls(
   compose: ComposeService,

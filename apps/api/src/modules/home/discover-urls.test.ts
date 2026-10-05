@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { discoverProjectPublicUrls, discoverServicePublicUrl, parseDotEnv } from './discover-urls.js';
+import {
+  discoverProjectPublicUrls,
+  discoverServicePublicUrl,
+  parseDotEnv,
+  sanitizePublicUrl,
+} from './discover-urls.js';
 
 describe('discoverServicePublicUrl', () => {
   it('reads a service-specific APP_URL', () => {
@@ -39,6 +44,11 @@ describe('discoverServicePublicUrl', () => {
         singleService: true,
       }),
     ).toBe('https://requests.example');
+  });
+
+  it('keeps a non-http value unchanged', () => {
+    expect(sanitizePublicUrl('')).toBe('');
+    expect(sanitizePublicUrl('not a url')).toBe('not a url');
   });
 
   it('drops credentials and query secrets from a public URL', () => {

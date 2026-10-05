@@ -17,6 +17,7 @@ import {
   Section,
   SuccessBanner,
   TabBar,
+  tabPanelProps,
 } from '@/components/ui/page-parts';
 import { SchedulerSection } from '@/components/settings/scheduler-section';
 import { UsersSection } from '@/components/settings/users-section';
@@ -70,6 +71,7 @@ export function SettingsPageView() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [tab, setTab] = useState<SettingsTab>('general');
+  const tabsId = useId();
   const [pendingTab, setPendingTab] = useState<SettingsTab | null>(null);
 
   const load = useCallback(async () => {
@@ -221,7 +223,7 @@ export function SettingsPageView() {
       {success ? <SuccessBanner message={success} /> : null}
 
       <div className="md:hidden">
-        <TabBar tabs={tabs} active={tab} onChange={(id) => requestTabChange(id as SettingsTab)} />
+        <TabBar idPrefix={tabsId} tabs={tabs} active={tab} onChange={(id) => requestTabChange(id as SettingsTab)} />
       </div>
 
       <div className="grid gap-6 md:grid-cols-[13rem_minmax(0,1fr)] lg:grid-cols-[15rem_minmax(0,1fr)]">
@@ -245,7 +247,7 @@ export function SettingsPageView() {
           </nav>
         </aside>
 
-        <div className="min-w-0 space-y-6">
+        <div {...tabPanelProps(tabsId, tab)} className="min-w-0 space-y-6">
           {tab === 'general' ? (
             <SettingsPanel title={t.settings.sections.general} description={desc.general}>
               <div className="grid gap-4 sm:grid-cols-2">

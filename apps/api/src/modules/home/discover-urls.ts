@@ -110,6 +110,15 @@ function unquote(value: string): string {
   return (comment >= 0 ? value.slice(0, comment) : value).trim();
 }
 
+/** Drops userinfo, query, and hash from an http(s) URL. Other strings stay unchanged. */
+export function sanitizePublicUrl(value: string): string {
+  if (!value.trim()) return value;
+  const clean = httpUrl(value);
+  if (clean) return clean;
+  if (/^https?:\/\//i.test(value.trim())) return '';
+  return value;
+}
+
 function httpUrl(value: string | undefined): string | null {
   const trimmed = unquote(value?.trim() ?? '');
   if (!trimmed || trimmed.length > 500 || /\s/.test(trimmed)) return null;
