@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CSRF_COOKIE, CSRF_HEADER, SESSION_COOKIE } from '@dockora/shared';
-import { allowsStreamQueryToken, csrfMismatch, isPublicAuthRoute, liftBearerToken } from './auth-gate.js';
+import { csrfMismatch, isPublicAuthRoute, liftBearerToken } from './auth-gate.js';
 import type { FastifyRequest } from 'fastify';
 
 describe('isPublicAuthRoute', () => {
@@ -39,7 +39,7 @@ describe('liftBearerToken', () => {
     expect(request.authSource).toBe('cookie');
   });
 
-  it('lifts a query token only for a GET event stream', () => {
+  it('ignores a query token on event streams', () => {
     const request = {
       method: 'GET',
       url: '/api/v1/dashboard/stream?token=abc.def',
@@ -47,10 +47,8 @@ describe('liftBearerToken', () => {
       query: { token: 'abc.def' },
       cookies: {},
     } as unknown as FastifyRequest;
-    expect(allowsStreamQueryToken(request)).toBe(true);
     liftBearerToken(request);
-    expect(request.headers.authorization).toBe('Bearer abc.def');
-    expect(request.authSource).toBe('query');
+    expect(request.headers.authorization).toBeUndefined();
   });
 
   it('ignores query tokens on websockets and ordinary routes', () => {

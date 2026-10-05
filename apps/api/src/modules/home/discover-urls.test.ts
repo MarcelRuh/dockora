@@ -51,6 +51,15 @@ describe('discoverServicePublicUrl', () => {
     expect(sanitizePublicUrl('not a url')).toBe('not a url');
   });
 
+  it('drops a secret-looking path segment', () => {
+    expect(
+      discoverServicePublicUrl({
+        env: { SEERR_APP_URL: 'https://requests.example/app/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
+        service: 'seerr',
+      }),
+    ).toBe('https://requests.example/app');
+  });
+
   it('drops credentials and query secrets from a public URL', () => {
     expect(
       discoverServicePublicUrl({

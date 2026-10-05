@@ -11,7 +11,14 @@ const settings = new SettingsService(new PrismaSettingsRepository());
 let cache: { value: boolean; at: number } | null = null;
 const CACHE_TTL_MS = 5_000;
 
-export type AuthTokenSource = 'header' | 'cookie' | 'query' | 'protocol';
+export type AuthTokenSource = 'header' | 'cookie' | 'protocol';
+
+/** Auth is on and the caller is not an operator or admin. */
+export async function isViewer(request: { user?: { role?: string } | null }): Promise<boolean> {
+  if (!(await isAuthEnabled())) return false;
+  const role = request.user?.role;
+  return role !== 'admin' && role !== 'operator';
+}
 
 export function invalidateAuthEnabledCache(): void {
   cache = null;
@@ -59,19 +66,9 @@ export function csrfMismatch(request: FastifyRequest): boolean {
 }
 
 /**
- * EventSource cannot set Authorization. A query token is accepted only on
- * GET paths ending in /stream and never on WebSocket upgrades. Everything else uses the
- * session cookie or `Sec-WebSocket-Protocol: dockora.jwt.<token>`.
+ * Sessions use the HttpOnly cookie. Cross-origin clients send Authorization.
+ * WebSockets use `Sec-WebSocket-Protocol: dockora.jwt.<token>`. Query tokens are ignored.
  */
-export function allowsStreamQueryToken(request: FastifyRequest): boolean {
-  if (request.method !== 'GET') return false;
-  const upgrade = request.headers.upgrade;
-  if (typeof upgrade === 'string' && upgrade.toLowerCase() === 'websocket') return false;
-  if (request.headers['sec-websocket-key']) return false;
-  const path = (request.url ?? '').split('?')[0] ?? '';
-  return path.endsWith('/stream');
-}
-
 export function liftBearerToken(request: FastifyRequest): void {
   if (request.headers.authorization) {
     request.authSource = 'header';
@@ -82,13 +79,6 @@ export function liftBearerToken(request: FastifyRequest): void {
   if (cookieToken) {
     request.headers.authorization = `Bearer ${cookieToken}`;
     request.authSource = 'cookie';
-    return;
-  }
-
-  const queryToken = (request.query as { token?: string } | undefined)?.token;
-  if (queryToken && allowsStreamQueryToken(request)) {
-    request.headers.authorization = `Bearer ${queryToken}`;
-    request.authSource = 'query';
     return;
   }
 

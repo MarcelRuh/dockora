@@ -8,7 +8,7 @@ import {
   type ComposeProjectSummary,
 } from '@dockora/shared';
 import { actorIdFromRequest, auditService } from '../audit/audit.service.js';
-import { isAuthEnabled } from '../auth/auth-gate.js';
+import { isAuthEnabled, isViewer } from '../auth/auth-gate.js';
 import { ADMIN_ROLES, OPERATOR_ROLES, rolesForComposeAction } from '../auth/role-policy.js';
 import {
   ComposeNotFoundError,
@@ -54,17 +54,25 @@ export const composeModule: FastifyPluginAsync = async (app: FastifyInstance) =>
     if (event.type === 'container') invalidateComposeDiscoveryCache();
   });
 
-  app.get(`${API_PREFIX}/compose`, async (): Promise<ComposeProjectSummary[]> => {
+  app.get(`${API_PREFIX}/compose`, async (request): Promise<ComposeProjectSummary[]> => {
     try {
-      return await service.list();
+      const projects = await service.list();
+      if (await isViewer(request)) {
+        return projects.map((project) => ({ ...project, path: '' }));
+      }
+      return projects;
     } catch (error) {
       return await throwComposeError(app, error);
     }
   });
 
-  app.get(`${API_PREFIX}/compose/bases`, async () => {
-    return { bases: service.listBasePaths() };
-  });
+  app.get(
+    `${API_PREFIX}/compose/bases`,
+    { preHandler: [app.requireRole(...OPERATOR_ROLES)] },
+    async () => {
+      return { bases: service.listBasePaths() };
+    },
+  );
 
   app.post<{
     Body: {
@@ -341,7 +349,7 @@ export const composeModule: FastifyPluginAsync = async (app: FastifyInstance) =>
         const authOn = await isAuthEnabled();
         const role = request.user?.role;
         if (authOn && role !== 'admin' && role !== 'operator') {
-          return { ...details, yaml: '' };
+          return { ...details, yaml: '', path: '' };
         }
         return details;
       } catch (error) {

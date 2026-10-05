@@ -625,6 +625,7 @@ export const de = {
         network: 'Container',
         published: 'Gruppiert nach Netzwerk',
         unattached: 'Ohne Netzwerk',
+        controls: 'Kartensteuerung',
       },
     },
     settings: {

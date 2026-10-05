@@ -6,10 +6,18 @@ updates:
       interval: weekly
     open-pull-requests-limit: 10
     groups:
+      prisma:
+        patterns:
+          - "prisma"
+          - "@prisma/client"
       production-deps:
         dependency-type: production
+        exclude-patterns:
+          - "@prisma/client"
       development-deps:
         dependency-type: development
+        exclude-patterns:
+          - "prisma"
 
   - package-ecosystem: github-actions
     directory: /

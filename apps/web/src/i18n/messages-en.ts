@@ -626,6 +626,7 @@ export const en = {
         network: 'containers',
         published: 'Grouped by network',
         unattached: 'No network',
+        controls: 'Map controls',
       },
     },
     settings: {

@@ -437,8 +437,8 @@ body {
   background: var(--dockora-surface) !important;
   border-bottom: 1px solid var(--dockora-border) !important;
   fill: var(--dockora-text) !important;
-  width: 28px !important;
-  height: 28px !important;
+  width: 44px !important;
+  height: 44px !important;
 }
 
 @media (hover: hover) and (pointer: fine) {

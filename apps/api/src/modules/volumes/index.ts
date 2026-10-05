@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { API_PREFIX, type VolumeBrowseEntry, type VolumeSummary } from '@dockora/shared';
 import { throwDockerError, withDockerError } from '../../domain/docker-errors.js';
+import { isViewer } from '../auth/auth-gate.js';
 import { OPERATOR_ROLES } from '../auth/role-policy.js';
 import { destructiveRateLimit } from '../../presentation/http/destructive-rate-limit.js';
 import { VolumeGuardError, VolumesService } from './volumes.service.js';
@@ -11,8 +12,12 @@ import { VolumeGuardError, VolumesService } from './volumes.service.js';
 export const volumesModule: FastifyPluginAsync = async (app: FastifyInstance) => {
   const service = new VolumesService(app.docker);
 
-  app.get(`${API_PREFIX}/volumes`, async (): Promise<VolumeSummary[]> => {
-    return withDockerError(app, () => service.list());
+  app.get(`${API_PREFIX}/volumes`, async (request): Promise<VolumeSummary[]> => {
+    const volumes = await withDockerError(app, () => service.list());
+    if (await isViewer(request)) {
+      return volumes.map((volume) => ({ ...volume, mountpoint: '' }));
+    }
+    return volumes;
   });
 
   app.get<{ Params: { name: string } }>(

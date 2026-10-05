@@ -1,3 +1,5 @@
+import { stripPublicUrlSecrets } from './public-url.js';
+
 const SPECIFIC_SUFFIXES = ['_APP_URL', '_PUBLIC_URL', '_BASE_URL', '_EXTERNAL_URL', '_URL'] as const;
 const GENERIC_KEYS = ['APP_URL', 'PUBLIC_URL', 'BASE_URL', 'EXTERNAL_URL'] as const;
 
@@ -120,18 +122,5 @@ export function sanitizePublicUrl(value: string): string {
 }
 
 function httpUrl(value: string | undefined): string | null {
-  const trimmed = unquote(value?.trim() ?? '');
-  if (!trimmed || trimmed.length > 500 || /\s/.test(trimmed)) return null;
-  try {
-    const url = new URL(trimmed);
-    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
-    if (!url.username && !url.password && !url.search && !url.hash) return trimmed;
-    url.username = '';
-    url.password = '';
-    url.search = '';
-    url.hash = '';
-    return url.toString();
-  } catch {
-    return null;
-  }
+  return stripPublicUrlSecrets(unquote(value?.trim() ?? ''));
 }

@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { API_PREFIX, APP_NAME, APP_VERSION } from '@dockora/shared';
+import { isViewer } from '../auth/auth-gate.js';
 import { actorIdFromRequest, auditService } from '../audit/audit.service.js';
 import { destructiveRateLimit } from '../../presentation/http/destructive-rate-limit.js';
 import { DockerHostUpdateService, type DockerHostComponent } from './docker-host-update.service.js';
@@ -19,24 +20,31 @@ export const systemModule: FastifyPluginAsync = async (app: FastifyInstance) => 
     selfImage: app.config.selfImage,
   });
 
-  app.get(`${API_PREFIX}/system/info`, async () => {
+  app.get(`${API_PREFIX}/system/info`, async (request) => {
+    const viewer = await isViewer(request);
     return {
       name: APP_NAME,
       version: APP_VERSION,
       nodeEnv: app.config.nodeEnv,
-      composeSearchPaths: app.config.composeSearchPaths,
-      composeExcludePaths: app.config.composeExcludePaths,
+      composeSearchPaths: viewer ? [] : app.config.composeSearchPaths,
+      composeExcludePaths: viewer ? [] : app.config.composeExcludePaths,
       autoUpdateEnabled: app.config.autoUpdateEnabled,
-      selfImage: app.config.selfImage,
-      installDir: app.config.installDirHost,
+      selfImage: viewer ? '' : app.config.selfImage,
+      installDir: viewer ? null : app.config.installDirHost,
       repo: app.config.repo,
       updateBranch: app.config.updateBranch,
-      pluginDir: app.config.pluginDir,
+      pluginDir: viewer ? '' : app.config.pluginDir,
     };
   });
 
-  app.get(`${API_PREFIX}/system/self-update`, async () => {
-    return selfUpdate.status();
+  app.get(`${API_PREFIX}/system/self-update`, async (request) => {
+    const status = await selfUpdate.status();
+    if (!(await isViewer(request))) return status;
+    return {
+      ...status,
+      installDir: null,
+      message: status.message.replace(/\s*\([^)]*[/\\][^)]*\)/g, '').trim(),
+    };
   });
 
   app.post(

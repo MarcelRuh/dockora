@@ -30,6 +30,7 @@ export interface TopologyLabels {
   network: string;
   published: string;
   unattached: string;
+  controls: string;
 }
 
 function HostNode({ data }: NodeProps<Node<HostNodeData>>) {
@@ -184,7 +185,7 @@ export function NetworkTopology({
           proOptions={{ hideAttribution: true }}
         >
           <Background gap={20} size={1} color="var(--dockora-border)" />
-          <Controls showInteractive={false} />
+          <Controls showInteractive={false} aria-label={labels.controls} />
         </ReactFlow>
       </div>
     </section>

@@ -33,7 +33,7 @@ We aim to acknowledge reports within **7 days**.
 - Host metrics run in systemd (`dockora-host-metrics`) on the host, so the default stack has no `pid: host` and no extra capabilities. The host shell is a separate Compose profile `host-shell` and stays off unless you start it
 - In-app self-update runs the script embedded in the API image. It does not download a shell script. The one-shot updater still mounts the Docker socket so it can rebuild the stack. That socket is the control plane: Dockora cannot manage containers without it
 - The API drops `NET_RAW`, `MKNOD`, `AUDIT_WRITE`, `SYS_CHROOT` and `SETFCAP`. The web container drops every capability. Both set `no-new-privileges`
-- Browser sessions use the HttpOnly cookie. WebSockets use `Sec-WebSocket-Protocol: dockora.jwt.<token>`. A `?token=` query is accepted only on GET `*/stream` (EventSource)
+- Browser sessions use the HttpOnly cookie. WebSockets use `Sec-WebSocket-Protocol: dockora.jwt.<token>`. A `?token=` query is ignored
 - Discord webhooks must be `https://discord.com/api/webhooks/…`. ntfy may use a LAN server; loopback and link-local addresses are rejected
 - Set `DOCKORA_EMBED=1` only on HTTPS, and set `DOCKORA_FRAME_ANCESTORS` to the parent site
 - Expose the UI only behind TLS (compose profile `tls`, or an external reverse proxy)

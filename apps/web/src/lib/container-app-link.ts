@@ -1,3 +1,4 @@
+import { stripPublicUrlSecrets } from './public-url';
 import { publishedPortHref, uniquePublishedPorts } from './published-ports';
 
 const URL_LABELS = ['url', 'dockora.url', 'homepage.href', 'net.unraid.docker.webui'] as const;
@@ -68,20 +69,7 @@ export function containerLinkChoices(
 }
 
 function httpUrl(value: string | undefined): string | null {
-  const trimmed = value?.trim() ?? '';
-  if (!/^https?:\/\//i.test(trimmed)) return null;
-  try {
-    const url = new URL(trimmed);
-    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
-    if (!url.username && !url.password && !url.search && !url.hash) return trimmed;
-    url.username = '';
-    url.password = '';
-    url.search = '';
-    url.hash = '';
-    return url.toString();
-  } catch {
-    return null;
-  }
+  return stripPublicUrlSecrets(value?.trim() ?? '');
 }
 
 function pickWebPort<T extends { port: string; href: string | null; hostPort: string | null }>(

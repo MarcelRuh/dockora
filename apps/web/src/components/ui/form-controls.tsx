@@ -14,7 +14,7 @@ const variants = {
 } as const;
 
 const sizes = {
-  sm: 'h-7 px-2 text-[10px] tracking-[0.1em]',
+  sm: 'h-7 px-2 text-[10px] tracking-[0.1em] [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:min-w-11 [@media(pointer:coarse)]:px-3',
   md: 'h-10 px-4 text-[11px] tracking-[0.14em]',
 } as const;
 

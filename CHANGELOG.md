@@ -5,6 +5,16 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.56] – 2026-10-05
+
+### Changed
+
+- Viewers no longer receive volume mount paths, Compose directories, or install paths
+- Public URLs drop secret-looking path segments as well as credentials and query values
+- Event streams ignore `?token=` and use the session cookie or Authorization header
+- Map controls are 44px and named; small buttons grow to 44px on coarse pointers
+- Dependabot updates Prisma CLI and client in one pull request
+
 ## [2.0.55] – 2026-10-05
 
 ### Changed
