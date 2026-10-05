@@ -11,6 +11,7 @@ import {
 import { request } from 'undici';
 import type { ComposeService } from '../compose/compose.service.js';
 import type Docker from 'dockerode';
+import { mergeRemoteCheck } from './digest-fallback.js';
 import { waitForContainerHealthy } from './health-wait.js';
 
 type RegistryAuth = {
@@ -51,6 +52,7 @@ export class UpdatesService {
       ? await this.deps.getRegistryAuth()
       : undefined;
     const results: UpdateCheckResult[] = [];
+    const remoteByImage = new Map<string, Promise<string | null>>();
 
     for (let i = 0; i < containers.length; i++) {
       const container = containers[i]!;
@@ -62,6 +64,7 @@ export class UpdatesService {
           container.name,
           container.image,
           registryAuth,
+          remoteByImage,
         );
         results.push(result);
         if (result.error?.toLowerCase().includes('rate limited')) {
@@ -159,12 +162,13 @@ export class UpdatesService {
     containerName: string,
     image: string,
     registryCreds?: { ghcrToken: string; lscrToken: string },
+    remoteByImage?: Map<string, Promise<string | null>>,
   ): Promise<UpdateCheckResult> {
     const parsed = parseImageRef(image);
     const registry = detectRegistry(image);
+    const previous = await prisma.updateCheckCache.findUnique({ where: { containerId } });
 
     let currentDigest: string | null = null;
-    let remoteDigest: string | null = null;
     let error: string | undefined;
 
     try {
@@ -174,14 +178,26 @@ export class UpdatesService {
       error = `Local inspect failed: ${err instanceof Error ? err.message : String(err)}`;
     }
 
+    let fetchedDigest: string | null = null;
+    let remoteError: string | undefined;
     try {
-      remoteDigest = await fetchRemoteDigest(
-        parsed,
-        await this.resolveAuth(parsed.registryHost, registryCreds),
-      );
+      const auth = await this.resolveAuth(parsed.registryHost, registryCreds);
+      const load = remoteByImage?.get(image) ?? fetchRemoteDigest(parsed, auth);
+      remoteByImage?.set(image, load);
+      fetchedDigest = await load;
     } catch (err) {
-      const remoteErr = err instanceof Error ? err.message : String(err);
-      error = error ? `${error}; Remote: ${remoteErr}` : remoteErr;
+      remoteByImage?.delete(image);
+      remoteError = err instanceof Error ? err.message : String(err);
+    }
+
+    const merged = mergeRemoteCheck({
+      previousRemoteDigest: previous?.remoteDigest ?? null,
+      fetchedDigest,
+      remoteError,
+    });
+    const remoteDigest = merged.remoteDigest;
+    if (merged.error) {
+      error = error ? `${error}; Remote: ${merged.error}` : merged.error;
     }
 
     const updateAvailable =
@@ -210,7 +226,7 @@ export class UpdatesService {
         registry,
         currentTag: parsed.tag,
         error: error ?? null,
-        checkedAt: new Date(),
+        checkedAt: fetchedDigest || !previous ? new Date() : previous.checkedAt,
       },
     });
 
@@ -464,7 +480,7 @@ async function fetchRemoteDigest(
     case 'dockerhub':
       return fetchDockerHubDigest(parsed);
     case 'ghcr':
-      return fetchOciDigest('ghcr.io', parsed, auth);
+      return fetchOciDigest(parsed.registryHost, parsed, auth);
     case 'quay':
       return fetchOciDigest('quay.io', parsed, auth);
     case 'gitea':
@@ -599,19 +615,11 @@ async function fetchManifestDigest(
     res = await attempt(bearer);
   }
 
-  // Rate limit: backoff + authenticated retry (never stay on anonymous)
-  for (let retry = 0; res.statusCode === 429 && retry < 3; retry++) {
+  // One pause, then a single retry. A burst of retries keeps the same repo in the 429 window.
+  if (res.statusCode === 429) {
+    const waitMs = retryAfterMs(res.headers['retry-after']) ?? 12_000;
     await res.body.dump().catch(() => undefined);
-    await sleep(2_000 * (retry + 1));
-    const challenge = parseWwwAuthenticate(res.headers['www-authenticate']);
-    const nextBearer =
-      (await resolveBearer(challenge)) ??
-      (auth?.registryAuth?.token ? await resolveBearer(null) : null) ??
-      bearer;
-    if (nextBearer) {
-      usedChallenge = true;
-      bearer = nextBearer;
-    }
+    await sleep(waitMs);
     res = await attempt(bearer);
   }
 
@@ -723,6 +731,16 @@ async function fetchRegistryBearerToken(
     if (withCreds) return withCreds;
   }
   return requestToken(false);
+}
+
+function retryAfterMs(header: string | string[] | undefined): number | null {
+  const raw = Array.isArray(header) ? header[0] : header;
+  if (!raw) return null;
+  const seconds = Number(raw);
+  if (Number.isFinite(seconds)) return Math.min(Math.max(seconds, 1), 30) * 1000;
+  const at = Date.parse(raw);
+  if (Number.isFinite(at)) return Math.min(Math.max(at - Date.now(), 1_000), 30_000);
+  return null;
 }
 
 function sleep(ms: number): Promise<void> {

@@ -5,6 +5,13 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.58] – 2026-10-05
+
+### Fixed
+
+- A registry rate limit keeps the last known image digest instead of leaving a standing error
+- GHCR and lscr.io checks wait once for Retry-After instead of repeating the same pull
+
 ## [2.0.57] – 2026-10-05
 
 ### Changed
