@@ -24,7 +24,9 @@ export async function buildApp(deps: BuildAppDeps): Promise<FastifyInstance> {
 
   const app = Fastify({
     loggerInstance: logger,
-    trustProxy: true,
+    // Trust forwarded addresses only from loopback and private peers (Compose proxy, Caddy, nginx).
+    // A public client cannot pick a new X-Forwarded-For to dodge the rate limit.
+    trustProxy: ['loopback', 'uniquelocal'],
     requestIdHeader: 'x-request-id',
     genReqId: () => crypto.randomUUID(),
   });

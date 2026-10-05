@@ -5,6 +5,13 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.57] – 2026-10-05
+
+### Changed
+
+- Login lockout follows the account, so a new forwarded address does not reset it
+- `X-Forwarded-For` is trusted only from loopback and private peers
+
 ## [2.0.56] – 2026-10-05
 
 ### Changed

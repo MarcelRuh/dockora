@@ -27,7 +27,7 @@ We aim to acknowledge reports within **7 days**.
 - Set a strong `BOOTSTRAP_ADMIN_PASSWORD` (≥ 12 characters, no defaults)
 - Authentication is **on by default**; keep it enabled on any network-exposed instance
 - Restrict Docker socket access; prefer rootless Docker where possible
-- Keep `DOCKORA_API_BIND=127.0.0.1` unless another host must call the API directly
+- Keep `DOCKORA_API_BIND=127.0.0.1` unless another host must call the API directly. `X-Forwarded-For` is trusted only from loopback and private addresses. Login failures also count per account, so a new forwarded address does not reset the lock
 - Leave `DOCKORA_HOST_TERMINAL` unset; set it to `1` only while you need a host shell
 - `/home` is mounted read-only. Directories you edit from the UI are extra writable binds in `docker-compose.override.yml` (not committed). `/opt` and `/srv` stay read-only. The API entrypoint does not change their owner or mode
 - Host metrics run in systemd (`dockora-host-metrics`) on the host, so the default stack has no `pid: host` and no extra capabilities. The host shell is a separate Compose profile `host-shell` and stays off unless you start it

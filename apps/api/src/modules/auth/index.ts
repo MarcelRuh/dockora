@@ -17,10 +17,9 @@ import { invalidateAuthEnabledCache, isAuthEnabled, isPublicAuthRoute, liftBeare
 import { clearSessionCookies, isSecureCookieRequest, jwtExpiresToSeconds, setSessionCookies } from './session-cookies.js';
 import { ensureAuthEnabledStored } from '../settings/settings.service.js';
 import {
-  assertLoginAllowed,
-  clearLoginFailures,
-  loginLockKey,
-  recordLoginFailure,
+  assertLoginIdentities,
+  clearLoginIdentity,
+  recordLoginIdentityFailure,
   useLoginLockoutFile,
 } from './login-lockout.js';
 import { isWeakBootstrapPassword } from '../../config/env.js';
@@ -124,9 +123,9 @@ const authPlugin: FastifyPluginAsync = async (app: FastifyInstance) => {
         throw app.httpErrors.badRequest('email and password required');
       }
 
-      const lockKey = loginLockKey(request.ip || 'unknown', email);
+      const clientIp = request.ip || 'unknown';
       try {
-        assertLoginAllowed(lockKey);
+        assertLoginIdentities(clientIp, email);
       } catch (error) {
         throw app.httpErrors.tooManyRequests(
           error instanceof Error ? error.message : 'Too many failed logins',
@@ -135,11 +134,11 @@ const authPlugin: FastifyPluginAsync = async (app: FastifyInstance) => {
 
       const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
       if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
-        recordLoginFailure(lockKey);
+        recordLoginIdentityFailure(clientIp, email);
         throw app.httpErrors.unauthorized('Invalid credentials');
       }
 
-      clearLoginFailures(lockKey);
+      clearLoginIdentity(clientIp, email);
 
       if (user.totpEnabled && user.totpSecretEnc) {
         const tempToken = await reply.jwtSign(
@@ -209,9 +208,9 @@ const authPlugin: FastifyPluginAsync = async (app: FastifyInstance) => {
         throw app.httpErrors.unauthorized('Invalid TOTP session');
       }
 
-      const lockKey = loginLockKey(request.ip || 'unknown', payload.email);
+      const clientIp = request.ip || 'unknown';
       try {
-        assertLoginAllowed(lockKey);
+        assertLoginIdentities(clientIp, payload.email);
       } catch (error) {
         throw app.httpErrors.tooManyRequests(
           error instanceof Error ? error.message : 'Too many failed logins',
@@ -239,11 +238,11 @@ const authPlugin: FastifyPluginAsync = async (app: FastifyInstance) => {
       }
 
       if (!ok) {
-        recordLoginFailure(lockKey);
+        recordLoginIdentityFailure(clientIp, payload.email);
         throw app.httpErrors.unauthorized('Invalid authentication code');
       }
 
-      clearLoginFailures(lockKey);
+      clearLoginIdentity(clientIp, payload.email);
 
       if (nextBackupHashes != null) {
         await prisma.user.update({

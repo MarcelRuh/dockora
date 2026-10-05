@@ -47,6 +47,26 @@ export function loginLockKey(ip: string, email: string): string {
   return `${ip}::${email.toLowerCase()}`;
 }
 
+/** Account-wide key. A new forwarded address does not reset this counter. */
+export function accountLockKey(email: string): string {
+  return `acct::${email.trim().toLowerCase()}`;
+}
+
+export function assertLoginIdentities(ip: string, email: string): void {
+  assertLoginAllowed(loginLockKey(ip, email));
+  assertLoginAllowed(accountLockKey(email));
+}
+
+export function recordLoginIdentityFailure(ip: string, email: string): void {
+  recordLoginFailure(loginLockKey(ip, email));
+  recordLoginFailure(accountLockKey(email));
+}
+
+export function clearLoginIdentity(ip: string, email: string): void {
+  clearLoginFailures(loginLockKey(ip, email));
+  clearLoginFailures(accountLockKey(email));
+}
+
 export function assertLoginAllowed(key: string): void {
   const state = locks.get(key);
   if (!state) return;
