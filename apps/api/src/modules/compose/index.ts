@@ -358,7 +358,7 @@ export const composeModule: FastifyPluginAsync = async (app: FastifyInstance) =>
         const authOn = await isAuthEnabled();
         const role = request.user?.role;
         if (authOn && role !== 'admin' && role !== 'operator') {
-          return { ...details, yaml: '', path: '' };
+          return { ...details, yaml: '', path: '', envFiles: [] };
         }
         return details;
       } catch (error) {

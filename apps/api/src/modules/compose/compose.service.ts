@@ -55,7 +55,32 @@ export interface ComposeServiceDeps {
 }
 
 export class ComposeService {
+  private readonly projectChains = new Map<string, Promise<unknown>>();
+
   constructor(private readonly deps: ComposeServiceDeps) {}
+
+  private async withProjectLock<T>(id: string, fn: () => Promise<T>): Promise<T> {
+    const prev = this.projectChains.get(id) ?? Promise.resolve();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const chain = prev.then(
+      () => gate,
+      () => gate,
+    );
+    this.projectChains.set(id, chain);
+    await prev.then(
+      () => undefined,
+      () => undefined,
+    );
+    try {
+      return await fn();
+    } finally {
+      release();
+      if (this.projectChains.get(id) === chain) this.projectChains.delete(id);
+    }
+  }
 
   async list(): Promise<ComposeProjectSummary[]> {
     const [projects, containers] = await Promise.all([
@@ -275,6 +300,14 @@ export class ComposeService {
     content: string,
     baseHash?: string,
   ): Promise<ComposeProjectDetails> {
+    return this.withProjectLock(id, () => this.updateYamlUnlocked(id, content, baseHash));
+  }
+
+  private async updateYamlUnlocked(
+    id: string,
+    content: string,
+    baseHash?: string,
+  ): Promise<ComposeProjectDetails> {
     const project = await this.resolveProject(id);
     if (baseHash) {
       const current = await readFile(project.absoluteComposePath, 'utf8').catch(() => '');
@@ -331,6 +364,15 @@ export class ComposeService {
     fileName = '.env',
     baseHash?: string,
   ): Promise<ComposeProjectDetails> {
+    return this.withProjectLock(id, () => this.updateEnvFileUnlocked(id, content, fileName, baseHash));
+  }
+
+  private async updateEnvFileUnlocked(
+    id: string,
+    content: string,
+    fileName = '.env',
+    baseHash?: string,
+  ): Promise<ComposeProjectDetails> {
     const project = await this.resolveProject(id);
     const safe = assertAllowedEnvFile(fileName);
     if (content.includes('\0')) {
@@ -356,6 +398,13 @@ export class ComposeService {
    * `--pull never` verhindert, dass Compose erneut das Tag-Image zieht.
    */
   async recreatePinned(
+    id: string,
+    opts: { serviceName: string; imageRef: string },
+  ): Promise<ActionResult> {
+    return this.withProjectLock(id, () => this.recreatePinnedUnlocked(id, opts));
+  }
+
+  private async recreatePinnedUnlocked(
     id: string,
     opts: { serviceName: string; imageRef: string },
   ): Promise<ActionResult> {
@@ -652,6 +701,14 @@ export class ComposeService {
     serviceName: string,
     options: { removeVolumes?: boolean } = {},
   ): Promise<ActionResult & { removedProject: boolean }> {
+    return this.withProjectLock(id, () => this.removeServiceUnlocked(id, serviceName, options));
+  }
+
+  private async removeServiceUnlocked(
+    id: string,
+    serviceName: string,
+    options: { removeVolumes?: boolean } = {},
+  ): Promise<ActionResult & { removedProject: boolean }> {
     const project = await this.resolveProject(id);
     const original = await readComposeYaml(project.absoluteComposePath);
     const removed = removeComposeService(original, serviceName);
@@ -709,6 +766,13 @@ export class ComposeService {
 
   /** Fügt einen Service in die Compose-Datei ein und startet ihn optional. */
   async addService(
+    id: string,
+    input: { name: string; image: string; ports?: string[]; start?: boolean },
+  ): Promise<ComposeProjectDetails> {
+    return this.withProjectLock(id, () => this.addServiceUnlocked(id, input));
+  }
+
+  private async addServiceUnlocked(
     id: string,
     input: { name: string; image: string; ports?: string[]; start?: boolean },
   ): Promise<ComposeProjectDetails> {

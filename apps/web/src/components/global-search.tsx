@@ -4,28 +4,30 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { fetchComposeProjects, fetchContainers, fetchImages } from '@/lib/api';
 import { useLocale } from '@/i18n/locale-provider';
+import { useAuth } from '@/components/auth/auth-provider';
 import { useDialogFocus } from '@/components/ui/focus-dialog';
+import { canAdmin, canOperate } from '@/lib/roles';
 import { cn } from '@/lib/utils';
 
 type Hit = { href: string; label: string; hint: string };
 
 const SEARCH_CACHE_TTL_MS = 5 * 60_000;
-let searchCache: { at: number; locale: string; hits: Hit[] } | null = null;
+let searchCache: { at: number; locale: string; roleKey: string; hits: Hit[] } | null = null;
 
 const NAV_HITS = [
-  { href: '/', key: 'dashboard' },
-  { href: '/containers', key: 'containers' },
-  { href: '/compose', key: 'compose' },
-  { href: '/images', key: 'images' },
-  { href: '/volumes', key: 'volumes' },
-  { href: '/updates', key: 'updates' },
-  { href: '/monitoring', key: 'monitoring' },
-  { href: '/network', key: 'network' },
-  { href: '/backups', key: 'backups' },
-  { href: '/logs', key: 'logs' },
-  { href: '/terminal', key: 'terminal' },
-  { href: '/self-update', key: 'selfUpdate' },
-  { href: '/settings', key: 'settings' },
+  { href: '/', key: 'dashboard', access: 'any' },
+  { href: '/containers', key: 'containers', access: 'any' },
+  { href: '/compose', key: 'compose', access: 'any' },
+  { href: '/images', key: 'images', access: 'any' },
+  { href: '/volumes', key: 'volumes', access: 'any' },
+  { href: '/updates', key: 'updates', access: 'any' },
+  { href: '/monitoring', key: 'monitoring', access: 'any' },
+  { href: '/network', key: 'network', access: 'any' },
+  { href: '/backups', key: 'backups', access: 'admin' },
+  { href: '/logs', key: 'logs', access: 'operator' },
+  { href: '/terminal', key: 'terminal', access: 'operator' },
+  { href: '/self-update', key: 'selfUpdate', access: 'admin' },
+  { href: '/settings', key: 'settings', access: 'any' },
 ] as const;
 
 export function GlobalSearch({
@@ -36,6 +38,7 @@ export function GlobalSearch({
   className?: string;
 }) {
   const { t, locale } = useLocale();
+  const { authEnabled, user } = useAuth();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -45,12 +48,14 @@ export function GlobalSearch({
   const inputRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   useDialogFocus(panelRef, () => setOpen(false), open);
+  const roleKey = `${authEnabled ? 'on' : 'off'}:${user?.role ?? 'none'}`;
 
   const loadHits = useCallback(async () => {
     const localeKey = locale;
     if (
       searchCache &&
       searchCache.locale === localeKey &&
+      searchCache.roleKey === roleKey &&
       Date.now() - searchCache.at < SEARCH_CACHE_TTL_MS
     ) {
       setHits(searchCache.hits);
@@ -65,6 +70,8 @@ export function GlobalSearch({
       ]);
       const next: Hit[] = [];
       for (const item of NAV_HITS) {
+        if (item.access === 'admin' && !canAdmin(user?.role, authEnabled)) continue;
+        if (item.access === 'operator' && !canOperate(user?.role, authEnabled)) continue;
         next.push({ href: item.href, label: t.nav[item.key], hint: t.common.pages });
       }
       for (const c of containers) {
@@ -89,12 +96,12 @@ export function GlobalSearch({
           hint: t.nav.images,
         });
       }
-      searchCache = { at: Date.now(), locale: localeKey, hits: next };
+      searchCache = { at: Date.now(), locale: localeKey, roleKey, hits: next };
       setHits(next);
     } finally {
       setLoading(false);
     }
-  }, [t, locale]);
+  }, [t, locale, roleKey, authEnabled, user?.role]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

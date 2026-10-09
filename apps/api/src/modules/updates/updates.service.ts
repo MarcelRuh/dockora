@@ -28,6 +28,7 @@ export interface UpdatesServiceDeps {
 export class UpdatesService {
   constructor(private readonly deps: UpdatesServiceDeps) {}
   private pruneReadAt = 0;
+  private readonly applyInFlight = new Set<string>();
 
   async listCached(): Promise<UpdateCheckResult[]> {
     await this.pruneStaleCacheThrottled();
@@ -239,6 +240,18 @@ export class UpdatesService {
    * Pullt das Image, recreatet den Container, prüft Health und rollt bei Fail zurück.
    */
   async applyUpdate(containerId: string): Promise<UpdateApplyResult> {
+    if (this.applyInFlight.has(containerId)) {
+      return { ok: false, message: 'Update already in progress for this container', step: 'pull' };
+    }
+    this.applyInFlight.add(containerId);
+    try {
+      return await this.applyUpdateLocked(containerId);
+    } finally {
+      this.applyInFlight.delete(containerId);
+    }
+  }
+
+  private async applyUpdateLocked(containerId: string): Promise<UpdateApplyResult> {
     const cached = await prisma.updateCheckCache.findUnique({ where: { containerId } });
     if (!cached) {
       return { ok: false, message: 'No cached update info for container', step: 'pull' };

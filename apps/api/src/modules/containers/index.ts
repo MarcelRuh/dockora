@@ -106,7 +106,14 @@ export const containersModule: FastifyPluginAsync = async (app: FastifyInstance)
           { tail },
         );
       } catch (error) {
-        withDockerError(app, () => Promise.reject(error));
+        const message = error instanceof Error ? error.message : 'log_stream_failed';
+        request.log.warn({ err: error }, 'Container log SSE failed');
+        try {
+          reply.raw.write(`event: error\ndata: ${JSON.stringify({ message })}\n\n`);
+        } catch {
+          // ignore write failures on a broken socket
+        }
+        reply.raw.end();
         return;
       }
 
@@ -186,7 +193,7 @@ export const containersModule: FastifyPluginAsync = async (app: FastifyInstance)
           resource: 'container',
           resourceId: request.params.id,
           metadata: {
-            deleteProjectDir: body.deleteProjectDir !== false,
+            deleteProjectDir: body.deleteProjectDir === true,
             removeVolumes: body.removeVolumes === true,
             viaCompose: Boolean(result && 'removedProject' in result),
           },
@@ -223,18 +230,7 @@ function parseTail(query: { tail?: string }): number {
   return Number.isFinite(n) && n > 0 ? Math.min(Math.floor(n), 5_000) : 200;
 }
 
-const VIEWER_HIDDEN_LABELS = new Set([
-  'com.docker.compose.project.working_dir',
-  'com.docker.compose.project.config_files',
-  'desktop.docker.io/binds',
-]);
-
 function redactViewerContainerSummary(container: ContainerSummary): ContainerSummary {
-  const labels = { ...container.labels };
-  for (const key of Object.keys(labels)) {
-    if (VIEWER_HIDDEN_LABELS.has(key) || /(?:^|\.)(?:path|dir|bind|mount|source)$/i.test(key)) {
-      labels[key] = '';
-    }
-  }
-  return { ...container, labels };
+  // Labels often carry paths, tokens, or private URLs — viewers get none of them.
+  return { ...container, labels: {} };
 }

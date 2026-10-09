@@ -13,6 +13,8 @@ model User {
   passwordHash    String
   displayName     String?
   role            String   @default("admin")
+  /// Bumped on password/role changes so older JWTs stop working.
+  sessionVersion  Int      @default(0)
   totpEnabled     Boolean  @default(false)
   /// AES-GCM encrypted TOTP secret (base64 payload)
   totpSecretEnc   String?

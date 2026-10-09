@@ -5,6 +5,24 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.63] – 2026-10-09
+
+### Security
+
+- Role and password changes bump a session version so older JWTs stop working
+- Auth-enabled cache cannot restore a stale “off” after a concurrent toggle
+- Terminal WebSockets require an allowed Origin (especially with embed cookies)
+- Container remove no longer deletes Compose project folders unless explicitly requested
+- Viewer container labels are fully redacted; Compose env file names stay operator-only
+- Notification mark-read is operator-only; proxy strips `?token=` from upstream queries
+
+### Fixed
+
+- Container log SSE writes an error event instead of hanging after hijack
+- Compose YAML/env edits and pinned recreates share a per-project lock
+- Image updates refuse a second apply while one is already in flight
+- Nav and global search hide operator/admin destinations from viewers
+
 ## [2.0.62] – 2026-10-09
 
 ### Performance

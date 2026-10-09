@@ -14,6 +14,7 @@ import {
 } from '@dockora/shared';
 import { prisma } from '../../infrastructure/db/prisma.js';
 import { invalidateAuthEnabledCache, isAuthEnabled, isPublicAuthRoute, liftBearerToken, csrfMismatch } from './auth-gate.js';
+import { assertFreshSession, clearSessionGuardCache } from './session-guard.js';
 import { clearSessionCookies, isSecureCookieRequest, jwtExpiresToSeconds, setSessionCookies } from './session-cookies.js';
 import { ensureAuthEnabledStored } from '../settings/settings.service.js';
 import {
@@ -38,8 +39,8 @@ import {
 
 declare module '@fastify/jwt' {
   interface FastifyJWT {
-    payload: { sub: string; role: UserRole; email: string; purpose?: 'totp' };
-    user: { sub: string; role: UserRole; email: string; purpose?: 'totp' };
+    payload: { sub: string; role: UserRole; email: string; purpose?: 'totp'; sv?: number };
+    user: { sub: string; role: UserRole; email: string; purpose?: 'totp'; sv?: number };
   }
 }
 
@@ -64,6 +65,13 @@ const authPlugin: FastifyPluginAsync = async (app: FastifyInstance) => {
     if (request.user.purpose === 'totp') {
       throw app.httpErrors.unauthorized('Complete two-factor authentication first');
     }
+    try {
+      await assertFreshSession(request);
+    } catch (error) {
+      throw app.httpErrors.unauthorized(
+        error instanceof Error ? error.message : 'Authentication required',
+      );
+    }
   });
 
   app.decorate('requireRole', (...roles: UserRole[]) => {
@@ -72,6 +80,13 @@ const authPlugin: FastifyPluginAsync = async (app: FastifyInstance) => {
       await request.jwtVerify();
       if (request.user.purpose === 'totp') {
         throw app.httpErrors.unauthorized('Complete two-factor authentication first');
+      }
+      try {
+        await assertFreshSession(request);
+      } catch (error) {
+        throw app.httpErrors.unauthorized(
+          error instanceof Error ? error.message : 'Authentication required',
+        );
       }
       if (!roles.includes(request.user.role)) {
         throw app.httpErrors.forbidden('Insufficient role');
@@ -91,9 +106,12 @@ const authPlugin: FastifyPluginAsync = async (app: FastifyInstance) => {
       if (request.user.purpose === 'totp') {
         throw app.httpErrors.unauthorized('Complete two-factor authentication first');
       }
+      await assertFreshSession(request);
     } catch (error) {
       if (error && typeof error === 'object' && 'statusCode' in error) throw error;
-      throw app.httpErrors.unauthorized('Authentication required');
+      throw app.httpErrors.unauthorized(
+        error instanceof Error ? error.message : 'Authentication required',
+      );
     }
   });
 
@@ -161,6 +179,7 @@ const authPlugin: FastifyPluginAsync = async (app: FastifyInstance) => {
         sub: user.id,
         role: user.role as UserRole,
         email: user.email,
+        sv: user.sessionVersion,
       });
       attachSession(request, reply, token);
 
@@ -245,16 +264,21 @@ const authPlugin: FastifyPluginAsync = async (app: FastifyInstance) => {
       clearLoginIdentity(clientIp, payload.email);
 
       if (nextBackupHashes != null) {
-        await prisma.user.update({
-          where: { id: user.id },
+        const consumed = await prisma.user.updateMany({
+          where: { id: user.id, totpBackupHashes: user.totpBackupHashes },
           data: { totpBackupHashes: nextBackupHashes },
         });
+        if (consumed.count === 0) {
+          throw app.httpErrors.unauthorized('Invalid authentication code');
+        }
+        clearSessionGuardCache(user.id);
       }
 
       const token = await reply.jwtSign({
         sub: user.id,
         role: user.role as UserRole,
         email: user.email,
+        sv: user.sessionVersion,
       });
       attachSession(request, reply, token);
 
@@ -472,14 +496,17 @@ const authPlugin: FastifyPluginAsync = async (app: FastifyInstance) => {
         }
       }
 
+      const revokeSessions = Boolean(password) || Boolean(role && role !== existing.role);
       const user = await prisma.user.update({
         where: { id: request.params.id },
         data: {
           ...(role ? { role } : {}),
           ...(displayName !== undefined ? { displayName } : {}),
           ...(password ? { passwordHash: await bcrypt.hash(password, 12) } : {}),
+          ...(revokeSessions ? { sessionVersion: { increment: 1 } } : {}),
         },
       });
+      if (revokeSessions) clearSessionGuardCache(user.id);
 
       void auditService.record({
         action: 'auth.user.update',
@@ -515,6 +542,7 @@ const authPlugin: FastifyPluginAsync = async (app: FastifyInstance) => {
       }
 
       await prisma.user.delete({ where: { id: existing.id } });
+      clearSessionGuardCache(existing.id);
       void auditService.record({
         action: 'auth.user.delete',
         actorId: actorIdFromRequest(request),

@@ -1,8 +1,9 @@
-import type { FastifyInstance, FastifyPluginAsync } from 'fastify';
+import type { FastifyInstance, FastifyPluginAsync, FastifyRequest } from 'fastify';
 import websocket from '@fastify/websocket';
 import { API_PREFIX } from '@dockora/shared';
 import type Docker from 'dockerode';
 import { actorIdFromRequest, auditService } from '../audit/audit.service.js';
+import { headerValue } from '../auth/session-cookies.js';
 import { attachDockerExecSession, interactiveShellCommand } from './attach-exec.js';
 
 /**
@@ -29,6 +30,7 @@ export const terminalModule: FastifyPluginAsync = async (app: FastifyInstance) =
       preHandler: [app.requireRole('admin', 'operator')],
     },
     async (socket, request) => {
+      if (!assertAllowedTerminalOrigin(socket, request, app.config.corsOrigin)) return;
       const id = (request.params as { id: string }).id;
       const query = request.query as {
         cols?: string;
@@ -87,6 +89,7 @@ export const terminalModule: FastifyPluginAsync = async (app: FastifyInstance) =
       preHandler: [app.requireRole('admin')],
     },
     async (socket, request) => {
+      if (!assertAllowedTerminalOrigin(socket, request, app.config.corsOrigin)) return;
       if (!app.config.hostTerminalEnabled) {
         socket.send('\r\nHost terminal is disabled. Set DOCKORA_HOST_TERMINAL=1 and restart the API.\r\n');
         socket.close();
@@ -164,4 +167,30 @@ async function isHostAgentRunning(docker: Docker, name: string): Promise<boolean
   } catch {
     return false;
   }
+}
+
+/** Block cross-site WebSocket upgrades that ride the session cookie (esp. DOCKORA_EMBED). */
+function assertAllowedTerminalOrigin(
+  socket: { send: (data: string) => void; close: () => void },
+  request: FastifyRequest,
+  corsOrigin: string,
+): boolean {
+  const origin = headerValue(request.headers.origin);
+  const allowed = corsOrigin
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+  if (!origin) {
+    // Cookie/protocol sessions from a browser must present Origin.
+    if (request.authSource === 'cookie' || request.authSource === 'protocol') {
+      socket.send('\r\nTerminal origin required\r\n');
+      socket.close();
+      return false;
+    }
+    return true;
+  }
+  if (allowed.includes('*') || allowed.includes(origin)) return true;
+  socket.send('\r\nTerminal origin not allowed\r\n');
+  socket.close();
+  return false;
 }

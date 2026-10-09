@@ -14,22 +14,22 @@ import { NAV_ICONS } from '@/components/ui/nav-icons';
 import { BrandLogo, BrandLogoWide } from '@/components/ui/brand-logo';
 import { useDialogFocus } from '@/components/ui/focus-dialog';
 import { fetchSelfUpdateStatus } from '@/lib/api';
-import { canAdmin } from '@/lib/roles';
+import { canAdmin, canOperate } from '@/lib/roles';
 
 const NAV_ITEMS = [
-  { key: 'dashboard', href: '/', ready: true },
-  { key: 'containers', href: '/containers', ready: true },
-  { key: 'compose', href: '/compose', ready: true },
-  { key: 'images', href: '/images', ready: true },
-  { key: 'volumes', href: '/volumes', ready: true },
-  { key: 'updates', href: '/updates', ready: true },
-  { key: 'monitoring', href: '/monitoring', ready: true },
-  { key: 'network', href: '/network', ready: true },
-  { key: 'backups', href: '/backups', ready: true },
-  { key: 'logs', href: '/logs', ready: true },
-  { key: 'terminal', href: '/terminal', ready: true },
-  { key: 'selfUpdate', href: '/self-update', ready: true },
-  { key: 'settings', href: '/settings', ready: true },
+  { key: 'dashboard', href: '/', ready: true, access: 'any' },
+  { key: 'containers', href: '/containers', ready: true, access: 'any' },
+  { key: 'compose', href: '/compose', ready: true, access: 'any' },
+  { key: 'images', href: '/images', ready: true, access: 'any' },
+  { key: 'volumes', href: '/volumes', ready: true, access: 'any' },
+  { key: 'updates', href: '/updates', ready: true, access: 'any' },
+  { key: 'monitoring', href: '/monitoring', ready: true, access: 'any' },
+  { key: 'network', href: '/network', ready: true, access: 'any' },
+  { key: 'backups', href: '/backups', ready: true, access: 'admin' },
+  { key: 'logs', href: '/logs', ready: true, access: 'operator' },
+  { key: 'terminal', href: '/terminal', ready: true, access: 'operator' },
+  { key: 'selfUpdate', href: '/self-update', ready: true, access: 'admin' },
+  { key: 'settings', href: '/settings', ready: true, access: 'any' },
 ] as const;
 
 let selfUpdateCache: { at: number; available: boolean } | null = null;
@@ -77,11 +77,17 @@ function NavList({
 }) {
   const { t } = useLocale();
   const pathname = usePathname();
+  const { authEnabled, user } = useAuth();
   const selfUpdateAvailable = useSelfUpdateAvailable();
+  const items = NAV_ITEMS.filter((item) => {
+    if (item.access === 'admin') return canAdmin(user?.role, authEnabled);
+    if (item.access === 'operator') return canOperate(user?.role, authEnabled);
+    return true;
+  });
 
   return (
     <ul className={cn('space-y-0.5', compact && 'space-y-0')}>
-      {NAV_ITEMS.map((item) => {
+      {items.map((item) => {
         const active = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
         const Icon = NAV_ICONS[item.key];
         const className = cn(

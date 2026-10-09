@@ -135,7 +135,7 @@ export class ContainersService {
     this.statsCache.delete(id);
 
     let projectMeta: { workingDir: string; projectName: string } | null = null;
-    if (action === 'remove' && options?.deleteProjectDir !== false) {
+    if (action === 'remove' && options?.deleteProjectDir === true) {
       try {
         const details = await this.deps.docker.inspectContainer(id);
         const workingDir = details.labels[COMPOSE_WORKING_DIR_LABEL]?.trim();
@@ -151,7 +151,7 @@ export class ContainersService {
 
     await this.deps.docker.containerAction(id, action, options);
 
-    if (action === 'remove' && projectMeta && options?.deleteProjectDir !== false) {
+    if (action === 'remove' && projectMeta && options?.deleteProjectDir === true) {
       const folderMsg = await this.maybeDeleteComposeProjectDir(projectMeta);
       if (folderMsg) {
         return { ok: true, message: `Container remove succeeded. ${folderMsg}` };

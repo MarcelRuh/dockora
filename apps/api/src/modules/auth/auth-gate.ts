@@ -8,7 +8,8 @@ import { headerValue } from './session-cookies.js';
 
 const settings = new SettingsService(new PrismaSettingsRepository());
 
-let cache: { value: boolean; at: number } | null = null;
+let cache: { value: boolean; at: number; gen: number } | null = null;
+let generation = 0;
 const CACHE_TTL_MS = 5_000;
 
 export type AuthTokenSource = 'header' | 'cookie' | 'protocol';
@@ -22,6 +23,7 @@ export async function isViewer(request: { user?: { role?: string } | null }): Pr
 
 export function invalidateAuthEnabledCache(): void {
   cache = null;
+  generation += 1;
 }
 
 export async function isAuthEnabled(): Promise<boolean> {
@@ -29,8 +31,11 @@ export async function isAuthEnabled(): Promise<boolean> {
   if (cache && now - cache.at < CACHE_TTL_MS) {
     return cache.value;
   }
+  const gen = generation;
   const current = await settings.getAuthEnabled();
-  cache = { value: current, at: now };
+  // A toggle while we were reading must not restore a stale false into the cache.
+  if (gen !== generation) return current;
+  cache = { value: current, at: Date.now(), gen };
   return current;
 }
 

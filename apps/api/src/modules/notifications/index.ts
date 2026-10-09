@@ -4,7 +4,7 @@ import {
   PrismaSettingsRepository,
   SettingsService,
 } from '../settings/settings.service.js';
-import { ADMIN_ROLES } from '../auth/role-policy.js';
+import { ADMIN_ROLES, OPERATOR_ROLES } from '../auth/role-policy.js';
 import { NotificationsService } from './notifications.service.js';
 
 export const notificationsModule: FastifyPluginAsync = async (app: FastifyInstance) => {
@@ -19,15 +19,20 @@ export const notificationsModule: FastifyPluginAsync = async (app: FastifyInstan
 
   app.post<{ Params: { id: string } }>(
     `${API_PREFIX}/notifications/:id/read`,
+    { preHandler: [app.requireRole(...OPERATOR_ROLES)] },
     async (request, reply) => {
       await service.markRead(request.params.id);
       return reply.status(204).send();
     },
   );
 
-  app.post(`${API_PREFIX}/notifications/read-all`, async () => {
-    return service.markAllRead();
-  });
+  app.post(
+    `${API_PREFIX}/notifications/read-all`,
+    { preHandler: [app.requireRole(...OPERATOR_ROLES)] },
+    async () => {
+      return service.markAllRead();
+    },
+  );
 
   app.post(
     `${API_PREFIX}/notifications/test`,
