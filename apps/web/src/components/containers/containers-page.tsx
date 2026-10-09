@@ -25,7 +25,7 @@ import {
   StatusBadge,
 } from '@/components/ui/page-parts';
 
-const STATS_POLL_MS = 45_000;
+const STATS_POLL_MS = 60_000;
 const FILTER_DEBOUNCE_MS = 350;
 
 function mergePreservingStats(
@@ -116,16 +116,16 @@ export function ContainersPage() {
       if (!silent) setLoading(true);
       setError(null);
       try {
-        const data = await fetchContainers(filter);
+        // First paint / filter change: one list call with stats. Live reloads stay cheap.
+        const data = await fetchContainers(silent ? filter : { ...filter, includeStats: true });
         setItems((prev) => mergePreservingStats(prev, data));
         setLoading(false);
-        if (!silent) void enrichStats(filter);
       } catch (err) {
         setError(err instanceof Error ? err.message : t.containers.loadError);
         if (!silent) setLoading(false);
       }
     },
-    [filter, enrichStats, t.containers.loadError],
+    [filter, t.containers.loadError],
   );
 
   useEffect(() => {

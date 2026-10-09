@@ -59,6 +59,13 @@ export class PrismaSettingsRepository implements ISettingsRepository {
   }
 }
 
+const SETTINGS_CACHE_TTL_MS = 5_000;
+let settingsCache: { at: number; envKey: string; value: AppSettings } | null = null;
+
+function clearSettingsCache(): void {
+  settingsCache = null;
+}
+
 export class SettingsService {
   constructor(private readonly repo: ISettingsRepository) {}
 
@@ -69,13 +76,23 @@ export class SettingsService {
   }
 
   async getSettings(envDefaults?: Partial<AppSettings>): Promise<AppSettings> {
+    const envKey = JSON.stringify(envDefaults ?? null);
+    const now = Date.now();
+    if (
+      settingsCache &&
+      settingsCache.envKey === envKey &&
+      now - settingsCache.at < SETTINGS_CACHE_TTL_MS
+    ) {
+      return settingsCache.value;
+    }
+
     const stored = await this.repo.getAll();
     const base: AppSettings = {
       ...DEFAULTS,
       ...envDefaults,
     };
 
-    return {
+    const value: AppSettings = {
       dockerSocket: stored.dockerSocket ?? base.dockerSocket,
       composeSearchPaths: stored.composeSearchPaths
         ? safeJson(stored.composeSearchPaths, base.composeSearchPaths)
@@ -126,6 +143,8 @@ export class SettingsService {
       monitoringTempThreshold: num(stored.monitoringTempThreshold, base.monitoringTempThreshold),
       authEnabled: stored.authEnabled ? stored.authEnabled === 'true' : base.authEnabled,
     };
+    settingsCache = { at: Date.now(), envKey, value };
+    return value;
   }
 
   async updateSettings(patch: Partial<AppSettings>): Promise<AppSettings> {
@@ -146,6 +165,7 @@ export class SettingsService {
     }
 
     await Promise.all(entries.map(([k, v]) => this.repo.set(k, v)));
+    clearSettingsCache();
     return this.getSettings();
   }
 }
@@ -182,6 +202,7 @@ export async function ensureAuthEnabledStored(): Promise<void> {
   const stored = await repo.get('authEnabled');
   if (stored == null || stored === '') {
     await repo.set('authEnabled', 'true');
+    clearSettingsCache();
   }
 }
 

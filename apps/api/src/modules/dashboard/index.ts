@@ -7,8 +7,8 @@ import { DockerHostUpdateService } from '../system/docker-host-update.service.js
 import { DashboardService } from './dashboard.service.js';
 import { lifetimeStatsService } from './lifetime.service.js';
 
-const SSE_INTERVAL_MS = 10_000;
-const OVERVIEW_TTL_MS = 4_000;
+const SSE_INTERVAL_MS = 15_000;
+const OVERVIEW_TTL_MS = 6_000;
 
 export const dashboardModule: FastifyPluginAsync = async (app: FastifyInstance) => {
   const dockerHostUpdates = new DockerHostUpdateService();

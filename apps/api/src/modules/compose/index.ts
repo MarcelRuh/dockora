@@ -18,6 +18,7 @@ import {
 } from './compose.service.js';
 import { UnsafeProjectPathError } from './safe-project-dir.js';
 import { invalidateComposeDiscoveryCache } from './compose-discovery.js';
+import { affectsComposeDiscovery } from '../../infrastructure/docker/resource-events.js';
 import { destructiveRateLimit } from '../../presentation/http/destructive-rate-limit.js';
 import {
   enrichPortConflictMessage,
@@ -52,7 +53,9 @@ export const composeModule: FastifyPluginAsync = async (app: FastifyInstance) =>
   app.decorate('composeService', service);
 
   app.docker.subscribeResourceChanges((event) => {
-    if (event.type === 'container') invalidateComposeDiscoveryCache();
+    if (event.type === 'container' && affectsComposeDiscovery(event.action)) {
+      invalidateComposeDiscoveryCache();
+    }
   });
 
   app.get(`${API_PREFIX}/compose`, async (request): Promise<ComposeProjectSummary[]> => {

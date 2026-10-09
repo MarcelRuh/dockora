@@ -21,9 +21,9 @@ export interface ContainersServiceDeps {
   searchPaths?: string[];
 }
 
-const STATS_CACHE_TTL_MS = 12_000;
+const STATS_CACHE_TTL_MS = 15_000;
 const STATS_CACHE_MAX = 200;
-const STATS_WARM_MS = 20_000;
+const STATS_WARM_MS = 30_000;
 const STATS_DEMAND_MS = 60_000;
 
 export class ContainersService {

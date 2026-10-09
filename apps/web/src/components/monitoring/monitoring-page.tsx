@@ -40,7 +40,7 @@ export function MonitoringPage() {
     void load();
   }, [load]);
 
-  useDockerLiveReload(() => void load(), 30_000);
+  useDockerLiveReload(() => void load(), 60_000);
 
   const rows =
     data?.containers.map((c) => [

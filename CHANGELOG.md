@@ -5,6 +5,15 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.62] – 2026-10-09
+
+### Performance
+
+- Docker `health_status` events no longer flush list, compose, or dashboard caches
+- Home relies on Docker live reload instead of a 30s full poll; URL discovery is cached and scanned in parallel
+- Container list loads stats in one request; stats warmer and monitoring polls are slower
+- Settings reads share a short TTL cache; backup lists are capped; dashboard SSE/overview TTL is gentler
+
 ## [2.0.61] – 2026-10-09
 
 ### Fixed

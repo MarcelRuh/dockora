@@ -31,6 +31,7 @@ import { Button, buttonClassName } from '@/components/ui/form-controls';
 import { NAV_ICONS } from '@/components/ui/nav-icons';
 import { ServiceIcon } from '@/components/ui/service-icon';
 import { useLocale } from '@/i18n/locale-provider';
+import { useDockerLiveReload } from '@/hooks/use-docker-live-reload';
 import {
   checkUpdates,
   composeAction,
@@ -334,20 +335,50 @@ export function CasaDesktop({
       void Promise.all([
         fetchContainers().catch(() => null),
         fetchUpdates().catch(() => null),
-        canEdit ? fetchDiscoveredAppUrls().catch(() => null) : Promise.resolve(null),
-        fetchSelfUpdateStatus().catch(() => null),
-      ]).then(([list, checks, discovered, dockora]) => {
+      ]).then(([list, checks]) => {
         if (cancelled) return;
         if (list) setContainers(list);
         if (checks) setUpdates(checks);
+      });
+    };
+    load();
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') load();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      cancelled = true;
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, []);
+
+  useDockerLiveReload(() => {
+    if (document.visibilityState === 'hidden') return;
+    void fetchContainers()
+      .then((list) => setContainers(list))
+      .catch(() => undefined);
+    void fetchUpdates()
+      .then((checks) => setUpdates(checks))
+      .catch(() => undefined);
+  }, 90_000);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadSlow = () => {
+      if (document.visibilityState === 'hidden') return;
+      void Promise.all([
+        canEdit ? fetchDiscoveredAppUrls().catch(() => null) : Promise.resolve(null),
+        fetchSelfUpdateStatus().catch(() => null),
+      ]).then(([discovered, dockora]) => {
+        if (cancelled) return;
         if (discovered) setDiscoveredUrls(discovered);
         if (dockora) setSelfUpdate(dockora);
       });
     };
-    load();
-    const timer = window.setInterval(load, 30_000);
+    loadSlow();
+    const timer = window.setInterval(loadSlow, 5 * 60_000);
     const onVisibility = () => {
-      if (document.visibilityState === 'visible') load();
+      if (document.visibilityState === 'visible') loadSlow();
     };
     document.addEventListener('visibilitychange', onVisibility);
     return () => {

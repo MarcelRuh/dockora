@@ -95,7 +95,10 @@ export class BackupsService {
   }
 
   async list(): Promise<BackupInfo[]> {
-    const rows = await prisma.backupRecord.findMany({ orderBy: { createdAt: 'desc' } });
+    const rows = await prisma.backupRecord.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+    });
     return rows.map(mapRow);
   }
 

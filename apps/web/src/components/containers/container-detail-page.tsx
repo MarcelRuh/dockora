@@ -101,7 +101,7 @@ export function ContainerDetailPage({ id }: { id: string }) {
     };
 
     void poll();
-    const timer = window.setInterval(() => void poll(), 8000);
+    const timer = window.setInterval(() => void poll(), 12_000);
     return () => {
       active = false;
       window.clearInterval(timer);

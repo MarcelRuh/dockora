@@ -7,6 +7,9 @@ import { ComposeService } from '../compose/compose.service.js';
 import { PrismaSettingsRepository } from '../settings/settings.service.js';
 import { discoverProjectPublicUrls, sanitizePublicUrl } from './discover-urls.js';
 import { prisma } from '../../infrastructure/db/prisma.js';
+import { mapPool } from '../../infrastructure/async/map-pool.js';
+import { createTtlMemo } from '../../infrastructure/cache/ttl-memo.js';
+import { affectsComposeDiscovery } from '../../infrastructure/docker/resource-events.js';
 import {
   HOME_LAYOUT_KEY,
   HOME_LAYOUT_REVISION_KEY,
@@ -16,6 +19,7 @@ import {
 } from './layout.js';
 
 const MAX_BODY_CHARS = 64_000;
+const DISCOVERED_URLS_TTL_MS = 60_000;
 
 export const homeModule: FastifyPluginAsync = async (app: FastifyInstance) => {
   const repo = new PrismaSettingsRepository();
@@ -23,6 +27,13 @@ export const homeModule: FastifyPluginAsync = async (app: FastifyInstance) => {
     docker: app.docker,
     searchPaths: app.config.composeSearchPaths,
     excludePaths: app.config.composeExcludePaths,
+  });
+  const discoveredMemo = createTtlMemo<Record<string, string>>(DISCOVERED_URLS_TTL_MS);
+
+  app.docker.subscribeResourceChanges((event) => {
+    if (event.type === 'container' && affectsComposeDiscovery(event.action)) {
+      discoveredMemo.clear();
+    }
   });
 
   app.get(`${API_PREFIX}/home/layout`, async (request): Promise<HomeLayoutResponse> => {
@@ -39,7 +50,8 @@ export const homeModule: FastifyPluginAsync = async (app: FastifyInstance) => {
     `${API_PREFIX}/home/discovered-urls`,
     { preHandler: [app.requireRole(...OPERATOR_ROLES)] },
     async (): Promise<{ urls: Record<string, string> }> => {
-      return { urls: await discoverContainerPublicUrls(compose, app.docker) };
+      const urls = await discoveredMemo.get(() => discoverContainerPublicUrls(compose, app.docker));
+      return { urls };
     },
   );
 
@@ -91,7 +103,7 @@ async function discoverContainerPublicUrls(
 ): Promise<Record<string, string>> {
   const [projects, containers] = await Promise.all([compose.list(), docker.listContainers(true)]);
   const urls: Record<string, string> = {};
-  for (const project of projects) {
+  await mapPool(projects, 4, async (project) => {
     try {
       const [details, envFile] = await Promise.all([
         compose.getDetails(project.id),
@@ -113,7 +125,7 @@ async function discoverContainerPublicUrls(
     } catch {
       // One unreadable stack should not hide the others.
     }
-  }
+  });
   return urls;
 }
 
