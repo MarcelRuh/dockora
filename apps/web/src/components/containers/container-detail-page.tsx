@@ -368,7 +368,7 @@ export function ContainerDetailPage({ id }: { id: string }) {
               <AccentPanel>
                 <p className="text-xs text-dockora-muted">{t.containers.stats.cpu}</p>
                 <p className="mt-1 font-mono text-2xl">{formatPercent(stats.cpuPercent, loc)}</p>
-                <ProgressBar value={stats.cpuPercent} className="mt-2" />
+                <ProgressBar value={stats.cpuPercent} className="mt-2" label={t.containers.stats.cpu} />
               </AccentPanel>
               <AccentPanel>
                 <p className="text-xs text-dockora-muted">{t.containers.stats.memory}</p>
@@ -379,7 +379,7 @@ export function ContainerDetailPage({ id }: { id: string }) {
                   {formatBytes(stats.memoryUsageBytes, loc)} /{' '}
                   {formatBytes(stats.memoryLimitBytes, loc)}
                 </p>
-                <ProgressBar value={stats.memoryPercent} className="mt-2" />
+                <ProgressBar value={stats.memoryPercent} className="mt-2" label={t.containers.stats.memory} />
               </AccentPanel>
               <AccentPanel>
                 <p className="text-xs text-dockora-muted">{t.containers.stats.network}</p>

@@ -507,7 +507,7 @@ function ResourceCell({ value, label }: { value: number | null | undefined; labe
   return (
     <div className="min-w-[7.5rem] space-y-1.5">
       <p className="font-mono text-xs tabular-nums text-dockora-text">{label}</p>
-      <ProgressBar value={value} className="h-1.5" />
+      <ProgressBar value={value} className="h-1.5" label={label} />
     </div>
   );
 }

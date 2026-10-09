@@ -222,7 +222,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-2 md:hidden">
             <button
               type="button"
-              className="dockora-field flex h-9 w-9 items-center justify-center"
+              className="dockora-field flex h-9 w-9 items-center justify-center [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11"
               aria-label={t.common.menu}
               aria-expanded={drawerOpen}
               onClick={() => setDrawerOpen(true)}

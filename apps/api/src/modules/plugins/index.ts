@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { API_PREFIX } from '@dockora/shared';
 import type { DockoraPlugin } from '../../domain/ports.js';
+import { isViewer } from '../auth/auth-gate.js';
 import { actorIdFromRequest, auditService } from '../audit/audit.service.js';
 import { prisma } from '../../infrastructure/db/prisma.js';
 import {
@@ -111,7 +112,13 @@ export const pluginsModule: FastifyPluginAsync = async (app: FastifyInstance) =>
     };
   }
 
-  app.get(`${API_PREFIX}/plugins`, async () => listPlugins());
+  app.get(`${API_PREFIX}/plugins`, async (request) => {
+    const listed = await listPlugins();
+    if (await isViewer(request)) {
+      return { ...listed, pluginDir: '' };
+    }
+    return listed;
+  });
 
   app.post<{ Params: { name: string } }>(
     `${API_PREFIX}/plugins/:name/enable`,

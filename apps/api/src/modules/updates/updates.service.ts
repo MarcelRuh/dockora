@@ -182,11 +182,13 @@ export class UpdatesService {
     let remoteError: string | undefined;
     try {
       const auth = await this.resolveAuth(parsed.registryHost, registryCreds);
-      const load = remoteByImage?.get(image) ?? fetchRemoteDigest(parsed, auth);
-      remoteByImage?.set(image, load);
+      const cacheKey = `${parsed.registryHost}/${apiRepositoryPath(parsed)}:${parsed.tag}`;
+      const load = remoteByImage?.get(cacheKey) ?? fetchRemoteDigest(parsed, auth);
+      remoteByImage?.set(cacheKey, load);
       fetchedDigest = await load;
     } catch (err) {
-      remoteByImage?.delete(image);
+      const cacheKey = `${parsed.registryHost}/${apiRepositoryPath(parsed)}:${parsed.tag}`;
+      remoteByImage?.delete(cacheKey);
       remoteError = err instanceof Error ? err.message : String(err);
     }
 
@@ -226,7 +228,7 @@ export class UpdatesService {
         registry,
         currentTag: parsed.tag,
         error: error ?? null,
-        checkedAt: fetchedDigest || !previous ? new Date() : previous.checkedAt,
+        checkedAt: new Date(),
       },
     });
 

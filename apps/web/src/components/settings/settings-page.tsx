@@ -5,7 +5,7 @@ import type { AppSettings, NotificationEvent } from '@dockora/shared';
 import { fetchSettings, testDiscordNotification, testNtfyNotification, updateSettings } from '@/lib/api';
 import { useLocale } from '@/i18n/locale-provider';
 import { useAuth } from '@/components/auth/auth-provider';
-import { canAdmin } from '@/lib/roles';
+import { canAdmin, canOperate } from '@/lib/roles';
 import { cn } from '@/lib/utils';
 import { Button, Input, Label, Select } from '@/components/ui/form-controls';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -64,6 +64,7 @@ export function SettingsPageView() {
   const { t } = useLocale();
   const { authEnabled, user } = useAuth();
   const isAdmin = canAdmin(user?.role, authEnabled);
+  const canOps = canOperate(user?.role, authEnabled);
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [baseline, setBaseline] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -95,20 +96,26 @@ export function SettingsPageView() {
   const tabs = useMemo(() => {
     const all: { id: SettingsTab; label: string }[] = [
       { id: 'general', label: t.settings.sections.general },
-      { id: 'docker', label: t.settings.sections.docker },
+    ];
+    if (canOps) {
+      all.push({ id: 'docker', label: t.settings.sections.docker });
+    }
+    all.push(
       { id: 'updates', label: t.settings.sections.updates },
       { id: 'notifications', label: t.settings.sections.notifications },
       { id: 'backup', label: t.settings.sections.backup },
       { id: 'monitoring', label: t.settings.sections.monitoring },
-      { id: 'scheduler', label: t.settings.sections.scheduler },
-    ];
+    );
+    if (canOps) {
+      all.push({ id: 'scheduler', label: t.settings.sections.scheduler });
+    }
     if (isAdmin) {
       all.push({ id: 'security', label: t.settings.sections.security });
       all.push({ id: 'plugins', label: t.settings.sections.plugins });
       all.push({ id: 'audit', label: t.settings.sections.audit });
     }
     return all;
-  }, [t, isAdmin]);
+  }, [t, isAdmin, canOps]);
 
   useEffect(() => {
     if (!tabs.some((item) => item.id === tab)) {
@@ -274,7 +281,7 @@ export function SettingsPageView() {
             </SettingsPanel>
           ) : null}
 
-          {tab === 'docker' ? (
+          {tab === 'docker' && canOps ? (
             <SettingsPanel title={t.settings.sections.docker} description={desc.docker}>
               <div className="grid gap-4">
                 <Field label={t.settings.fields.dockerSocket} hint={t.settings.hints.dockerSocket}>
@@ -585,7 +592,7 @@ export function SettingsPageView() {
             </SettingsPanel>
           ) : null}
 
-          {tab === 'scheduler' ? <SchedulerSection canEdit={isAdmin} /> : null}
+          {tab === 'scheduler' && canOps ? <SchedulerSection canEdit={isAdmin} /> : null}
 
           {tab === 'security' && isAdmin ? (
             <div className="space-y-6">

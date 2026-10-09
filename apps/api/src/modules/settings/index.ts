@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { API_PREFIX, type AppSettings } from '@dockora/shared';
-import { invalidateAuthEnabledCache, isAuthEnabled } from '../auth/auth-gate.js';
+import { invalidateAuthEnabledCache, isAuthEnabled, isViewer } from '../auth/auth-gate.js';
 import { actorIdFromRequest, auditService } from '../audit/audit.service.js';
 import {
   PrismaSettingsRepository,
@@ -12,6 +12,7 @@ import {
   shouldKeepSecret,
   shouldKeepWebhook,
 } from './secret-hygiene.js';
+import { cronFromUpdateIntervalMinutes } from './update-check-cron.js';
 
 const SECRET_KEYS = ['discordWebhookUrl', 'ghcrToken', 'lscrToken', 'ntfyToken'] as const;
 
@@ -45,7 +46,17 @@ export const settingsModule: FastifyPluginAsync = async (app: FastifyInstance) =
       autoUpdateImages: app.config.autoUpdateEnabled,
     });
     const authOn = await isAuthEnabled();
-    if (authOn && request.user?.role !== 'admin') return hideSettingsSecrets(settings);
+    if (authOn && request.user?.role === 'admin') {
+      return maskSettingsSecrets(settings);
+    }
+    if (await isViewer(request)) {
+      return {
+        ...hideSettingsSecrets(settings),
+        dockerSocket: '',
+        composeSearchPaths: [],
+      };
+    }
+    // Operators need to see that registry tokens exist without receiving the secret.
     return maskSettingsSecrets(settings);
   });
 
@@ -69,6 +80,17 @@ export const settingsModule: FastifyPluginAsync = async (app: FastifyInstance) =
       const updated = await service.updateSettings(patch);
       if ('authEnabled' in patch) {
         invalidateAuthEnabledCache();
+      }
+      if (
+        typeof patch.updateCheckIntervalMinutes === 'number' &&
+        app.hasDecorator('schedulerService')
+      ) {
+        const cron = cronFromUpdateIntervalMinutes(updated.updateCheckIntervalMinutes);
+        const jobs = await app.schedulerService.listJobs();
+        const job = jobs.find((entry) => entry.type === 'update_check');
+        if (job && job.cron !== cron) {
+          await app.schedulerService.updateJob(job.id, { cron });
+        }
       }
       const keys = Object.keys(patch).filter(
         (k) => !(SECRET_KEYS as readonly string[]).includes(k),

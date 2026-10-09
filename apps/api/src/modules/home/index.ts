@@ -35,9 +35,13 @@ export const homeModule: FastifyPluginAsync = async (app: FastifyInstance) => {
     return state;
   });
 
-  app.get(`${API_PREFIX}/home/discovered-urls`, async (): Promise<{ urls: Record<string, string> }> => {
-    return { urls: await discoverContainerPublicUrls(compose, app.docker) };
-  });
+  app.get(
+    `${API_PREFIX}/home/discovered-urls`,
+    { preHandler: [app.requireRole(...OPERATOR_ROLES)] },
+    async (): Promise<{ urls: Record<string, string> }> => {
+      return { urls: await discoverContainerPublicUrls(compose, app.docker) };
+    },
+  );
 
   app.put<{ Body: unknown }>(
     `${API_PREFIX}/home/layout`,
@@ -104,7 +108,7 @@ async function discoverContainerPublicUrls(
         const sameProject = container.composeProject === project.name || workingDir === projectPath;
         const service = container.composeService;
         if (!sameProject || !service || !byService[service]) continue;
-        urls[container.name] = byService[service]!;
+        urls[container.name] = sanitizePublicUrl(byService[service]!);
       }
     } catch {
       // One unreadable stack should not hide the others.

@@ -111,6 +111,14 @@ if [[ "$AUTH_ENABLED" == "true" ]]; then
   expect_viewer_403 PUT '/api/v1/compose/smoke-id/yaml'
   expect_viewer_403 POST '/api/v1/images/pull'
   expect_viewer_403 POST '/api/v1/backups'
+  DISCOVERED_CODE=$(curl -sS -o /dev/null -w '%{http_code}' \
+    -H "authorization: Bearer $VIEWER_TOKEN" \
+    "$API/api/v1/home/discovered-urls" || true)
+  if [[ "$DISCOVERED_CODE" != "403" ]]; then
+    echo "FAIL: viewer GET /home/discovered-urls expected 403, got $DISCOVERED_CODE"
+    curl -fsS "${AUTH_HEADER[@]}" -X DELETE "$API/api/v1/auth/users/$VIEWER_ID" >/dev/null || true
+    exit 1
+  fi
   curl -fsS "${AUTH_HEADER[@]}" -X DELETE "$API/api/v1/auth/users/$VIEWER_ID" >/dev/null || {
     echo "WARN: could not delete smoke viewer $VIEWER_ID"
   }

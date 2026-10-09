@@ -7,12 +7,14 @@ export function ProgressBar({
   tone = 'accent',
   autoTone = true,
   className,
+  label,
 }: {
   value: number | null;
   tone?: 'accent' | 'success' | 'warning' | 'danger';
   /** Resource gauges: color shifts by fill %. Task progress: set false. */
   autoTone?: boolean;
   className?: string;
+  label?: string;
 }) {
   const pct = value == null ? 0 : Math.min(100, Math.max(0, value));
   const resolvedTone =
@@ -31,6 +33,7 @@ export function ProgressBar({
         className,
       )}
       role="progressbar"
+      aria-label={label}
       aria-valuenow={value == null ? undefined : Math.round(pct)}
       aria-valuemin={0}
       aria-valuemax={100}

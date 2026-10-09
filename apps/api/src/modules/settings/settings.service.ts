@@ -93,8 +93,8 @@ export class SettingsService {
       ntfyEnabled: stored.ntfyEnabled ? stored.ntfyEnabled === 'true' : base.ntfyEnabled,
       locale: (stored.locale as AppSettings['locale']) ?? base.locale,
       timezone: stored.timezone ?? base.timezone,
-      updateCheckIntervalMinutes: num(
-        stored.updateCheckIntervalMinutes,
+      updateCheckIntervalMinutes: clampUpdateIntervalMinutes(
+        num(stored.updateCheckIntervalMinutes, base.updateCheckIntervalMinutes),
         base.updateCheckIntervalMinutes,
       ),
       autoUpdateImages: stored.autoUpdateImages
@@ -168,6 +168,12 @@ function num(raw: string | undefined, fallback: number): number {
 export function clampDays(value: number, fallback: number): number {
   if (!Number.isFinite(value)) return fallback;
   return Math.min(3650, Math.max(1, Math.round(value)));
+}
+
+/** Update-check interval: 15 minutes to 24 hours. */
+export function clampUpdateIntervalMinutes(value: number, fallback: number): number {
+  if (!Number.isFinite(value)) return fallback;
+  return Math.min(24 * 60, Math.max(15, Math.round(value)));
 }
 
 /** Persist default login-on if the operator never saved the toggle. */

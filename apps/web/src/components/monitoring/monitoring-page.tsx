@@ -119,7 +119,9 @@ export function MonitoringPage() {
                       : formatPercent(item.value as number | null, loc)}
                   </p>
                 </div>
-                {'format' in item ? null : <ProgressBar value={item.value as number | null} />}
+                {'format' in item ? null : (
+                  <ProgressBar value={item.value as number | null} label={item.label} />
+                )}
               </div>
             ))}
           </div>
@@ -129,7 +131,7 @@ export function MonitoringPage() {
             {data.alerts.length === 0 ? (
               <p className="text-sm text-dockora-muted">{t.monitoring.noAlerts}</p>
             ) : (
-              <ul className="space-y-2">
+              <ul className="space-y-2" role="alert">
                 {data.alerts.map((alert) => (
                   <li
                     key={alert}

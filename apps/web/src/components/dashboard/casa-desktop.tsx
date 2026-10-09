@@ -325,7 +325,7 @@ export function CasaDesktop({
       void Promise.all([
         fetchContainers().catch(() => null),
         fetchUpdates().catch(() => null),
-        fetchDiscoveredAppUrls().catch(() => null),
+        canEdit ? fetchDiscoveredAppUrls().catch(() => null) : Promise.resolve(null),
         fetchSelfUpdateStatus().catch(() => null),
       ]).then(([list, checks, discovered, dockora]) => {
         if (cancelled) return;
@@ -346,7 +346,7 @@ export function CasaDesktop({
       window.clearInterval(timer);
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, []);
+  }, [canEdit]);
 
   useEffect(() => {
     if (!addEditor) return;
@@ -1113,7 +1113,12 @@ export function CasaDesktop({
                           'absolute right-0.5 top-0.5 h-2 w-2 rounded-full ring-2 ring-dockora-surface',
                           runningTile ? 'bg-dockora-success' : 'bg-dockora-muted',
                         )}
-                      />
+                        title={runningTile ? t.common.running : t.common.stopped}
+                      >
+                        <span className="sr-only">
+                          {runningTile ? t.common.running : t.common.stopped}
+                        </span>
+                      </span>
                     </span>
                   </ContainerTile>
                 </li>
@@ -2323,7 +2328,11 @@ function FeatureCard({
       <div className="relative z-10 min-w-0">
         <h2 className="dockora-title-gradient text-xl">{title}</h2>
         <p className="mt-1 text-sm text-dockora-muted">{body}</p>
-        {alert ? <p className="mt-1 truncate text-xs text-dockora-danger">{alert}</p> : null}
+        {alert ? (
+          <p role="alert" className="mt-1 truncate text-xs text-dockora-danger">
+            {alert}
+          </p>
+        ) : null}
         <div className="mt-4 flex flex-wrap gap-2">
           <Link href={href} className={buttonClassName({ variant: 'primary', size: 'sm' })}>
             {action}

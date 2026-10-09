@@ -5,6 +5,17 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.59] – 2026-10-09
+
+### Fixed
+
+- Viewers can no longer read Compose env discovery, Docker socket paths, plugin dirs, or compose working-dir labels
+- Operators cannot run backup or cleanup jobs; those stay admin-only
+- The update-check interval in settings drives the scheduler cron
+- Registry digest checks share one request per canonical image reference
+- Operators see masked registry tokens instead of empty fields
+- Home unhealthy alerts, monitoring alerts, progress bars, and menu targets are named for assistive tech
+
 ## [2.0.58] – 2026-10-05
 
 ### Fixed

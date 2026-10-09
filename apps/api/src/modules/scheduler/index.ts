@@ -203,9 +203,13 @@ export const schedulerModule: FastifyPluginAsync = async (app: FastifyInstance) 
     scheduler.stop();
   });
 
-  app.get(`${API_PREFIX}/scheduler/jobs`, async (): Promise<ScheduledJob[]> => {
-    return scheduler.listJobs();
-  });
+  app.get(
+    `${API_PREFIX}/scheduler/jobs`,
+    { preHandler: [app.requireRole('admin', 'operator')] },
+    async (): Promise<ScheduledJob[]> => {
+      return scheduler.listJobs();
+    },
+  );
 
   app.patch<{
     Params: { id: string };
@@ -222,6 +226,18 @@ export const schedulerModule: FastifyPluginAsync = async (app: FastifyInstance) 
     `${API_PREFIX}/scheduler/jobs/:id/run`,
     { preHandler: [app.requireRole('admin', 'operator')] },
     async (request) => {
+      const jobs = await scheduler.listJobs();
+      const job = jobs.find((entry) => entry.id === request.params.id);
+      if (!job) {
+        throw app.httpErrors.notFound('Job not found');
+      }
+      const role = request.user?.role;
+      if (
+        role !== 'admin' &&
+        (job.type === 'backup' || job.type === 'cleanup')
+      ) {
+        throw app.httpErrors.forbidden('Admin role required for this job');
+      }
       return scheduler.runJob(request.params.id);
     },
   );

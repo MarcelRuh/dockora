@@ -48,7 +48,13 @@ export const containersModule: FastifyPluginAsync = async (app: FastifyInstance)
   app.get<{ Querystring: ContainerFilter }>(
     `${API_PREFIX}/containers`,
     async (request): Promise<ContainerSummary[]> => {
-      return withDockerError(app, () => service.list(request.query));
+      const list = await withDockerError(app, () => service.list(request.query));
+      const authOn = await isAuthEnabled();
+      const role = request.user?.role;
+      if (authOn && role !== 'admin' && role !== 'operator') {
+        return list.map(redactViewerContainerSummary);
+      }
+      return list;
     },
   );
 
@@ -215,4 +221,20 @@ function parseTail(query: { tail?: string }): number {
   if (!raw) return 200;
   const n = Number(raw);
   return Number.isFinite(n) && n > 0 ? Math.min(Math.floor(n), 5_000) : 200;
+}
+
+const VIEWER_HIDDEN_LABELS = new Set([
+  'com.docker.compose.project.working_dir',
+  'com.docker.compose.project.config_files',
+  'desktop.docker.io/binds',
+]);
+
+function redactViewerContainerSummary(container: ContainerSummary): ContainerSummary {
+  const labels = { ...container.labels };
+  for (const key of Object.keys(labels)) {
+    if (VIEWER_HIDDEN_LABELS.has(key) || /(?:^|\.)(?:path|dir|bind|mount|source)$/i.test(key)) {
+      labels[key] = '';
+    }
+  }
+  return { ...container, labels };
 }

@@ -282,7 +282,7 @@ export function UpdatesPage() {
             {stepLabel}
             {phase ? ` · ${phase}` : null}
           </p>
-          <ProgressBar value={applyProgress} autoTone={false} />
+          <ProgressBar value={applyProgress} autoTone={false} label={stepLabel ?? t.updates.applying} />
         </div>
       ) : null}
 
