@@ -2,9 +2,11 @@ import type { HomeLayout } from '@dockora/shared';
 
 export function createLayoutSaveQueue(deps: {
   save: (layout: HomeLayout, revision: number) => Promise<number>;
-  reloadRevision: () => Promise<number>;
+  /** Load the remote layout after a 409 so local edits do not overwrite another operator. */
+  reloadState: () => Promise<{ layout: HomeLayout; revision: number }>;
   isConflict: (error: unknown) => boolean;
   onError: (kind: 'conflict' | 'failed') => void;
+  onReloaded?: (layout: HomeLayout) => void;
   onSaved?: () => void;
 }) {
   let revision = 0;
@@ -19,23 +21,23 @@ export function createLayoutSaveQueue(deps: {
       return;
     }
     inflight = true;
-    let conflicts = 0;
     try {
       while (latest) {
         const snapshot = latest;
         rerun = false;
         try {
           revision = await deps.save(snapshot, revision);
-          conflicts = 0;
         } catch (error) {
-          if (deps.isConflict(error) && conflicts < 2) {
-            conflicts += 1;
-            revision = await deps.reloadRevision();
-            rerun = true;
-          } else {
-            deps.onError(deps.isConflict(error) ? 'conflict' : 'failed');
+          if (deps.isConflict(error)) {
+            const remote = await deps.reloadState();
+            revision = remote.revision;
+            latest = remote.layout;
+            deps.onReloaded?.(remote.layout);
+            deps.onError('conflict');
             break;
           }
+          deps.onError('failed');
+          break;
         }
         if (!rerun && latest === snapshot) {
           deps.onSaved?.();

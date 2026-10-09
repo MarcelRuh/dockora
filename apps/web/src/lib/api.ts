@@ -202,10 +202,14 @@ export async function composeAction(
   );
 }
 
-export async function saveComposeYaml(id: string, content: string): Promise<ComposeProjectDetails> {
+export async function saveComposeYaml(
+  id: string,
+  content: string,
+  baseHash?: string,
+): Promise<ComposeProjectDetails> {
   return request<ComposeProjectDetails>(`/compose/${encodeURIComponent(id)}/yaml`, {
     method: 'PUT',
-    body: JSON.stringify({ content }),
+    body: JSON.stringify({ content, baseHash }),
   });
 }
 
@@ -221,10 +225,11 @@ export async function saveComposeEnv(
   id: string,
   content: string,
   fileName = '.env',
+  baseHash?: string,
 ): Promise<ComposeProjectDetails> {
   return request<ComposeProjectDetails>(`/compose/${encodeURIComponent(id)}/env`, {
     method: 'PUT',
-    body: JSON.stringify({ content, fileName }),
+    body: JSON.stringify({ content, fileName, baseHash }),
   });
 }
 

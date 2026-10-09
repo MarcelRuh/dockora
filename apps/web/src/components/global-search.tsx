@@ -40,6 +40,7 @@ export function GlobalSearch({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [hits, setHits] = useState<Hit[]>([]);
+  const [hitIndex, setHitIndex] = useState(-1);
   const [loading, setLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -110,6 +111,7 @@ export function GlobalSearch({
   useEffect(() => {
     if (!open) return;
     setQuery('');
+    setHitIndex(-1);
     void loadHits();
     const id = window.setTimeout(() => inputRef.current?.focus(), 20);
     return () => window.clearTimeout(id);
@@ -128,6 +130,10 @@ export function GlobalSearch({
       .slice(0, 20);
   }, [hits, query]);
 
+  useEffect(() => {
+    setHitIndex(-1);
+  }, [query]);
+
   const go = (href: string) => {
     setOpen(false);
     router.push(href);
@@ -140,7 +146,9 @@ export function GlobalSearch({
         onClick={() => setOpen(true)}
         className={cn(
           'dockora-field font-mono text-xs uppercase tracking-wider transition-shadow hover:border-dockora-pink hover:shadow-neon-pink',
-          compact ? 'px-2 py-1' : 'w-full px-3 py-1.5 text-left',
+          compact
+            ? 'px-2 py-1 [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:px-3 [@media(pointer:coarse)]:py-2'
+            : 'w-full px-3 py-1.5 text-left [@media(pointer:coarse)]:min-h-11',
           className,
         )}
         aria-label={t.common.globalSearch}
@@ -148,7 +156,7 @@ export function GlobalSearch({
         {compact ? t.common.search : t.common.globalSearchHint}
       </button>
       {open ? (
-        <div className="fixed inset-0 z-[60]" role="dialog" aria-modal="true" aria-label={t.common.globalSearch}>
+        <div className="fixed inset-0 z-[60]" role="presentation">
           <button
             type="button"
             className="absolute inset-0 bg-black/70 backdrop-blur-sm"
@@ -157,6 +165,9 @@ export function GlobalSearch({
           />
           <div
             ref={panelRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label={t.common.globalSearch}
             className="absolute left-1/2 top-[12vh] w-[min(36rem,92vw)] -translate-x-1/2 overflow-hidden rounded-md border border-dockora-border bg-dockora-surface shadow-neon"
           >
             <input
@@ -164,21 +175,65 @@ export function GlobalSearch({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={t.common.globalSearch}
+              role="combobox"
+              aria-expanded={filtered.length > 0}
+              aria-controls="dockora-global-search-hits"
+              aria-activedescendant={
+                hitIndex >= 0 && filtered[hitIndex]
+                  ? `dockora-global-hit-${hitIndex}`
+                  : undefined
+              }
+              aria-autocomplete="list"
               aria-label={t.common.globalSearch}
               className="dockora-field w-full rounded-none border-0 border-b border-dockora-border px-4 py-3 font-mono text-sm"
+              onKeyDown={(event) => {
+                if (event.key === 'ArrowDown') {
+                  event.preventDefault();
+                  if (filtered.length === 0) return;
+                  setHitIndex((index) => (index + 1) % filtered.length);
+                  return;
+                }
+                if (event.key === 'ArrowUp') {
+                  event.preventDefault();
+                  if (filtered.length === 0) return;
+                  setHitIndex((index) => (index <= 0 ? filtered.length - 1 : index - 1));
+                  return;
+                }
+                if (event.key === 'Enter') {
+                  const hit = filtered[hitIndex] ?? filtered[0];
+                  if (!hit) return;
+                  event.preventDefault();
+                  go(hit.href);
+                  return;
+                }
+                if (event.key === 'Escape') {
+                  event.preventDefault();
+                  setOpen(false);
+                }
+              }}
             />
-            <ul className="max-h-[min(50vh,22rem)] overflow-y-auto py-1">
+            <ul
+              id="dockora-global-search-hits"
+              role="listbox"
+              className="max-h-[min(50vh,22rem)] overflow-y-auto py-1"
+            >
               {loading && hits.length === 0 ? (
                 <li className="px-4 py-3 text-sm text-dockora-muted">{t.common.loading}</li>
               ) : null}
               {!loading && filtered.length === 0 ? (
                 <li className="px-4 py-3 text-sm text-dockora-muted">{t.common.noData}</li>
               ) : null}
-              {filtered.map((hit) => (
-                <li key={`${hit.href}:${hit.label}`}>
+              {filtered.map((hit, index) => (
+                <li key={`${hit.href}:${hit.label}`} role="presentation">
                   <button
                     type="button"
-                    className="flex w-full flex-col items-start gap-0.5 px-4 py-2 text-left hover:bg-dockora-accentSoft"
+                    id={`dockora-global-hit-${index}`}
+                    role="option"
+                    aria-selected={hitIndex === index}
+                    className={cn(
+                      'flex w-full flex-col items-start gap-0.5 px-4 py-2 text-left hover:bg-dockora-accentSoft',
+                      hitIndex === index && 'bg-dockora-accentSoft',
+                    )}
                     onClick={() => go(hit.href)}
                   >
                     <span className="text-sm text-dockora-text">{hit.label}</span>

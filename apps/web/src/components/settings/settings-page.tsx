@@ -235,12 +235,32 @@ export function SettingsPageView() {
 
       <div className="grid gap-6 md:grid-cols-[13rem_minmax(0,1fr)] lg:grid-cols-[15rem_minmax(0,1fr)]">
         <aside className="hidden md:block">
-          <nav className="sticky top-4 space-y-1 rounded-md border border-dockora-border bg-dockora-surface/60 p-2">
-            {tabs.map((item) => (
+          <nav
+            role="tablist"
+            aria-orientation="vertical"
+            className="sticky top-4 space-y-1 rounded-md border border-dockora-border bg-dockora-surface/60 p-2"
+          >
+            {tabs.map((item, index) => (
               <button
                 key={item.id}
                 type="button"
+                role="tab"
+                id={`${tabsId}-${item.id}`}
+                aria-controls={`${tabsId}-panel-${item.id}`}
+                aria-selected={tab === item.id}
+                tabIndex={tab === item.id ? 0 : -1}
                 onClick={() => requestTabChange(item.id)}
+                onKeyDown={(event) => {
+                  if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+                  event.preventDefault();
+                  const delta = event.key === 'ArrowDown' ? 1 : -1;
+                  const next = tabs[(index + delta + tabs.length) % tabs.length];
+                  if (!next) return;
+                  requestTabChange(next.id);
+                  event.currentTarget.parentElement
+                    ?.querySelector<HTMLElement>(`#${CSS.escape(`${tabsId}-${next.id}`)}`)
+                    ?.focus();
+                }}
                 className={cn(
                   'block w-full rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors',
                   tab === item.id

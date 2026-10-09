@@ -33,6 +33,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ServiceIcon } from '@/components/ui/service-icon';
 import { EnvEditor } from '@/components/compose/env-editor';
 import { selfhstIconUrl, setComposeServiceIcon } from '@/lib/compose-icon-yaml';
+import { contentHash } from '@/lib/content-hash';
 import {
   ErrorBanner,
   LoadingState,
@@ -60,7 +61,9 @@ export function ComposeDetailPage({ id }: { id: string }) {
   const [project, setProject] = useState<ComposeProjectDetails | null>(null);
   const [serviceContainers, setServiceContainers] = useState<ContainerSummary[]>([]);
   const [yaml, setYaml] = useState('');
+  const [yamlBaseHash, setYamlBaseHash] = useState<string | undefined>(undefined);
   const [envContent, setEnvContent] = useState('');
+  const [envBaseHash, setEnvBaseHash] = useState<string | undefined>(undefined);
   const [envFile, setEnvFile] = useState('.env');
   const [envExists, setEnvExists] = useState(false);
   const [logs, setLogs] = useState('');
@@ -82,6 +85,7 @@ export function ComposeDetailPage({ id }: { id: string }) {
       const env = await fetchComposeEnv(id, fileName);
       setEnvFile(env.fileName);
       setEnvContent(env.content);
+      setEnvBaseHash(await contentHash(env.content));
       setEnvExists(env.exists);
     },
     [id],
@@ -97,6 +101,7 @@ export function ComposeDetailPage({ id }: { id: string }) {
       ]);
       setProject(data);
       setYaml(data.yaml);
+      setYamlBaseHash(await contentHash(data.yaml));
       setServiceContainers(containers.filter((c) => c.composeProject === data.name));
       if (canOps) {
         const preferred =
@@ -122,9 +127,10 @@ export function ComposeDetailPage({ id }: { id: string }) {
     setError(null);
     setSuccess(null);
     try {
-      const updated = await saveComposeYaml(id, yaml);
+      const updated = await saveComposeYaml(id, yaml, yamlBaseHash);
       setProject(updated);
       setYaml(updated.yaml);
+      setYamlBaseHash(await contentHash(updated.yaml));
       setSuccess(t.compose.saved);
     } catch (err) {
       setError(err instanceof Error ? err.message : t.common.failed);
@@ -138,9 +144,10 @@ export function ComposeDetailPage({ id }: { id: string }) {
     setError(null);
     setSuccess(null);
     try {
-      const updated = await saveComposeEnv(id, envContent, envFile);
+      const updated = await saveComposeEnv(id, envContent, envFile, envBaseHash);
       setProject(updated);
       setEnvExists(true);
+      setEnvBaseHash(await contentHash(envContent));
       setSuccess(t.compose.envSaved);
     } catch (err) {
       setError(err instanceof Error ? err.message : t.common.failed);
@@ -185,9 +192,10 @@ export function ComposeDetailPage({ id }: { id: string }) {
     setSuccess(null);
     try {
       const next = setComposeServiceIcon(yaml, service, url);
-      const updated = await saveComposeYaml(id, next);
+      const updated = await saveComposeYaml(id, next, yamlBaseHash);
       setProject(updated);
       setYaml(updated.yaml);
+      setYamlBaseHash(await contentHash(updated.yaml));
       setSuccess(t.compose.saved);
     } catch (err) {
       setError(err instanceof Error ? err.message : t.common.failed);

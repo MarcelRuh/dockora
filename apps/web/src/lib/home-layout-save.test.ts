@@ -30,7 +30,7 @@ describe('createLayoutSaveQueue', () => {
         if (seen.length === 1) return first.promise.then(() => revision + 1);
         return Promise.resolve(revision + 1);
       },
-      reloadRevision: () => Promise.resolve(0),
+      reloadState: () => Promise.resolve({ layout: layout('remote'), revision: 0 }),
       isConflict: () => false,
       onError: () => undefined,
     });
@@ -48,7 +48,7 @@ describe('createLayoutSaveQueue', () => {
     let saved = 0;
     const queue = createLayoutSaveQueue({
       save: (_value, revision) => Promise.resolve(revision + 1),
-      reloadRevision: () => Promise.resolve(0),
+      reloadState: () => Promise.resolve({ layout: layout('remote'), revision: 0 }),
       isConflict: () => false,
       onError: () => undefined,
       onSaved: () => {
@@ -60,23 +60,29 @@ describe('createLayoutSaveQueue', () => {
     expect(saved).toBe(1);
   });
 
-  it('retries a stale revision with the latest layout', async () => {
-    const revisions: number[] = [];
-    let calls = 0;
+  it('adopts the remote layout on conflict instead of overwriting it', async () => {
+    const names: string[] = [];
+    let reloaded: string | null = null;
+    let error: string | null = null;
     const queue = createLayoutSaveQueue({
-      save: (_value, revision) => {
-        calls += 1;
-        revisions.push(revision);
-        if (calls === 1) return Promise.reject(Object.assign(new Error('stale'), { status: 409 }));
-        return Promise.resolve(revision + 1);
+      save: (value) => {
+        names.push(value.links[0]?.name ?? '');
+        return Promise.reject(Object.assign(new Error('stale'), { status: 409 }));
       },
-      reloadRevision: () => Promise.resolve(4),
-      isConflict: (error) => error instanceof Error && (error as { status?: number }).status === 409,
-      onError: () => undefined,
+      reloadState: () => Promise.resolve({ layout: layout('remote'), revision: 9 }),
+      isConflict: (err) => err instanceof Error && (err as { status?: number }).status === 409,
+      onError: (kind) => {
+        error = kind;
+      },
+      onReloaded: (value) => {
+        reloaded = value.links[0]?.name ?? null;
+      },
     });
     queue.setRevision(1);
-    queue.submit(layout('current'));
+    queue.submit(layout('local'));
     await queue.settled();
-    expect(revisions).toEqual([1, 4]);
+    expect(names).toEqual(['local']);
+    expect(reloaded).toBe('remote');
+    expect(error).toBe('conflict');
   });
 });

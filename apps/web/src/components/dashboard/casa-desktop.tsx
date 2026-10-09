@@ -60,6 +60,7 @@ import {
   writeHomeLayoutCache,
 } from '@/lib/home-layout';
 import { createLayoutSaveQueue } from '@/lib/home-layout-save';
+import { contentHash } from '@/lib/content-hash';
 import { containerLinkChoices, resolveContainerAppHref, resolvePublicAppUrl } from '@/lib/container-app-link';
 import { resolveContainerIconUrl } from '@/lib/container-icon';
 import { setComposeServicePublicUrl, setComposeServiceUrl } from '@/lib/compose-icon-yaml';
@@ -226,10 +227,18 @@ export function CasaDesktop({
   if (saveQueueRef.current === null) {
     saveQueueRef.current = createLayoutSaveQueue({
       save: async (layout, revision) => (await saveHomeLayout(layout, revision)).revision,
-      reloadRevision: async () => (await fetchHomeLayout()).revision ?? 0,
+      reloadState: async () => {
+        const state = await fetchHomeLayout();
+        return { layout: state.layout, revision: state.revision ?? 0 };
+      },
       isConflict: (error) => error instanceof ApiError && error.status === 409,
       onError: (kind) =>
         setLayoutError(kind === 'conflict' ? saveErrorRef.current.conflict : saveErrorRef.current.failed),
+      onReloaded: (layout) => {
+        applyLayout(layout);
+        writeHomeLayoutCache(layout);
+        dirtyRef.current = false;
+      },
       onSaved: () => {
         saveGeneration.current += 1;
         if (saveTimer.current) return;
@@ -858,11 +867,12 @@ export function CasaDesktop({
           return;
         }
         const details = await fetchComposeProject(project.id);
+        const baseHash = await contentHash(details.yaml);
         let nextYaml = setComposeServiceUrl(details.yaml, service, url);
         if (publicToStore !== undefined) {
           nextYaml = setComposeServicePublicUrl(nextYaml, service, publicToStore);
         }
-        await saveComposeYaml(project.id, nextYaml);
+        await saveComposeYaml(project.id, nextYaml, baseHash);
         persistUrls(container.name, url, publicToStore);
         setPendingRecreate({ name: container.name, projectId: project.id, service });
         setUrlMessage(home.appUrlSavedRecreate);

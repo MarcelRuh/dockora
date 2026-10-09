@@ -627,6 +627,9 @@ export const en = {
         published: 'Grouped by network',
         unattached: 'No network',
         controls: 'Map controls',
+        zoomIn: 'Zoom in',
+        zoomOut: 'Zoom out',
+        fitView: 'Fit view',
       },
     },
     settings: {

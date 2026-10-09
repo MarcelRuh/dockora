@@ -5,6 +5,17 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.60] – 2026-10-09
+
+### Fixed
+
+- A home-layout conflict reloads the remote layout instead of overwriting it
+- Compose YAML and env saves refuse a stale base hash with HTTP 409
+- Global search is a combobox with arrow-key navigation
+- Settings desktop tabs and the engine dialog expose correct ARIA roles
+- Network map zoom controls use localized labels
+- Dependabot watches Dockerfiles under `/docker`
+
 ## [2.0.59] – 2026-10-09
 
 ### Fixed

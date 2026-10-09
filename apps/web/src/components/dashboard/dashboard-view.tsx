@@ -43,7 +43,7 @@ export function DashboardView({
         <div className="space-y-6">
           <CasaDesktop overview={data} onOpenEngine={() => setEngineOpen(true)} />
           {engineOpen ? (
-            <div className="fixed inset-0 z-[70]" role="dialog" aria-modal="true" aria-label={t.dashboard.home.more}>
+            <div className="fixed inset-0 z-[70]" role="presentation">
               <button
                 type="button"
                 className="dockora-dialog-backdrop absolute inset-0 bg-black/70"
@@ -53,11 +53,16 @@ export function DashboardView({
               <div className="absolute left-1/2 top-[8vh] w-[min(56rem,94vw)] -translate-x-1/2">
               <div
                 ref={enginePanelRef}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="dockora-engine-dialog-title"
                 tabIndex={-1}
                 className="dockora-dialog-panel dockora-glass max-h-[80vh] space-y-4 overflow-y-auto p-4 outline-none"
               >
                 <div className="flex items-center justify-between gap-3">
-                  <h2 className="text-sm font-medium">{t.dashboard.home.more}</h2>
+                  <h2 id="dockora-engine-dialog-title" className="text-sm font-medium">
+                    {t.dashboard.home.more}
+                  </h2>
                   <button type="button" className="text-sm text-dockora-muted" onClick={() => setEngineOpen(false)}>
                     {t.common.close}
                   </button>

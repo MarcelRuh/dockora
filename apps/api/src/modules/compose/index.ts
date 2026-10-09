@@ -11,6 +11,7 @@ import { actorIdFromRequest, auditService } from '../audit/audit.service.js';
 import { isAuthEnabled, isViewer } from '../auth/auth-gate.js';
 import { ADMIN_ROLES, OPERATOR_ROLES, rolesForComposeAction } from '../auth/role-policy.js';
 import {
+  ComposeConflictError,
   ComposeNotFoundError,
   ComposeService,
   ComposeValidationError,
@@ -151,7 +152,7 @@ export const composeModule: FastifyPluginAsync = async (app: FastifyInstance) =>
     },
   );
 
-  app.put<{ Params: { id: string }; Body: { content: string } }>(
+  app.put<{ Params: { id: string }; Body: { content: string; baseHash?: string } }>(
     `${API_PREFIX}/compose/:id/yaml`,
     { preHandler: [app.requireRole(...OPERATOR_ROLES)] },
     async (request): Promise<ComposeProjectDetails> => {
@@ -159,7 +160,11 @@ export const composeModule: FastifyPluginAsync = async (app: FastifyInstance) =>
         throw app.httpErrors.badRequest('Request body must include content: string');
       }
       try {
-        return await service.updateYaml(request.params.id, request.body.content);
+        return await service.updateYaml(
+          request.params.id,
+          request.body.content,
+          typeof request.body.baseHash === 'string' ? request.body.baseHash : undefined,
+        );
       } catch (error) {
         return await throwComposeError(app, error);
       }
@@ -180,7 +185,7 @@ export const composeModule: FastifyPluginAsync = async (app: FastifyInstance) =>
 
   app.put<{
     Params: { id: string };
-    Body: { content: string; fileName?: string };
+    Body: { content: string; fileName?: string; baseHash?: string };
   }>(
     `${API_PREFIX}/compose/:id/env`,
     { preHandler: [app.requireRole(...OPERATOR_ROLES)] },
@@ -193,6 +198,7 @@ export const composeModule: FastifyPluginAsync = async (app: FastifyInstance) =>
         request.params.id,
         request.body.content,
         request.body.fileName ?? '.env',
+        typeof request.body.baseHash === 'string' ? request.body.baseHash : undefined,
       );
     } catch (error) {
       return await throwComposeError(app, error);
@@ -375,6 +381,9 @@ async function enrichIfPortConflict(
 export async function throwComposeError(app: FastifyInstance, error: unknown): Promise<never> {
   if (error instanceof ComposeNotFoundError) {
     throw app.httpErrors.notFound(error.message);
+  }
+  if (error instanceof ComposeConflictError) {
+    throw app.httpErrors.conflict(error.message);
   }
   if (error instanceof ComposeValidationError || error instanceof UnsafeProjectPathError) {
     throw app.httpErrors.badRequest(await enrichIfPortConflict(app, error.message));

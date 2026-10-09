@@ -25,6 +25,7 @@ import {
   resolveComposeStatus,
   resolveDiscoveredProject,
 } from './compose-discovery.js';
+import { contentHash } from './content-hash.js';
 import { deleteProjectDirectory } from './safe-project-dir.js';
 import { mapPool } from '../../infrastructure/async/map-pool.js';
 
@@ -269,8 +270,18 @@ export class ComposeService {
     };
   }
 
-  async updateYaml(id: string, content: string): Promise<ComposeProjectDetails> {
+  async updateYaml(
+    id: string,
+    content: string,
+    baseHash?: string,
+  ): Promise<ComposeProjectDetails> {
     const project = await this.resolveProject(id);
+    if (baseHash) {
+      const current = await readFile(project.absoluteComposePath, 'utf8').catch(() => '');
+      if (contentHash(current) !== baseHash) {
+        throw new ComposeConflictError('Compose file changed on disk');
+      }
+    }
     const tmpPath = `${project.absoluteComposePath}.dockora-tmp`;
     const envPath = path.join(project.path, '.env');
 
@@ -318,6 +329,7 @@ export class ComposeService {
     id: string,
     content: string,
     fileName = '.env',
+    baseHash?: string,
   ): Promise<ComposeProjectDetails> {
     const project = await this.resolveProject(id);
     const safe = assertAllowedEnvFile(fileName);
@@ -327,7 +339,14 @@ export class ComposeService {
     if (content.length > 256_000) {
       throw new ComposeValidationError('Env file too large (max 256KB)');
     }
-    await writeFile(path.join(project.path, safe), content, 'utf8');
+    const full = path.join(project.path, safe);
+    if (baseHash) {
+      const current = await readFile(full, 'utf8').catch(() => '');
+      if (contentHash(current) !== baseHash) {
+        throw new ComposeConflictError('Env file changed on disk');
+      }
+    }
+    await writeFile(full, content, 'utf8');
     return this.getDetails(id);
   }
 
@@ -743,6 +762,10 @@ export class ComposeNotFoundError extends Error {
 
 export class ComposeValidationError extends Error {
   readonly statusCode = 400;
+}
+
+export class ComposeConflictError extends Error {
+  readonly statusCode = 409;
 }
 
 const COMPOSE_SERVICE_NAME = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$/;

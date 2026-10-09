@@ -626,6 +626,9 @@ export const de = {
         published: 'Gruppiert nach Netzwerk',
         unattached: 'Ohne Netzwerk',
         controls: 'Kartensteuerung',
+        zoomIn: 'Vergrößern',
+        zoomOut: 'Verkleinern',
+        fitView: 'Alles einpassen',
       },
     },
     settings: {

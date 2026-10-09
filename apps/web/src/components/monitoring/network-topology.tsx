@@ -31,6 +31,9 @@ export interface TopologyLabels {
   published: string;
   unattached: string;
   controls: string;
+  zoomIn: string;
+  zoomOut: string;
+  fitView: string;
 }
 
 function HostNode({ data }: NodeProps<Node<HostNodeData>>) {
@@ -183,6 +186,11 @@ export function NetworkTopology({
           nodesConnectable={false}
           elementsSelectable
           proOptions={{ hideAttribution: true }}
+          ariaLabelConfig={{
+            'controls.zoomIn.ariaLabel': labels.zoomIn,
+            'controls.zoomOut.ariaLabel': labels.zoomOut,
+            'controls.fitView.ariaLabel': labels.fitView,
+          }}
         >
           <Background gap={20} size={1} color="var(--dockora-border)" />
           <Controls showInteractive={false} aria-label={labels.controls} />
