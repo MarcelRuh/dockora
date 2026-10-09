@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { useLocale } from '@/i18n/locale-provider';
 import { GlobalSearch } from '@/components/global-search';
+import { useHomeChrome } from '@/components/home-chrome';
 import { NeonAtmosphere, NeonParticles } from '@/components/ui/neon-particles';
 import { cn } from '@/lib/utils';
 import type { Locale } from '@dockora/shared';
@@ -162,7 +163,8 @@ function LocaleControls({ dense = false, search = true }: { dense?: boolean; sea
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { t } = useLocale();
   const pathname = usePathname();
-  const home = pathname === '/';
+  const homePage = useHomeChrome();
+  const home = homePage || pathname === '/' || pathname === '';
   const [drawerOpen, setDrawerOpen] = useState(false);
   const drawerRef = useRef<HTMLElement>(null);
   useDialogFocus(drawerRef, () => setDrawerOpen(false), drawerOpen);

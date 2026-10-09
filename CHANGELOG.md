@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.0.61] – 2026-10-09
+
+### Fixed
+
+- The module sidebar stays hidden on the home dashboard even when the path check alone is not enough
+
 ## [2.0.60] – 2026-10-09
 
 ### Fixed
