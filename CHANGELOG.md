@@ -5,6 +5,34 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.1.0] – 2026-11-19
+
+### Fixed
+
+- Update check no longer treats a container shown as a bare `sha256:` image ID (tag moved after a pull) as a Docker Hub repo named "sha256" – it resolves the configured image and compares against the image the container really runs
+- Pinned compose upgrades no longer write into the stack folder (`EROFS` on read-only mounts); the image pin comes from a temporary override file
+- Editing YAML/.env, adding/removing services and compose backups fail early with a clear message on read-only stack folders – before any container is touched
+- Compose projects are matched by their working directory, never recreated as standalone containers
+- Standalone recreate keeps networks/aliases, user and anonymous volumes and restores the old container if the new one fails to start
+- Rollback also runs when recreate fails, restores the original tag, and auto-update skips a release that was already rolled back
+- Containers without a healthcheck must stay up ~12 s before an update counts as healthy
+- No more false "update available" from foreign-repo digests or manifest bodies without a digest header
+- GHCR/LSCR tokens are used for `docker pull`, not only for the check
+- The stack's `compose.override.yaml` is loaded when Dockora runs compose; service names are parsed with YAML (any indentation)
+- Action errors on the containers page survive background reloads; stale responses can't overwrite newer data
+
+### Changed
+
+- Updates page redesigned: summary tiles, responsive list instead of a wide table, readable error hints; "Upgrade all" continues past failures
+- Dashboard update errors can be dismissed
+- Only the replaced image is removed after an update (no global image prune)
+
+### Performance
+
+- Registry digests are fetched with `HEAD` (does not count against the Docker Hub pull limit)
+- Hidden tabs pause stats/log/progress polling and dashboard re-renders; dashboard SSE reconnects after a drop
+- Background particle animation throttled to ~24 fps
+
 ## [2.0.63] – 2026-10-09
 
 ### Security
