@@ -23,3 +23,12 @@ describe('pinServiceImage', () => {
     );
   });
 });
+
+describe('buildImageOverride', () => {
+  it('only overrides the image of one service', async () => {
+    const { buildImageOverride } = await import('./compose.service.js');
+    const YAML = (await import('yaml')).default;
+    const out = YAML.parse(buildImageOverride('nginx-proxy-manager', 'jc21/nginx-proxy-manager@sha256:abc'));
+    expect(out).toEqual({ services: { 'nginx-proxy-manager': { image: 'jc21/nginx-proxy-manager@sha256:abc' } } });
+  });
+});

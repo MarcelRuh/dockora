@@ -19,4 +19,14 @@ describe('createTtlMemo', () => {
     expect(c).toBe(1);
     expect(factory).toHaveBeenCalledTimes(1);
   });
+
+  it('does not let a request started before clear() repopulate the cache', async () => {
+    const memo = createTtlMemo<string>(60_000);
+    let release!: (v: string) => void;
+    const slow = memo.get(() => new Promise<string>((r) => (release = r)));
+    memo.clear();
+    release('stale');
+    await slow;
+    expect(await memo.get(async () => 'fresh')).toBe('fresh');
+  });
 });

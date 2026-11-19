@@ -14,9 +14,11 @@ import type {
   DockerVolumeBrowseEntry,
   DockerVolumeInfo,
   IDockerClient,
+  RegistryPullAuth,
 } from '../../domain/ports.js';
 import { formatPorts, mapContainerStatus } from '../../domain/container-utils.js';
 import { withTimeout } from '../async/with-timeout.js';
+import { isImageIdRef } from '../../domain/image-ref.js';
 import {
   isLiveContainerStatus,
   isNoisyDockerAction,
@@ -73,6 +75,8 @@ export class DockerodeClient implements IDockerClient {
   private versionCache: { at: number; value: DockerVersionInfo } | null = null;
   private versionInflight: Promise<DockerVersionInfo> | null = null;
   private resourceListeners = new Set<(event: DockerResourceChange) => void>();
+  /** containerId → Config.Image, for containers whose list row only shows an image ID. */
+  private configuredImageByContainer = new Map<string, string>();
 
   constructor(options: DockerodeClientOptions) {
     this.logger = options.logger;
@@ -149,8 +153,8 @@ export class DockerodeClient implements IDockerClient {
       this.docker.listContainers({ all }),
       15_000,
       'Docker listContainers timeout',
-    ).then((list) => {
-      const value = list.map((c) => mapListContainer(c));
+    ).then(async (list) => {
+      const value = await this.resolveImageIdRows(list.map((c) => mapListContainer(c)));
       const at = Date.now();
       this.listCache.set(key, { at, value, inflight: null });
       if (all) {
@@ -169,6 +173,42 @@ export class DockerodeClient implements IDockerClient {
       this.listCache.delete(key);
       throw error;
     }
+  }
+
+  /**
+   * When a tag moves to a newer image (e.g. after `docker pull` without recreate), the list API
+   * reports the old container's image as a bare `sha256:…` ID. Resolve those rows back to the
+   * configured reference (`Config.Image`) so the UI and the update check see `repo:tag`.
+   * Results are cached per container ID, so this costs one inspect per affected container.
+   */
+  private async resolveImageIdRows(rows: DockerContainerInfo[]): Promise<DockerContainerInfo[]> {
+    const live = new Set(rows.map((r) => r.id));
+    for (const id of this.configuredImageByContainer.keys()) {
+      if (!live.has(id)) this.configuredImageByContainer.delete(id);
+    }
+    await Promise.all(
+      rows.map(async (row) => {
+        if (!isImageIdRef(row.image)) return;
+        let configured = this.configuredImageByContainer.get(row.id);
+        if (!configured) {
+          try {
+            const info = await withTimeout(
+              this.docker.getContainer(row.id).inspect(),
+              5_000,
+              'Docker inspect timeout',
+            );
+            configured = info.Config?.Image;
+          } catch {
+            configured = undefined;
+          }
+          if (configured && !isImageIdRef(configured)) {
+            this.configuredImageByContainer.set(row.id, configured);
+          }
+        }
+        if (configured && !isImageIdRef(configured)) row.image = configured;
+      }),
+    );
+    return rows;
   }
 
   async inspectContainer(id: string): Promise<DockerContainerDetails> {
@@ -303,11 +343,16 @@ export class DockerodeClient implements IDockerClient {
     }
   }
 
-  async pullImage(image: string): Promise<void> {
+  async pullImage(image: string, auth?: RegistryPullAuth): Promise<void> {
     await new Promise<void>((resolve, reject) => {
-      this.docker.pull(image, (err: Error | null, stream: NodeJS.ReadableStream) => {
+      const opts = auth ? { authconfig: auth } : {};
+      this.docker.pull(image, opts, (err: Error | null, stream?: NodeJS.ReadableStream) => {
         if (err) {
           reject(err);
+          return;
+        }
+        if (!stream) {
+          reject(new Error(`docker pull ${image} returned no stream`));
           return;
         }
         this.docker.modem.followProgress(stream, (progressErr: Error | null) => {
