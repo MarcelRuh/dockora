@@ -36,7 +36,7 @@ test('signed-in forms expose labels and the second login step does too', async (
   }
 
   await page.goto('/settings');
-  await page.getByRole('button', { name: /Sicherheit|Security/i }).click();
+  await page.getByRole('tab', { name: /Sicherheit|Security/i }).click();
   await expect(page.getByLabel(/^E-Mail$|^Email$/)).toBeVisible();
   await expect(page.getByLabel(/Passwort \(min|Password \(min/i)).toBeVisible();
   await expect(page.getByLabel(/Anzeigename|Display name/i).first()).toBeVisible();
