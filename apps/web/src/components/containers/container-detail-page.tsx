@@ -10,6 +10,7 @@ import {
   fetchContainer,
   fetchContainerLogs,
   fetchContainerStats,
+  ApiError,
 } from '@/lib/api';
 import { useLocale } from '@/i18n/locale-provider';
 import { useAuth } from '@/components/auth/auth-provider';
@@ -64,14 +65,22 @@ export function ContainerDetailPage({ id }: { id: string }) {
   const [removeVolumes, setRemoveVolumes] = useState(false);
 
   const loadContainer = useCallback(async (opts?: { silent?: boolean }) => {
-    if (!opts?.silent) setLoading(true);
-    setError(null);
+    const silent = opts?.silent === true;
+    if (!silent) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       const data = await fetchContainer(id);
       setContainer(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.containers.notFound);
-      setContainer(null);
+      // A background reload that hits a transient API/Docker hiccup keeps the last good data
+      // (and the open terminal/logs). Only a real 404 or a foreground load replaces the page.
+      const gone = err instanceof ApiError && err.status === 404;
+      if (!silent || gone) {
+        setError(err instanceof Error ? err.message : t.containers.notFound);
+        setContainer(null);
+      }
     } finally {
       if (!opts?.silent) setLoading(false);
     }
@@ -101,7 +110,9 @@ export function ContainerDetailPage({ id }: { id: string }) {
     };
 
     void poll();
-    const timer = window.setInterval(() => void poll(), 12_000);
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void poll();
+    }, 12_000);
     return () => {
       active = false;
       window.clearInterval(timer);
@@ -156,7 +167,9 @@ export function ContainerDetailPage({ id }: { id: string }) {
         // keep connection; EventSource retries. Fallback poll if closed permanently.
       };
     } catch {
-      const timer = window.setInterval(() => void loadLogs(), 3000);
+      const timer = window.setInterval(() => {
+        if (document.visibilityState === 'visible') void loadLogs();
+      }, 3000);
       return () => window.clearInterval(timer);
     }
 

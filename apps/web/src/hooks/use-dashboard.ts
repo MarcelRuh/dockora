@@ -16,6 +16,7 @@ export interface UseDashboardResult {
 }
 
 const POLL_INTERVAL_MS = 15_000;
+const SSE_RETRY_MS = 60_000;
 
 /**
  * Live-Dashboard: bevorzugt SSE direkt gegen die API, Fallback Polling.
@@ -51,41 +52,59 @@ export function useDashboard(): UseDashboardResult {
     let receivedSse = false;
     let es: EventSource | null = null;
     let pollTimer: number | undefined;
+    let retryTimer: number | undefined;
+    let fallbackTimer: number | undefined;
+    /** Latest SSE payload received while the tab was hidden – applied once it is visible. */
+    let hiddenPayload: DashboardOverview | null = null;
 
     const clearPoll = () => {
       window.clearInterval(pollTimer);
       pollTimer = undefined;
     };
 
+    const apply = (overview: DashboardOverview) => {
+      setData(overview);
+      setError(null);
+      setState('ready');
+      setLastUpdated(new Date());
+    };
+
     const startPolling = () => {
+      if (closed) return;
       clearPoll();
       void refresh();
       pollTimer = window.setInterval(() => {
         if (document.visibilityState === 'visible') void refresh();
       }, POLL_INTERVAL_MS);
+      // Try to get back on SSE after a proxy/API restart instead of polling forever.
+      window.clearTimeout(retryTimer);
+      retryTimer = window.setTimeout(connect, SSE_RETRY_MS);
     };
 
-    const onVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        void refresh();
+    const connect = () => {
+      if (closed) return;
+      receivedSse = false;
+      try {
+        es = openEventSource('/api/v1/dashboard/stream');
+      } catch {
+        startPolling();
+        return;
       }
-    };
-    document.addEventListener('visibilitychange', onVisibility);
-
-    try {
-      es = openEventSource('/api/v1/dashboard/stream');
       setState((prev) => (prev === 'ready' ? prev : 'loading'));
 
       es.addEventListener('dashboard', (event) => {
         if (closed) return;
         receivedSse = true;
         clearPoll();
+        window.clearTimeout(retryTimer);
         try {
           const overview = JSON.parse((event as MessageEvent).data) as DashboardOverview;
-          setData(overview);
-          setError(null);
-          setState('ready');
-          setLastUpdated(new Date());
+          // Don't re-render the whole dashboard in a background tab.
+          if (document.visibilityState === 'hidden') {
+            hiddenPayload = overview;
+            return;
+          }
+          apply(overview);
         } catch {
           setError('Invalid dashboard SSE payload');
         }
@@ -94,26 +113,38 @@ export function useDashboard(): UseDashboardResult {
       es.onerror = () => {
         if (closed) return;
         if (receivedSse && es?.readyState !== EventSource.CLOSED) return;
-        receivedSse = false;
         es?.close();
         es = null;
         startPolling();
       };
-    } catch {
-      startPolling();
-    }
 
-    const fallbackTimer = window.setTimeout(() => {
-      if (!closed && !receivedSse) {
-        es?.close();
-        es = null;
-        startPolling();
+      window.clearTimeout(fallbackTimer);
+      fallbackTimer = window.setTimeout(() => {
+        if (!closed && !receivedSse && es) {
+          es.close();
+          es = null;
+          startPolling();
+        }
+      }, 3_000);
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (hiddenPayload) {
+        apply(hiddenPayload);
+        hiddenPayload = null;
+      } else if (!es) {
+        void refresh();
       }
-    }, 3_000);
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+
+    connect();
 
     return () => {
       closed = true;
       window.clearTimeout(fallbackTimer);
+      window.clearTimeout(retryTimer);
       clearPoll();
       es?.close();
       document.removeEventListener('visibilitychange', onVisibility);

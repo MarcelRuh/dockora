@@ -61,9 +61,10 @@ export function SelfUpdateSection() {
     void load();
   }, [load]);
 
-  // Poll while an updater container is running (even after page reload).
+  // Poll while an updater container is running (even after page reload). While handleApply
+  // is running it polls itself – a second poller would only double the requests.
   useEffect(() => {
-    if (!status?.updating && !busy) return;
+    if (!status?.updating || busy) return;
     const timer = window.setInterval(() => void load(), 1500);
     return () => window.clearInterval(timer);
   }, [status?.updating, busy, load]);
