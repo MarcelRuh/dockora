@@ -1,3 +1,4 @@
+import YAML from 'yaml';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import type { ComposeProjectStatus } from '@dockora/shared';
@@ -217,28 +218,12 @@ export async function readComposeYaml(composeFilePath: string): Promise<string> 
 }
 
 export function extractServiceNames(yamlContent: string): string[] {
+  // Parse properly: any indentation, comments, anchors and names starting with a digit.
   try {
-    const lines = yamlContent.split('\n');
-    const services: string[] = [];
-    let inServices = false;
-
-    for (const line of lines) {
-      if (/^services:\s*$/.test(line)) {
-        inServices = true;
-        continue;
-      }
-      if (inServices) {
-        if (/^[a-zA-Z_][\w.-]*:\s*$/.test(line) && !line.startsWith(' ')) {
-          break;
-        }
-        const match = line.match(/^  ([a-zA-Z_][\w.-]*):\s*$/);
-        if (match?.[1]) {
-          services.push(match[1]);
-        }
-      }
-    }
-
-    return services;
+    const doc = YAML.parse(yamlContent) as { services?: unknown } | null;
+    const services = doc?.services;
+    if (!services || typeof services !== 'object' || Array.isArray(services)) return [];
+    return Object.keys(services);
   } catch {
     return [];
   }

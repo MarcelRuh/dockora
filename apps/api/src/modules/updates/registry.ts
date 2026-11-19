@@ -152,5 +152,7 @@ export function pickDigest(
     if (match) return extractDigest(match);
   }
 
-  return extractDigest(repoDigests[0]);
+  // A digest of a different repository (mirror, retag) can never equal the remote digest and
+  // would show a permanent false "update available".
+  return null;
 }

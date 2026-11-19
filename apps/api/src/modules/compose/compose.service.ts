@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 import { accessSync, constants, existsSync } from 'node:fs';
-import { access, copyFile, mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
+import { access, copyFile, mkdir, mkdtemp, readFile, rm, unlink, writeFile } from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import YAML from 'yaml';
@@ -45,6 +46,27 @@ function isDirWritable(dir: string): boolean {
     return true;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Fails fast with a readable message when Dockora cannot write the stack folder – typically
+ * because it is only mounted read-only (`/home:/home:ro`). Must run before any side effect
+ * (e.g. before `compose rm`), so a read-only stack is never left half-changed.
+ */
+async function assertProjectWritable(dir: string, file?: string): Promise<void> {
+  for (const target of file ? [dir, file] : [dir]) {
+    try {
+      await access(target, constants.W_OK);
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === 'ENOENT' && target === file) continue;
+      throw new ComposeValidationError(
+        code === 'EROFS'
+          ? `Stack folder ${dir} is mounted read-only in Dockora. Mount it writable (e.g. "- ${dir}:${dir}" under services.api.volumes in docker-compose.override.yml of the Dockora install) to edit it from Dockora.`
+          : `Dockora cannot write to ${target} (${code ?? 'access denied'}). Check the folder permissions.`,
+      );
+    }
   }
 }
 
@@ -315,6 +337,7 @@ export class ComposeService {
         throw new ComposeConflictError('Compose file changed on disk');
       }
     }
+    await assertProjectWritable(project.path, project.absoluteComposePath);
     const tmpPath = `${project.absoluteComposePath}.dockora-tmp`;
     const envPath = path.join(project.path, '.env');
 
@@ -382,6 +405,7 @@ export class ComposeService {
       throw new ComposeValidationError('Env file too large (max 256KB)');
     }
     const full = path.join(project.path, safe);
+    await assertProjectWritable(project.path, full);
     if (baseHash) {
       const current = await readFile(full, 'utf8').catch(() => '');
       if (contentHash(current) !== baseHash) {
@@ -394,8 +418,9 @@ export class ComposeService {
 
   /**
    * Recreate eines Compose-Service mit Image-Pin (Tag oder Digest).
-   * YAML wird temporär umgeschrieben und danach wiederhergestellt.
-   * `--pull never` verhindert, dass Compose erneut das Tag-Image zieht.
+   * Die Compose-Datei des Nutzers wird nie angefasst: Der Pin kommt aus einer temporären
+   * Override-Datei (`-f <tmp>`), damit das auch bei schreibgeschützten Stack-Ordnern
+   * (z. B. `/home:/home:ro`) funktioniert. `--pull never` verhindert erneutes Ziehen des Tags.
    */
   async recreatePinned(
     id: string,
@@ -413,30 +438,36 @@ export class ComposeService {
     if (!serviceName || !/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(serviceName)) {
       throw new ComposeValidationError(`Invalid compose service name: ${opts.serviceName}`);
     }
-    if (!opts.imageRef?.trim()) {
+    const imageRef = opts.imageRef?.trim();
+    if (!imageRef) {
       throw new ComposeValidationError('imageRef is required for pinned recreate');
     }
 
     const original = await readComposeYaml(project.absoluteComposePath);
-    let pinned: string;
+    let override: string;
     try {
-      pinned = pinServiceImage(original, serviceName, opts.imageRef.trim());
+      // Validates that the service exists before we touch any container.
+      pinServiceImage(original, serviceName, imageRef);
+      override = buildImageOverride(serviceName, imageRef);
     } catch (error) {
       throw new ComposeValidationError(
         error instanceof Error ? error.message : 'Failed to pin service image in YAML',
       );
     }
 
-    const bakPath = `${project.absoluteComposePath}.dockora-pin.bak`;
-    await writeFile(bakPath, original, 'utf8');
-    await writeFile(project.absoluteComposePath, pinned, 'utf8');
-
+    const tmpDir = await mkdtemp(path.join(os.tmpdir(), 'dockora-pin-'));
+    const overridePath = path.join(tmpDir, 'compose.override.yaml');
     try {
+      await writeFile(overridePath, override, 'utf8');
       const args = await withEnvFile(project, [
         '--project-directory',
         project.path,
         '-f',
         project.absoluteComposePath,
+      ]);
+      args.push(
+        '-f',
+        overridePath,
         'up',
         '-d',
         '--force-recreate',
@@ -445,15 +476,14 @@ export class ComposeService {
         '--pull',
         'never',
         serviceName,
-      ]);
+      );
       await execCompose(args, { cwd: project.path });
       return {
         ok: true,
-        message: `Compose service ${serviceName} recreated with ${opts.imageRef}`,
+        message: `Compose service ${serviceName} recreated with ${imageRef}`,
       };
     } finally {
-      await writeFile(project.absoluteComposePath, original, 'utf8').catch(() => undefined);
-      await unlink(bakPath).catch(() => undefined);
+      await rm(tmpDir, { recursive: true, force: true }).catch(() => undefined);
     }
   }
 
@@ -461,6 +491,7 @@ export class ComposeService {
     const project = await this.resolveProject(id);
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const backupDir = path.join(project.path, '.dockora', 'backups', timestamp);
+    await assertProjectWritable(project.path);
     await mkdir(backupDir, { recursive: true });
 
     const includes: string[] = [];
@@ -713,6 +744,7 @@ export class ComposeService {
     const original = await readComposeYaml(project.absoluteComposePath);
     const removed = removeComposeService(original, serviceName);
     const removeVolumes = options.removeVolumes === true;
+    await assertProjectWritable(project.path, project.absoluteComposePath);
 
     if (removed.remaining.length === 0) {
       const result = await this.remove(id, { removeFiles: true, removeVolumes });
@@ -779,6 +811,7 @@ export class ComposeService {
     const project = await this.resolveProject(id);
     const original = await readComposeYaml(project.absoluteComposePath);
     const next = addComposeService(original, input);
+    await assertProjectWritable(project.path, project.absoluteComposePath);
     await writeFile(project.absoluteComposePath, next, 'utf8');
     invalidateComposeDiscoveryCache();
 
@@ -896,22 +929,44 @@ export function assertComposeService(
   return name;
 }
 
+const OVERRIDE_FILENAMES: Record<string, string[]> = {
+  'compose.yaml': ['compose.override.yaml', 'compose.override.yml'],
+  'compose.yml': ['compose.override.yml', 'compose.override.yaml'],
+  'docker-compose.yml': ['docker-compose.override.yml', 'docker-compose.override.yaml'],
+  'docker-compose.yaml': ['docker-compose.override.yaml', 'docker-compose.override.yml'],
+};
+
+/**
+ * Adds `--env-file` and – because an explicit `-f` disables compose's auto-loading – the
+ * project's standard override file, so Dockora runs the stack exactly like `docker compose up`.
+ */
 async function withEnvFile(
   project: { path: string },
   args: string[],
 ): Promise<string[]> {
-  const envPath = path.join(project.path, '.env');
-  try {
-    await access(envPath);
-    // Insert after project-directory / before trailing command if possible
-    const out = [...args];
-    const fIdx = out.indexOf('-f');
-    const insertAt = fIdx >= 0 ? fIdx + 2 : out.length;
-    out.splice(insertAt, 0, '--env-file', envPath);
-    return out;
-  } catch {
-    return args;
+  const out = [...args];
+  const fIdx = out.indexOf('-f');
+  let insertAt = fIdx >= 0 ? fIdx + 2 : out.length;
+
+  const baseFile = fIdx >= 0 ? out[fIdx + 1] : undefined;
+  const overrideNames = baseFile ? OVERRIDE_FILENAMES[path.basename(baseFile)] : undefined;
+  if (baseFile && overrideNames) {
+    for (const name of overrideNames) {
+      const candidate = path.join(path.dirname(baseFile), name);
+      if (out.includes(candidate)) break;
+      if (await access(candidate).then(() => true, () => false)) {
+        out.splice(insertAt, 0, '-f', candidate);
+        insertAt += 2;
+        break;
+      }
+    }
   }
+
+  const envPath = path.join(project.path, '.env');
+  if (await access(envPath).then(() => true, () => false)) {
+    out.splice(insertAt, 0, '--env-file', envPath);
+  }
+  return out;
 }
 
 async function buildComposeArgs(
@@ -1034,6 +1089,11 @@ export function removeComposeService(
     .map((item) => nodeKey(item.key))
     .filter((key): key is string => Boolean(key));
   return { yaml: String(doc), remaining };
+}
+
+/** Minimal compose override that only swaps one service's image. */
+export function buildImageOverride(serviceName: string, imageRef: string): string {
+  return YAML.stringify({ services: { [serviceName]: { image: imageRef } } });
 }
 
 /** Setzt services.<name>.image auf imageRef (YAML-Document-API). */

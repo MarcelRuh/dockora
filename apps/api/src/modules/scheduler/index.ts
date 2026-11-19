@@ -58,7 +58,7 @@ export const schedulerModule: FastifyPluginAsync = async (app: FastifyInstance) 
     if (autoUpdate) {
       const installed: typeof available = [];
       for (const item of available) {
-        const result = await updates.applyUpdate(item.containerId);
+        const result = await updates.applyUpdate(item.containerId, { auto: true });
         if (result.ok) installed.push(item);
       }
       await notifyUpdatesInstalled(notifications, installed, { auto: true });

@@ -113,7 +113,7 @@ export interface IDockerClient {
   ): Promise<{ close: () => void }>;
   getContainerStats(id: string): Promise<DockerStatsSnapshot>;
   listImages(): Promise<DockerImageInfo[]>;
-  pullImage(image: string): Promise<void>;
+  pullImage(image: string, auth?: RegistryPullAuth): Promise<void>;
   /** Tag an existing local image as repo:tag (e.g. after digest pull). */
   tagImage(source: string, target: string): Promise<void>;
   removeImage(id: string, force?: boolean): Promise<void>;
@@ -176,4 +176,11 @@ export interface DockoraPlugin {
   readonly version: string;
   register(): Promise<void>;
   unregister?(): Promise<void>;
+}
+
+/** Credentials forwarded to the daemon for `docker pull` (e.g. GHCR PAT). */
+export interface RegistryPullAuth {
+  username: string;
+  password: string;
+  serveraddress: string;
 }

@@ -1,6 +1,6 @@
 import type { UpdateApplyResult, UpdateCheckResult, RegistryProvider } from '@dockora/shared';
 import { isDockoraSelfContainer } from '../../domain/dockora-self.js';
-import type { IDockerClient } from '../../domain/ports.js';
+import type { IDockerClient, RegistryPullAuth } from '../../domain/ports.js';
 import { prisma } from '../../infrastructure/db/prisma.js';
 import {
   apiRepositoryPath,
@@ -8,11 +8,13 @@ import {
   parseImageRef,
   pickDigest,
 } from './registry.js';
+import { createHash } from 'node:crypto';
 import { request } from 'undici';
 import type { ComposeService } from '../compose/compose.service.js';
 import type Docker from 'dockerode';
 import { mergeRemoteCheck } from './digest-fallback.js';
 import { waitForContainerHealthy } from './health-wait.js';
+import { isImageIdRef } from '../../domain/image-ref.js';
 
 type RegistryAuth = {
   token: string;
@@ -25,10 +27,14 @@ export interface UpdatesServiceDeps {
   getRegistryAuth?: () => Promise<{ ghcrToken: string; lscrToken: string }>;
 }
 
+// Shared across UpdatesService instances (HTTP routes and the scheduler each build one).
+const applyInFlight = new Set<string>();
+/** containerName → remote digest whose update failed its healthcheck and was rolled back. */
+const rolledBackDigests = new Map<string, string>();
+
 export class UpdatesService {
   constructor(private readonly deps: UpdatesServiceDeps) {}
   private pruneReadAt = 0;
-  private readonly applyInFlight = new Set<string>();
 
   async listCached(): Promise<UpdateCheckResult[]> {
     await this.pruneStaleCacheThrottled();
@@ -55,18 +61,17 @@ export class UpdatesService {
     const results: UpdateCheckResult[] = [];
     const remoteByImage = new Map<string, Promise<string | null>>();
 
-    for (let i = 0; i < containers.length; i++) {
-      const container = containers[i]!;
-      // Stagger registry calls – GHCR anonymous/auth quotas are easy to trip in a burst
-      if (i > 0) await sleep(750);
+    let lastRegistryCallAt = 0;
+    for (const container of containers) {
+      // Stagger registry calls – GHCR anonymous/auth quotas are easy to trip in a burst.
+      // Containers sharing an already-fetched image reuse the in-flight digest and skip the wait.
+      if (!remoteByImage.has(remoteCacheKey(container.image)) && !isImageIdRef(container.image)) {
+        const wait = 750 - (Date.now() - lastRegistryCallAt);
+        if (lastRegistryCallAt > 0 && wait > 0) await sleep(wait);
+        lastRegistryCallAt = Date.now();
+      }
       try {
-        const result = await this.checkContainer(
-          container.id,
-          container.name,
-          container.image,
-          registryAuth,
-          remoteByImage,
-        );
+        const result = await this.checkContainer(container, registryAuth, remoteByImage);
         results.push(result);
         if (result.error?.toLowerCase().includes('rate limited')) {
           await sleep(5_000);
@@ -159,12 +164,20 @@ export class UpdatesService {
   }
 
   async checkContainer(
-    containerId: string,
-    containerName: string,
-    image: string,
+    container: { id: string; name: string; image: string; imageId?: string },
     registryCreds?: { ghcrToken: string; lscrToken: string },
     remoteByImage?: Map<string, Promise<string | null>>,
   ): Promise<UpdateCheckResult> {
+    const { id: containerId, name: containerName, image } = container;
+    if (isImageIdRef(image)) {
+      // No tag to compare against: the container was created from a bare image ID.
+      return this.persistError(
+        containerId,
+        containerName,
+        image,
+        'Container references an image ID, not a tag – recreate it from its compose file or a tagged image to enable update checks',
+      );
+    }
     const parsed = parseImageRef(image);
     const registry = detectRegistry(image);
     const previous = await prisma.updateCheckCache.findUnique({ where: { containerId } });
@@ -173,7 +186,12 @@ export class UpdatesService {
     let error: string | undefined;
 
     try {
-      const inspect = await this.deps.docker.getImageInspect(image);
+      // Inspect the image the container actually runs. The tag may already point to a newer
+      // pull (update pulled but not yet recreated) – that must still count as "update available".
+      let inspect = container.imageId
+        ? await this.deps.docker.getImageInspect(container.imageId).catch(() => null)
+        : null;
+      inspect ??= await this.deps.docker.getImageInspect(image);
       currentDigest = pickDigest(inspect.RepoDigests, parsed);
     } catch (err) {
       error = `Local inspect failed: ${err instanceof Error ? err.message : String(err)}`;
@@ -183,13 +201,12 @@ export class UpdatesService {
     let remoteError: string | undefined;
     try {
       const auth = await this.resolveAuth(parsed.registryHost, registryCreds);
-      const cacheKey = `${parsed.registryHost}/${apiRepositoryPath(parsed)}:${parsed.tag}`;
+      const cacheKey = remoteCacheKey(image);
       const load = remoteByImage?.get(cacheKey) ?? fetchRemoteDigest(parsed, auth);
       remoteByImage?.set(cacheKey, load);
       fetchedDigest = await load;
     } catch (err) {
-      const cacheKey = `${parsed.registryHost}/${apiRepositoryPath(parsed)}:${parsed.tag}`;
-      remoteByImage?.delete(cacheKey);
+      remoteByImage?.delete(remoteCacheKey(image));
       remoteError = err instanceof Error ? err.message : String(err);
     }
 
@@ -238,68 +255,130 @@ export class UpdatesService {
 
   /**
    * Pullt das Image, recreatet den Container, prüft Health und rollt bei Fail zurück.
+   * `opts.auto` (scheduler) skips a remote digest that already failed and was rolled back,
+   * so a broken upstream release is not re-applied (and the service restarted) every cycle.
    */
-  async applyUpdate(containerId: string): Promise<UpdateApplyResult> {
-    if (this.applyInFlight.has(containerId)) {
+  async applyUpdate(containerId: string, opts?: { auto?: boolean }): Promise<UpdateApplyResult> {
+    if (applyInFlight.has(containerId)) {
       return { ok: false, message: 'Update already in progress for this container', step: 'pull' };
     }
-    this.applyInFlight.add(containerId);
+    applyInFlight.add(containerId);
     try {
-      return await this.applyUpdateLocked(containerId);
+      return await this.applyUpdateLocked(containerId, opts);
     } finally {
-      this.applyInFlight.delete(containerId);
+      applyInFlight.delete(containerId);
     }
   }
 
-  private async applyUpdateLocked(containerId: string): Promise<UpdateApplyResult> {
-    const cached = await prisma.updateCheckCache.findUnique({ where: { containerId } });
-    if (!cached) {
+  private async applyUpdateLocked(
+    containerId: string,
+    opts?: { auto?: boolean },
+  ): Promise<UpdateApplyResult> {
+    const cachedRow = await prisma.updateCheckCache.findUnique({ where: { containerId } });
+    if (!cachedRow) {
       return { ok: false, message: 'No cached update info for container', step: 'pull' };
     }
 
-    if (!cached.updateAvailable) {
-      return { ok: false, message: 'No update available' };
+    const before = await this.deps.docker.inspectContainer(containerId).catch(() => null);
+    if (!before) {
+      return { ok: false, message: 'Container not found', step: 'pull' };
     }
 
-    const previousDigest = cached.currentDigest;
+    // Re-check right before acting: the cached digests may be hours old, and pulling a stale
+    // `repo@digest` and retagging would move the tag backwards.
+    const registryCreds = this.deps.getRegistryAuth ? await this.deps.getRegistryAuth() : undefined;
+    const fresh = await this.checkContainer(
+      {
+        id: before.id,
+        name: before.name,
+        image: isImageIdRef(before.image) ? cachedRow.image : before.image,
+        imageId: before.imageId,
+      },
+      registryCreds,
+    ).catch(() => null);
+    const cached = fresh ?? mapRow(cachedRow);
+    if (!cached.updateAvailable || !cached.remoteDigest) {
+      return { ok: false, message: 'No update available' };
+    }
+    const failedDigest = rolledBackDigests.get(before.name);
+    if (opts?.auto && failedDigest && failedDigest === cached.remoteDigest) {
+      return {
+        ok: false,
+        step: 'rollback',
+        message: `Skipped: ${cached.remoteDigest.slice(0, 19)} was rolled back earlier`,
+      };
+    }
+
     const previousImage = cached.image;
+    const previousImageId = before.imageId ?? null;
+    const previousDigest = cached.currentDigest;
     const remoteDigest = cached.remoteDigest;
+    const containerName = before.name;
+    const composeServiceName =
+      before.composeService ?? before.labels['com.docker.compose.service'] ?? null;
     let composeProjectId: string | null = null;
-    let composeServiceName: string | null = null;
-    let containerName = cached.containerName;
+
+    if (before.composeProject) {
+      // Match on the working dir label: compose normalises project names (and `name:` /
+      // COMPOSE_PROJECT_NAME override them), so the folder name is not a reliable key.
+      const workingDir = before.labels['com.docker.compose.project.working_dir'];
+      composeProjectId = this.deps.compose
+        ? workingDir
+          ? await this.deps.compose.findId(workingDir, before.composeProject)
+          : ((await this.deps.compose.list()).find((p) => p.name === before.composeProject)?.id ??
+            null)
+        : null;
+      if (!composeProjectId) {
+        return {
+          ok: false,
+          step: 'pull',
+          message: `Compose project "${before.composeProject}" (${workingDir ?? 'unknown dir'}) is not in Dockora's compose search paths – refusing to recreate it as a standalone container`,
+        };
+      }
+    }
+
+    // Pull exact digest, but recreate with the original tag (e.g. :latest) so Config.Image
+    // stays human-readable and matches the compose YAML.
+    const taggedRef = previousImage;
+    const digestRef = taggedRef.includes('@') ? null : `${stripTag(taggedRef)}@${remoteDigest}`;
+    const runRef = taggedRef;
+    const pullAuth = await this.resolvePullAuth(taggedRef, registryCreds);
 
     try {
-      const before = await this.deps.docker.inspectContainer(containerId).catch(() => null);
-      if (before) {
-        containerName = before.name;
-        composeServiceName = before.composeService ?? before.labels['com.docker.compose.service'] ?? null;
-        if (before.composeProject && this.deps.compose) {
-          const projects = await this.deps.compose.list();
-          composeProjectId =
-            projects.find((p) => p.name === before.composeProject)?.id ?? null;
-        }
-      }
-
-      // Pull exact digest when known, but recreate with the original tag
-      // (e.g. :latest) so Config.Image stays human-readable and matches compose YAML.
-      const taggedRef = cached.image;
-      const digestRef =
-        remoteDigest && !taggedRef.includes('@')
-          ? `${stripTag(taggedRef)}@${remoteDigest}`
-          : null;
-      const pullRef = digestRef ?? taggedRef;
-      const runRef = taggedRef;
-
-      await this.deps.docker.pullImage(pullRef).catch(async () => {
-        await this.deps.docker.pullImage(taggedRef);
-      });
+      let pulledDigest = false;
       if (digestRef) {
-        await this.deps.docker.tagImage(digestRef, runRef).catch(async () => {
-          await this.deps.docker.tagImage(pullRef, runRef);
-        });
+        pulledDigest = await this.deps.docker
+          .pullImage(digestRef, pullAuth)
+          .then(() => true)
+          .catch(() => false);
       }
+      if (pulledDigest && digestRef) {
+        await this.deps.docker.tagImage(digestRef, runRef);
+      } else {
+        // Digest pull unsupported (some registries/mirrors) – pulling the tag moves it itself.
+        await this.deps.docker.pullImage(taggedRef, pullAuth);
+      }
+    } catch (error) {
+      return {
+        ok: false,
+        step: 'pull',
+        message: `Pull failed: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
 
-      let recreateMsg = '';
+    const rollbackInput = {
+      previousImage,
+      previousImageId,
+      previousDigest,
+      composeProjectId,
+      composeServiceName,
+      containerName,
+      containerId,
+      pullAuth,
+    };
+
+    let recreateMsg = '';
+    try {
       if (composeProjectId && this.deps.compose && composeServiceName) {
         await this.deps.compose.recreatePinned(composeProjectId, {
           serviceName: composeServiceName,
@@ -313,99 +392,119 @@ export class UpdatesService {
         await recreateStandaloneContainer(this.deps.docker, containerId, runRef);
         recreateMsg = ' Standalone container recreated.';
       }
-
-      const health = await waitForContainerHealthy(this.deps.docker, containerName);
-      if (!health.ok) {
-        const rolled = await this.rollbackUpdate({
-          previousImage,
-          previousDigest,
-          composeProjectId,
-          composeServiceName,
-          containerName,
-          containerId,
-        });
-        return {
-          ok: false,
-          rolledBack: true,
-          step: 'rollback',
-          message: `Update failed healthcheck: ${health.message}. ${rolled}`,
-        };
-      }
-
-      // Cache aktualisieren
-      try {
-        const list = await this.deps.docker.listContainers(true);
-        const current =
-          list.find((c) => c.id === containerId || c.id.startsWith(containerId)) ??
-          list.find((c) => c.name.replace(/^\//, '') === containerName.replace(/^\//, ''));
-        if (current) {
-          await this.checkContainer(current.id, current.name, current.image);
-          if (current.id !== containerId) {
-            await prisma.updateCheckCache.delete({ where: { containerId } }).catch(() => undefined);
-          }
-        } else {
-          await prisma.updateCheckCache.update({
-            where: { containerId },
-            data: { updateAvailable: false, error: null, checkedAt: new Date() },
-          });
-        }
-      } catch {
-        await prisma.updateCheckCache
-          .update({
-            where: { containerId },
-            data: { updateAvailable: false, checkedAt: new Date() },
-          })
-          .catch(() => undefined);
-      }
-
-      let prunedImages = 0;
-      let spaceReclaimed = 0;
-      try {
-        const pruned = await this.deps.docker.pruneImages(true);
-        prunedImages = pruned.imagesDeleted;
-        spaceReclaimed = pruned.spaceReclaimed;
-      } catch {
-        // Prune ist best-effort – Update bleibt erfolgreich
-      }
-
-      const pruneMsg =
-        prunedImages > 0
-          ? ` Pruned ${prunedImages} unused image(s) (${Math.round(spaceReclaimed / (1024 * 1024))} MiB).`
-          : '';
-
-      return {
-        ok: true,
-        step: 'done',
-        prunedImages,
-        spaceReclaimed,
-        message: `Image pulled.${recreateMsg} ${health.message}${pruneMsg}`,
-      };
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const rolled = await this.rollbackUpdate(rollbackInput);
       return {
         ok: false,
-        step: 'pull',
-        message: error instanceof Error ? error.message : String(error),
+        rolledBack: true,
+        step: 'rollback',
+        message: `Recreate failed: ${message}. ${rolled}`,
       };
     }
+
+    const health = await waitForContainerHealthy(this.deps.docker, containerName);
+    if (!health.ok) {
+      rolledBackDigests.set(containerName, remoteDigest);
+      const rolled = await this.rollbackUpdate(rollbackInput);
+      return {
+        ok: false,
+        rolledBack: true,
+        step: 'rollback',
+        message: `Update failed healthcheck: ${health.message}. ${rolled}`,
+      };
+    }
+    rolledBackDigests.delete(containerName);
+
+    // Cache aktualisieren
+    let newImageId: string | undefined;
+    try {
+      const list = await this.deps.docker.listContainers(true);
+      const current =
+        list.find((c) => c.name.replace(/^\//, '') === containerName.replace(/^\//, '')) ??
+        list.find((c) => c.id === containerId);
+      if (current) {
+        newImageId = current.imageId;
+        await this.checkContainer(current, registryCreds);
+        if (current.id !== containerId) {
+          await prisma.updateCheckCache.delete({ where: { containerId } }).catch(() => undefined);
+        }
+      } else {
+        await prisma.updateCheckCache.update({
+          where: { containerId },
+          data: { updateAvailable: false, error: null, checkedAt: new Date() },
+        });
+      }
+    } catch {
+      await prisma.updateCheckCache
+        .update({
+          where: { containerId },
+          data: { updateAvailable: false, checkedAt: new Date() },
+        })
+        .catch(() => undefined);
+    }
+
+    // Only drop the image this update replaced – a global prune would also delete unrelated
+    // dangling images. Docker refuses while another container still uses it; that's fine.
+    let prunedImages = 0;
+    if (previousImageId && previousImageId !== newImageId) {
+      try {
+        await this.deps.docker.removeImage(previousImageId);
+        prunedImages = 1;
+      } catch {
+        // still in use or already gone
+      }
+    }
+    const pruneMsg = prunedImages > 0 ? ' Previous image removed.' : '';
+
+    return {
+      ok: true,
+      step: 'done',
+      prunedImages,
+      message: `Image pulled.${recreateMsg} ${health.message}${pruneMsg}`,
+    };
+  }
+
+  private async resolvePullAuth(
+    imageRef: string,
+    creds?: { ghcrToken: string; lscrToken: string },
+  ): Promise<RegistryPullAuth | undefined> {
+    const host = parseImageRef(imageRef).registryHost;
+    const auth = await this.resolveAuth(host, creds).catch(() => undefined);
+    if (!auth) return undefined;
+    return { username: auth.username, password: auth.token, serveraddress: host };
   }
 
   private async rollbackUpdate(input: {
     previousImage: string;
+    previousImageId: string | null;
     previousDigest: string | null;
     composeProjectId: string | null;
     composeServiceName: string | null;
     containerName: string;
     containerId: string;
+    pullAuth?: RegistryPullAuth;
   }): Promise<string> {
     try {
-      const imageRef =
-        input.previousDigest && !input.previousImage.includes('@')
-          ? `${stripTag(input.previousImage)}@${input.previousDigest}`
-          : input.previousImage;
-
-      await this.deps.docker.pullImage(imageRef).catch(async () => {
-        await this.deps.docker.pullImage(input.previousImage);
-      });
+      // Point the tag back at the old image (still local), so the container keeps a readable
+      // `repo:tag` reference and the next check compares against the right tag.
+      let restored = false;
+      if (input.previousImageId && !input.previousImage.includes('@')) {
+        restored = await this.deps.docker
+          .tagImage(input.previousImageId, input.previousImage)
+          .then(() => true)
+          .catch(() => false);
+      }
+      if (!restored && input.previousDigest && !input.previousImage.includes('@')) {
+        const digestRef = `${stripTag(input.previousImage)}@${input.previousDigest}`;
+        await this.deps.docker.pullImage(digestRef, input.pullAuth);
+        await this.deps.docker.tagImage(digestRef, input.previousImage);
+        restored = true;
+      }
+      if (!restored) {
+        return 'Rollback skipped: previous image is no longer available locally.';
+      }
+      const imageRef = input.previousImage;
 
       if (input.composeProjectId && this.deps.compose && input.composeServiceName) {
         await this.deps.compose.recreatePinned(input.composeProjectId, {
@@ -419,11 +518,12 @@ export class UpdatesService {
         const current =
           list.find((c) => c.name.replace(/^\//, '') === input.containerName.replace(/^\//, '')) ??
           list.find((c) => c.id.startsWith(input.containerId));
-        if (current) {
-          await recreateStandaloneContainer(this.deps.docker, current.id, imageRef);
+        if (!current) {
+          return `Rollback failed: container ${input.containerName} no longer exists.`;
         }
+        await recreateStandaloneContainer(this.deps.docker, current.id, imageRef);
       }
-      return `Rollback to previous image attempted (${imageRef}).`;
+      return `Rolled back to the previous image (${imageRef}).`;
     } catch (error) {
       return `Rollback failed: ${error instanceof Error ? error.message : String(error)}`;
     }
@@ -435,7 +535,10 @@ export class UpdatesService {
     image: string,
     message: string,
   ): Promise<UpdateCheckResult> {
-    const parsed = parseImageRef(image);
+    const byId = isImageIdRef(image);
+    const parsed = byId ? null : parseImageRef(image);
+    const registry = parsed?.registry ?? 'private';
+    const currentTag = parsed?.tag ?? '';
     const row = await prisma.updateCheckCache.upsert({
       where: { containerId },
       create: {
@@ -445,20 +548,28 @@ export class UpdatesService {
         currentDigest: null,
         remoteDigest: null,
         updateAvailable: false,
-        registry: parsed.registry,
-        currentTag: parsed.tag,
+        registry,
+        currentTag,
         error: message,
         checkedAt: new Date(),
       },
       update: {
         containerName,
         image,
+        registry,
+        currentTag,
+        ...(byId ? { currentDigest: null, remoteDigest: null, updateAvailable: false } : {}),
         error: message,
         checkedAt: new Date(),
       },
     });
     return mapRow(row);
   }
+}
+
+function remoteCacheKey(image: string): string {
+  const parsed = parseImageRef(image);
+  return `${parsed.registryHost}/${apiRepositoryPath(parsed)}:${parsed.tag}`;
 }
 
 function mapRow(row: {
@@ -575,10 +686,19 @@ async function fetchManifestDigest(
   const url = `https://${registryHost}/v2/${repoPath}/manifests/${tag}`;
   const ref = `${registryHost}/${repoPath}:${tag}`;
 
+  // HEAD is enough for the digest header and – unlike GET – does not count against the
+  // Docker Hub pull rate limit.
+  let method: 'HEAD' | 'GET' = 'HEAD';
   const attempt = async (bearer?: string) => {
     const headers: Record<string, string> = { Accept: MANIFEST_ACCEPT };
     if (bearer) headers.Authorization = `Bearer ${bearer}`;
-    return request(url, { headers, signal: AbortSignal.timeout(10_000) });
+    const res = await request(url, { method, headers, signal: AbortSignal.timeout(10_000) });
+    if (method === 'HEAD' && (res.statusCode === 405 || res.statusCode === 501)) {
+      await res.body.dump().catch(() => undefined);
+      method = 'GET';
+      return request(url, { method, headers, signal: AbortSignal.timeout(10_000) });
+    }
+    return res;
   };
 
   const resolveBearer = async (
@@ -662,26 +782,24 @@ async function fetchManifestDigest(
   }
 
   const digestHeader = res.headers['docker-content-digest'];
-  if (typeof digestHeader === 'string') {
+  if (typeof digestHeader === 'string' && digestHeader.startsWith('sha256:')) {
     await res.body.dump().catch(() => undefined);
     return digestHeader;
   }
+  await res.body.dump().catch(() => undefined);
 
-  const body = (await res.body.json()) as {
-    config?: { digest?: string };
-    layers?: Array<{ digest?: string }>;
-    manifests?: Array<{ digest?: string }>;
-  };
-
-  if (body.config?.digest) {
-    return body.config.digest;
+  // No digest header: the manifest digest is the sha256 of the raw manifest body
+  // (config/child digests would never match the local RepoDigests).
+  method = 'GET';
+  const full = await attempt(bearer);
+  if (full.statusCode >= 400) {
+    await full.body.dump().catch(() => undefined);
+    throw new Error(`Manifest fetch failed (${full.statusCode}) for ${ref}`);
   }
-  // OCI index / manifest list without Content-Digest header – use first child digest
-  if (body.manifests?.[0]?.digest) {
-    return body.manifests[0].digest;
-  }
-
-  return null;
+  const fullHeader = full.headers['docker-content-digest'];
+  const raw = Buffer.from(await full.body.arrayBuffer());
+  if (typeof fullHeader === 'string' && fullHeader.startsWith('sha256:')) return fullHeader;
+  return `sha256:${createHash('sha256').update(raw).digest('hex')}`;
 }
 
 function parseWwwAuthenticate(header: string | string[] | undefined): WwwAuthChallenge | null {
@@ -772,56 +890,112 @@ async function recreateStandaloneContainer(
     throw new Error('Docker offline – cannot recreate container');
   }
 
-  const container = docker.getContainer(containerId);
-  const info = await container.inspect();
+  const old = docker.getContainer(containerId);
+  const info = await old.inspect();
   const name = info.Name?.replace(/^\//, '') || undefined;
+  const image = imageOverride || info.Config?.Image;
+  if (!image) throw new Error('Container has no image reference');
 
+  // Cmd/Entrypoint in Config include the *old* image defaults. Only carry them over when the
+  // user overrode them, otherwise a new image with changed defaults would run stale commands.
+  const oldImageConfig = await docker
+    .getImage(info.Image)
+    .inspect()
+    .then((i) => i.Config)
+    .catch(() => undefined);
+  const sameArray = (a?: string[] | null, b?: string[] | null) =>
+    JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+  const cmd = oldImageConfig && sameArray(info.Config?.Cmd, oldImageConfig.Cmd) ? undefined : info.Config?.Cmd;
+  const entrypoint =
+    oldImageConfig && sameArray(info.Config?.Entrypoint as string[] | undefined, oldImageConfig.Entrypoint as string[] | undefined)
+      ? undefined
+      : info.Config?.Entrypoint;
+
+  // Keep anonymous volumes: they are not in Binds, so re-attach them by name.
+  const hostConfig = { ...(info.HostConfig ?? {}) } as Docker.HostConfig;
+  const declared = new Set(
+    [
+      ...(hostConfig.Binds ?? []).map((b) => b.split(':')[1]),
+      ...((hostConfig.Mounts ?? []) as Array<{ Target?: string }>).map((m) => m.Target),
+    ].filter(Boolean),
+  );
+  const extraBinds = (info.Mounts ?? [])
+    .filter((m) => m.Type === 'volume' && m.Name && !declared.has(m.Destination))
+    .map((m) => `${m.Name}:${m.Destination}${m.RW === false ? ':ro' : ''}`);
+  if (extraBinds.length) hostConfig.Binds = [...(hostConfig.Binds ?? []), ...extraBinds];
+
+  // Networks: create with the primary one (older APIs accept only one), connect the rest after.
+  const networks = Object.entries(info.NetworkSettings?.Networks ?? {});
+  const endpoint = (cfg: Docker.NetworkInfo) => ({
+    Aliases: (cfg.Aliases ?? []).filter((a: string) => !info.Id.startsWith(a)),
+    IPAMConfig: cfg.IPAMConfig ?? undefined,
+    Links: cfg.Links ?? undefined,
+  });
+  const primary = networks.find(([net]) => net === hostConfig.NetworkMode) ?? networks[0];
+  const usesOwnNetworkStack = /^(host|none|container:)/.test(hostConfig.NetworkMode ?? '');
+
+  const createOpts: Docker.ContainerCreateOptions = {
+    ...(info.Config as Docker.ContainerCreateOptions),
+    name,
+    Image: image,
+    Cmd: cmd ?? undefined,
+    Entrypoint: entrypoint ?? undefined,
+    // Hostname defaults to the container ID; keep it only if it was set explicitly.
+    Hostname: info.Config?.Hostname && !info.Id.startsWith(info.Config.Hostname) ? info.Config.Hostname : undefined,
+    HostConfig: hostConfig,
+    NetworkingConfig:
+      primary && !usesOwnNetworkStack
+        ? { EndpointsConfig: { [primary[0]]: endpoint(primary[1]) } }
+        : undefined,
+  };
+
+  // Keep the old container (renamed, stopped) until the new one runs, so a failed create/start
+  // can be undone instead of leaving the user without a container.
+  const backupName = name ? `${name}-dockora-old-${Date.now().toString(36)}` : undefined;
   try {
-    await container.stop({ t: 10 });
+    await old.stop({ t: 10 });
   } catch {
     // already stopped
   }
-  await container.remove({ force: true });
-
-  // Brief settle so docker-proxy can release host ports after force-remove
+  if (backupName) await old.rename({ name: backupName });
+  // Brief settle so docker-proxy can release host ports
   await sleep(500);
 
-  const createOpts = {
-    name,
-    Image: imageOverride || info.Config?.Image,
-    Env: info.Config?.Env,
-    Cmd: info.Config?.Cmd ?? undefined,
-    Entrypoint: info.Config?.Entrypoint ?? undefined,
-    WorkingDir: info.Config?.WorkingDir || undefined,
-    Labels: info.Config?.Labels ?? undefined,
-    ExposedPorts: info.Config?.ExposedPorts ?? undefined,
-    HostConfig: info.HostConfig ?? undefined,
-  };
-
-  let lastError: unknown;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    if (attempt > 0) await sleep(1_000 * attempt);
-    try {
-      // Remove a half-created leftover from a previous failed attempt
-      if (attempt > 0 && name) {
-        try {
-          await docker.getContainer(name).remove({ force: true });
-        } catch {
-          // none
+  let created: Docker.Container | null = null;
+  try {
+    let lastError: unknown;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (attempt > 0) await sleep(1_000 * attempt);
+      try {
+        if (created) {
+          await created.remove({ force: true }).catch(() => undefined);
+          created = null;
         }
-      }
-      const created = await docker.createContainer(createOpts);
-      await created.start();
-      return;
-    } catch (error) {
-      lastError = error;
-      const msg = error instanceof Error ? error.message : String(error);
-      if (!/port is already allocated|address already in use/i.test(msg)) {
-        throw error;
+        created = await docker.createContainer(createOpts);
+        if (!usesOwnNetworkStack) {
+          for (const [net, cfg] of networks) {
+            if (net === primary?.[0]) continue;
+            await docker.getNetwork(net).connect({ Container: created.id, EndpointConfig: endpoint(cfg) });
+          }
+        }
+        await created.start();
+        lastError = undefined;
+        break;
+      } catch (error) {
+        lastError = error;
+        const msg = error instanceof Error ? error.message : String(error);
+        if (!/port is already allocated|address already in use/i.test(msg)) break;
       }
     }
+    if (lastError) throw lastError;
+  } catch (error) {
+    if (created) await created.remove({ force: true }).catch(() => undefined);
+    if (backupName && name) await old.rename({ name }).catch(() => undefined);
+    if (info.State?.Running) await old.start().catch(() => undefined);
+    throw error instanceof Error ? error : new Error(String(error));
   }
-  throw lastError instanceof Error ? lastError : new Error(String(lastError));
+
+  await old.remove({ force: true }).catch(() => undefined);
 }
 
 /** repo/name:tag → repo/name (für Digest-Pin). */
