@@ -60,24 +60,29 @@ export function NeonParticles() {
       color: COLORS[Math.floor(Math.random() * COLORS.length)]!,
     });
 
+    // ~24 fps is plenty for a slow background drift. Movement is time-based, so the speed is
+    // the same on 60 Hz and 144 Hz displays, and we skip the work entirely between frames.
+    const FRAME_MS = 42;
     let lastFrame = 0;
     const draw = (now: number) => {
       if (!running) return;
       raf = window.requestAnimationFrame(draw);
+      const elapsed = now - lastFrame;
+      if (lastFrame !== 0 && elapsed < FRAME_MS) return;
+      const step = lastFrame === 0 ? 1 : Math.min(elapsed / 16.7, 4);
+      lastFrame = now;
       const w = canvas.clientWidth;
       const h = canvas.clientHeight;
       if (w === 0 || h === 0) return;
 
       for (const p of particles) {
-        p.x += p.speedX;
-        p.y += p.speedY;
+        p.x += p.speedX * step;
+        p.y += p.speedY * step;
         if (p.x < 0 || p.x > w || p.y < 0 || p.y > h) {
           Object.assign(p, createParticle(w, h));
         }
       }
 
-      if (now - lastFrame < 32) return;
-      lastFrame = now;
       ctx.clearRect(0, 0, w, h);
 
       for (const p of particles) {
@@ -114,19 +119,27 @@ export function NeonParticles() {
         window.cancelAnimationFrame(raf);
       } else {
         running = true;
+        lastFrame = 0;
         raf = window.requestAnimationFrame(draw);
       }
     };
 
+    let resizeTimer: number | undefined;
+    const onResize = () => {
+      window.clearTimeout(resizeTimer);
+      resizeTimer = window.setTimeout(resize, 150);
+    };
+
     resize();
     raf = window.requestAnimationFrame(draw);
-    window.addEventListener('resize', resize);
+    window.addEventListener('resize', onResize);
     document.addEventListener('visibilitychange', onVisibility);
 
     return () => {
       running = false;
       window.cancelAnimationFrame(raf);
-      window.removeEventListener('resize', resize);
+      window.clearTimeout(resizeTimer);
+      window.removeEventListener('resize', onResize);
       document.removeEventListener('visibilitychange', onVisibility);
     };
   }, []);

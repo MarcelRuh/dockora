@@ -83,10 +83,14 @@ export function ContainersPage() {
     return () => window.clearTimeout(id);
   }, [draftName, draftImage]);
 
+  // Drops responses from requests that were superseded (filter change, live reload, action).
+  const loadSeq = useRef(0);
   const enrichStats = useCallback(
     async (listFilter: ContainerFilter) => {
       try {
+        const seq = loadSeq.current;
         const data = await fetchContainers({ ...listFilter, includeStats: true });
+        if (seq !== loadSeq.current) return;
         setItems((prev) => {
           const byId = new Map(data.map((c) => [c.id, c]));
           return prev.map((row) => {
@@ -112,15 +116,20 @@ export function ContainersPage() {
 
   const load = useCallback(
     async (opts?: { silent?: boolean }) => {
-      const silent = opts?.silent || hasItems.current;
+      const background = opts?.silent === true;
+      const silent = background || hasItems.current;
+      const seq = ++loadSeq.current;
       if (!silent) setLoading(true);
-      setError(null);
+      // Background reloads must not wipe an action error the user has not read yet.
+      if (!background) setError(null);
       try {
         // First paint / filter change: one list call with stats. Live reloads stay cheap.
         const data = await fetchContainers(silent ? filter : { ...filter, includeStats: true });
+        if (seq !== loadSeq.current) return;
         setItems((prev) => mergePreservingStats(prev, data));
         setLoading(false);
       } catch (err) {
+        if (seq !== loadSeq.current) return;
         setError(err instanceof Error ? err.message : t.containers.loadError);
         if (!silent) setLoading(false);
       }

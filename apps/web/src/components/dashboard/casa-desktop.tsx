@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -328,18 +329,24 @@ export function CasaDesktop({
     };
   }, []);
 
+  // Every container/update fetch goes through here; a sequence number drops responses that
+  // arrive after a newer request started (live reload vs. post-action refresh).
+  const refreshSeq = useRef(0);
+  const refreshContainersAndUpdates = useCallback(async () => {
+    const seq = ++refreshSeq.current;
+    const [list, checks] = await Promise.all([
+      fetchContainers().catch(() => null),
+      fetchUpdates().catch(() => null),
+    ]);
+    if (seq !== refreshSeq.current) return;
+    if (list) setContainers(list);
+    if (checks) setUpdates(checks);
+  }, []);
+
   useEffect(() => {
-    let cancelled = false;
     const load = () => {
       if (document.visibilityState === 'hidden') return;
-      void Promise.all([
-        fetchContainers().catch(() => null),
-        fetchUpdates().catch(() => null),
-      ]).then(([list, checks]) => {
-        if (cancelled) return;
-        if (list) setContainers(list);
-        if (checks) setUpdates(checks);
-      });
+      void refreshContainersAndUpdates();
     };
     load();
     const onVisibility = () => {
@@ -347,19 +354,14 @@ export function CasaDesktop({
     };
     document.addEventListener('visibilitychange', onVisibility);
     return () => {
-      cancelled = true;
+      refreshSeq.current++;
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, []);
+  }, [refreshContainersAndUpdates]);
 
   useDockerLiveReload(() => {
     if (document.visibilityState === 'hidden') return;
-    void fetchContainers()
-      .then((list) => setContainers(list))
-      .catch(() => undefined);
-    void fetchUpdates()
-      .then((checks) => setUpdates(checks))
-      .catch(() => undefined);
+    void refreshContainersAndUpdates();
   }, 90_000);
 
   useEffect(() => {
@@ -925,8 +927,7 @@ export function CasaDesktop({
     setUrlMessage(null);
     try {
       await composeAction(pendingRecreate.projectId, 'recreate', pendingRecreate.service);
-      const list = await fetchContainers();
-      setContainers(list);
+      await refreshContainersAndUpdates();
       setUrlMessage(home.appUrlRecreated);
       setPendingRecreate(null);
     } catch (error) {
@@ -940,21 +941,19 @@ export function CasaDesktop({
     setUpdateError(null);
     setUpdateBusy(ids[0] ?? 'all');
     try {
+      const failed: string[] = [];
       for (const id of ids) {
         setUpdateBusy(id);
-        const result = await pullUpdate(id);
-        if (!result.ok) {
-          throw new Error(result.message);
+        const name = updates.find((u) => u.containerId === id)?.containerName ?? id.slice(0, 12);
+        try {
+          const result = await pullUpdate(id);
+          if (!result.ok) failed.push(`${name}: ${result.message}`);
+        } catch (error) {
+          failed.push(`${name}: ${error instanceof Error ? error.message : t.common.failed}`);
         }
       }
-      const [list, checks] = await Promise.all([
-        fetchContainers().catch(() => null),
-        fetchUpdates().catch(() => null),
-      ]);
-      if (list) setContainers(list);
-      if (checks) setUpdates(checks);
-    } catch (error) {
-      setUpdateError(error instanceof Error ? error.message : t.common.failed);
+      if (failed.length) setUpdateError(failed.join('\n'));
+      await refreshContainersAndUpdates();
     } finally {
       setUpdateBusy(null);
     }
@@ -1516,7 +1515,22 @@ export function CasaDesktop({
             }
           />
         </div>
-        {updateError ? <p role="alert" className="text-xs text-dockora-danger">{updateError}</p> : null}
+        {updateError ? (
+          <div
+            role="alert"
+            className="flex items-start gap-3 border border-dockora-danger/40 bg-dockora-danger/10 px-4 py-2.5 text-xs text-dockora-danger"
+          >
+            <p className="min-w-0 flex-1 whitespace-pre-line break-words leading-relaxed">{updateError}</p>
+            <button
+              type="button"
+              onClick={() => setUpdateError(null)}
+              aria-label={t.common.close}
+              className="shrink-0 px-1 text-base leading-none text-dockora-danger/80 hover:text-white"
+            >
+              ×
+            </button>
+          </div>
+        ) : null}
         {layoutError ? <p role="alert" className="text-xs text-dockora-danger">{layoutError}</p> : null}
 
         <section ref={appsSectionRef} aria-label={home.apps} data-app-grid="" className="relative min-w-0">

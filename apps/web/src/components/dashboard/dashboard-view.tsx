@@ -200,7 +200,14 @@ function EngineStrip({
 
   useEffect(() => {
     if (!busyTarget && !progress?.updating) return;
-    const timer = window.setInterval(() => void loadProgress(), 1000);
+    let inFlight = false;
+    const timer = window.setInterval(() => {
+      if (inFlight || document.visibilityState !== 'visible') return;
+      inFlight = true;
+      void loadProgress().finally(() => {
+        inFlight = false;
+      });
+    }, 1000);
     return () => window.clearInterval(timer);
   }, [busyTarget, progress?.updating, loadProgress]);
 
