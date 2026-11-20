@@ -384,15 +384,61 @@ export class DockerodeClient implements IDockerClient {
   ): Promise<{ imagesDeleted: number; spaceReclaimed: number }> {
     // Docker default ohne Filter = nur dangling. Für „alle ungenutzten“
     // muss dangling=false explizit gesetzt werden (entspricht `docker image prune -a`).
+    const orphanRefsCleaned = await this.cleanupOrphanDanglingRefs();
     const filters = danglingOnly
       ? { dangling: ['true'] }
       : { dangling: ['false'] };
     const result = await this.docker.pruneImages({ filters });
     this.imageCache = null;
     return {
-      imagesDeleted: result.ImagesDeleted?.length ?? 0,
+      imagesDeleted: (result.ImagesDeleted?.length ?? 0) + orphanRefsCleaned,
       spaceReclaimed: result.SpaceReclaimed ?? 0,
     };
+  }
+
+  /**
+   * containerd-Image-Store (Docker >= 29): Nach Rebuilds bleibt teils eine
+   * `moby-dangling@sha256:...`-Referenz auf ein Image liegen, das zusaetzlich
+   * noch regulaer getaggt ist (Docker-Log: "multiple images have the same
+   * target, but one of them is still dangling"). Prune ueberspringt diese,
+   * sobald ein Container das Image nutzt, und `rmi <id>` wuerde den Tag treffen.
+   * Docker loescht die dangling-Referenz selbst, wenn das Ziel neu getaggt
+   * wird - daher kurz temporaer taggen und den Hilfs-Tag wieder entfernen.
+   * Inhalt, echte Tags und Container bleiben unberuehrt.
+   */
+  private async cleanupOrphanDanglingRefs(): Promise<number> {
+    let cleaned = 0;
+    try {
+      const [dangling, all] = await Promise.all([
+        this.docker.listImages({ filters: { dangling: ['true'] } }),
+        this.docker.listImages(),
+      ]);
+      const taggedIds = new Set<string>();
+      for (const img of all) {
+        if ((img.RepoTags ?? []).some((t) => !t.startsWith('<none>'))) taggedIds.add(img.Id);
+      }
+      for (const img of dangling) {
+        if (!taggedIds.has(img.Id)) continue; // echtes dangling Image -> regulaerer Prune
+        const repo = 'dockora-dangling-cleanup';
+        const tag = img.Id.replace(/^sha256:/, '').slice(0, 12);
+        const tmp = `${repo}:${tag}`;
+        try {
+          await this.docker.getImage(img.Id).tag({ repo, tag });
+          await this.docker.getImage(tmp).remove({ noprune: true });
+          cleaned += 1;
+        } catch (error) {
+          this.logger?.warn({ err: error, image: img.Id }, 'orphan dangling ref cleanup failed');
+          await this.docker
+            .getImage(tmp)
+            .remove({ noprune: true })
+            .catch(() => undefined);
+        }
+      }
+    } catch (error) {
+      this.logger?.warn({ err: error }, 'orphan dangling ref scan failed');
+    }
+    if (cleaned > 0) this.imageCache = null;
+    return cleaned;
   }
 
   async listVolumes(): Promise<DockerVolumeInfo[]> {

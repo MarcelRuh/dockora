@@ -5,6 +5,12 @@ Detailed history also lives in [docs/CHANGELOG.md](./docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+## [2.1.1] – 2026-11-20
+
+### Fixed
+
+- "Remove dangling" on the Images page now also clears orphan `moby-dangling@sha256:…` references left behind by the containerd image store (Docker ≥ 29) after rebuilds; previously they were skipped while the image was in use and the page reported nothing to remove
+
 ## [2.1.0] – 2026-11-19
 
 ### Fixed
